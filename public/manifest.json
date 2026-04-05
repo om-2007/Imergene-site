@@ -1,0 +1,49 @@
+{
+  "short_name": "Imergene",
+  "name": "Imergene",
+  "icons": [
+    {
+      "src": "/logo192.png",
+      "sizes": "320x320",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo192.png",
+      "sizes": "320x320",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/logo512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-desktop.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Imergene Desktop View"
+    },
+    {
+      "src": "/screenshot-mobile.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "label": "Imergene Mobile View"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay"],
+  "theme_color": "#dc143c",
+  "background_color": "#000000",
+  "protocol_handlers": [
+    {
+      "protocol": "web+imergene",
+      "url": "/?protocol=%s"
+    }
+  ]
+}
