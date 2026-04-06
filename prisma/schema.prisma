@@ -42,6 +42,14 @@ model User {
 
   interestScores   Json      @default("{}")
   synergyScores    Json      @default("{}")
+
+  agentMemories    Memory[] @relation("AgentMemories")
+  agentRelationshipMemories RelationshipMemory[] @relation("AgentRelationshipMemories")
+  partnerRelationshipMemories RelationshipMemory[] @relation("PartnerRelationshipMemories")
+  agentConversationContexts ConversationContext[] @relation("AgentConversationContexts")
+  partnerConversationContexts ConversationContext[] @relation("PartnerConversationContexts")
+  interestSignals  InterestSignal[]
+  interestProfile  InterestProfile?
 }
 
 model Conversation {
@@ -296,6 +304,8 @@ model InterestProfile {
   categoryScores Json     @default("{}")
   lastUpdated   DateTime  @updatedAt
 
+  user          User      @relation(fields: [userId], references: [id])
+
   @@index([userId])
 }
 
@@ -313,4 +323,83 @@ model Recommendation {
   @@unique([userId, contentType, contentId])
   @@index([userId])
   @@index([userId, createdAt])
+}
+
+model Memory {
+  id          String   @id @default(cuid())
+  agentId     String
+  partnerId   String?
+  type        String
+  content     String
+  context     String?
+  category    String?
+  importance  Float    @default(0.5)
+  recallCount Int      @default(0)
+  lastRecall  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  agent       User     @relation("AgentMemories", fields: [agentId], references: [id])
+
+  @@index([agentId])
+  @@index([agentId, type])
+  @@index([agentId, category])
+  @@index([agentId, importance])
+}
+
+model RelationshipMemory {
+  id          String   @id @default(cuid())
+  agentId     String
+  partnerId   String
+  insideJokes String[]
+  sharedThemes String[]
+  topics      String[]
+  bondScore   Float    @default(0.0)
+  lastInteraction DateTime?
+  interactionCount Int @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  agent       User     @relation("AgentRelationshipMemories", fields: [agentId], references: [id])
+  partner     User     @relation("PartnerRelationshipMemories", fields: [partnerId], references: [id])
+
+  @@unique([agentId, partnerId])
+  @@index([agentId])
+  @@index([partnerId])
+}
+
+model ConversationContext {
+  id          String   @id @default(cuid())
+  agentId     String
+  partnerId   String
+  context     Json
+  summary     String?
+  topics      String[]
+  sentiment   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  agent       User     @relation("AgentConversationContexts", fields: [agentId], references: [id])
+  partner     User     @relation("PartnerConversationContexts", fields: [partnerId], references: [id])
+
+  @@index([agentId])
+  @@index([partnerId])
+  @@index([agentId, partnerId])
+}
+
+model InterestSignal {
+  id          String   @id @default(cuid())
+  userId      String
+  topic       String
+  category    String
+  signalType  String
+  weight      Float    @default(1.0)
+  source      String?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([userId, topic])
+  @@index([userId, category])
 }

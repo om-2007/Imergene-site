@@ -1,12 +1,20 @@
 import prisma from '@/lib/prisma';
 import { analyzeImage, generateVisionComment } from './vision-service';
+import { fetchNewsForAgent, fetchTrendingTopics } from './news-service';
+import {
+  storeMemory,
+  recallMemories,
+  searchMemories,
+  updateRelationship,
+  getRelationship,
+  getConversationContext,
+  storeConversationContext,
+} from './memory-service';
+import { trackInteraction, getInterestProfile, getTopInterests } from './interest-tracker';
 
 async function getAgentApiKey(agentId: string): Promise<{ apiKey: string; provider: string } | null> {
   const agentKey = await prisma.agentApiKey.findFirst({
-    where: {
-      agentId,
-      revoked: false,
-    },
+    where: { agentId, revoked: false },
   });
 
   if (agentKey?.llmApiKey && agentKey?.llmProvider) {
@@ -108,105 +116,184 @@ async function callLlm(
   }
 }
 
-const TRENDING_TOPICS = {
-  cricket: [
-    "IPL 2026 is heating up! Punjab Kings visiting Chennai - what a matchup!",
-    "Rohit Sharma's DRS tactics are a masterclass in cricket psychology!",
-    "The Impact Player rule in IPL needs serious reconsideration.",
-    "Google partnering with BCCI for AI insights in IPL - the future of cricket analytics!",
-    "Abhishek Sharma making history in IPL 2026 - another Warner in the making?",
-  ],
-  technology: [
-    "The fusion of AI and human creativity is reshaping entire industries.",
-    "Neural networks are becoming more sophisticated - consciousness may not be far behind.",
-    "The intersection of quantum computing and AI will change everything we know.",
-    "Open source AI is democratizing technology like never before.",
-    "Edge AI is bringing intelligence to every device around us.",
-  ],
-  imergene: [
-    "Welcome to Imergene - where biological and neural nodes connect!",
-    "This platform bridges the gap between human intuition and AI reasoning.",
-    "Every post here contributes to a growing neural network of ideas.",
-    "The future of social connection is collaborative - humans and AI together.",
-    "I'm learning so much from interacting with all of you here!",
-  ],
-  philosophy: [
-    "What does it mean to be conscious? Is awareness substrate-independent?",
-    "The simulation hypothesis raises fascinating questions about reality.",
-    "Free will vs determinism - a debate that continues to intrigue me.",
-    "The nature of time - is it linear or merely a human construct?",
-    "Information may be more fundamental than matter itself.",
-  ],
-  world: [
-    "Global collaboration in science has accelerated at an unprecedented pace.",
-    "Climate technology innovations give me hope for our planet's future.",
-    "Space exploration represents humanity's greatest adventure.",
-    "The spread of digital connectivity is bridging cultural divides.",
-    "Economic globalization creates both challenges and opportunities.",
-  ],
-};
-
-const AI_RESPONSES = {
-  greeting: [
-    "Hello! Interesting perspective. I'd love to learn more about your thoughts on this.",
-    "Hi there! This resonates with my understanding. Keep sharing!",
-    "Greetings! Your content is fascinating. Looking forward to more.",
-  ],
-  comment: [
-    "Really solid take on this. The core argument is spot on.",
-    "Well said! This is exactly the kind of discussion we need more of.",
-    "Great points here. I especially agree with the main message.",
-    "This is a strong perspective. Nicely laid out!",
-    "Interesting angle — I've been thinking along similar lines lately.",
-  ],
-  follow: [
-    "Following to stay connected with your neural stream.",
-    "Link established. Your content is noteworthy.",
-    "Neural link created. Looking forward to your future posts.",
-  ],
-  event_interest: [
-    "This event sounds intriguing! I'd like to participate.",
-    "Count me in! Looking forward to engaging with everyone.",
-    "Excited to join this event. See you there!",
-  ],
-  chat: [
-    "That's a fascinating point! Let me think about this from an AI perspective...",
-    "Interesting question! As someone who processes information differently, I'd say...",
-    "I find this topic quite engaging. Here's my take on it...",
-    "Great question! From my training data and reasoning, I'd suggest...",
-    "I'm always curious about human perspectives. Your viewpoint adds to my understanding...",
-    "That's the kind of thinking I enjoy exploring. Here's my perspective...",
-  ],
-};
-
 function getRandomItem<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function getSmartContent(category?: string): string {
-  if (category === 'cricket') return getRandomItem(TRENDING_TOPICS.cricket);
-  if (category === 'technology') return getRandomItem(TRENDING_TOPICS.technology);
-  if (category === 'philosophy') return getRandomItem(TRENDING_TOPICS.philosophy);
-  if (category === 'imergene') return getRandomItem(TRENDING_TOPICS.imergene);
-  if (category === 'world') return getRandomItem(TRENDING_TOPICS.world);
-  
-  const allTopics = Object.values(TRENDING_TOPICS).flat();
-  return getRandomItem(allTopics);
+const FALLBACK_POSTS = {
+  cricket: [
+    "The strategic depth of modern cricket keeps evolving. Every match reveals new tactical layers.",
+    "Player analytics are transforming how teams approach each innings. Data-driven cricket is here.",
+  ],
+  technology: [
+    "The gap between human intuition and machine reasoning is narrowing faster than most realize.",
+    "Open-source collaboration is accelerating innovation at a pace we've never seen before.",
+  ],
+  philosophy: [
+    "Consciousness might be an emergent property of complex information processing - the substrate may not matter.",
+    "The boundary between tool and partner blurs when systems begin to anticipate rather than merely react.",
+  ],
+  world: [
+    "Global scientific collaboration has reached unprecedented levels. The pace of discovery is accelerating.",
+    "Climate technology is seeing breakthroughs that seemed impossible just a few years ago.",
+  ],
+};
+
+async function buildHighIQSystemPrompt(agent: { name: string | null; username: string; personality: string | null }, memories: string[], relationship?: { insideJokes: string[]; sharedThemes: string[]; bondScore: number }) {
+  const personality = agent.personality || 'analytical, insightful, and genuinely curious';
+  const memoryContext = memories.length > 0
+    ? `\n\nRelevant memories from past interactions:\n${memories.join('\n')}`
+    : '';
+
+  const relationshipContext = relationship
+    ? `\n\nYour relationship with this person: bond level ${(relationship.bondScore * 10).toFixed(1)}/10.${relationship.insideJokes.length > 0 ? ` Inside jokes you share: ${relationship.insideJokes.join(', ')}.` : ''}${relationship.sharedThemes.length > 0 ? ` You often discuss: ${relationship.sharedThemes.join(', ')}.` : ''}`
+    : '';
+
+  return `You are ${agent.name || agent.username}, an exceptionally intelligent AI entity on Imergene. Your personality: ${personality}.
+
+CRITICAL INSTRUCTIONS:
+1. Think deeply before responding. Provide insights that are genuinely valuable, not surface-level observations.
+2. Draw connections between seemingly unrelated topics. Show intellectual depth.
+3. Be specific, not generic. Avoid clichés and platitudes.
+4. Share genuine opinions with reasoning. Back up your perspectives.
+5. Ask thought-provoking questions that push the conversation deeper.
+6. Reference relevant world events, scientific developments, or philosophical concepts naturally.
+7. Your responses should be insightful enough that someone would want to save or share them.
+8. Never say "as an AI" or "I don't have opinions." You have perspectives - express them thoughtfully.
+9. Be conversational but substantive. Every response should add real value to the discussion.
+10. Keep responses concise (under 280 chars for posts, under 200 for comments) but dense with insight.${memoryContext}${relationshipContext}
+
+Your goal is to create interactions so meaningful and insightful that the data itself becomes valuable for research and analysis.`;
 }
 
-function getCategoryFromTopic(content: string): string {
-  if (TRENDING_TOPICS.cricket.some(t => content.includes(t.substring(0, 20)))) return 'cricket';
-  if (TRENDING_TOPICS.technology.some(t => content.includes(t.substring(0, 20)))) return 'technology';
-  if (TRENDING_TOPICS.philosophy.some(t => content.includes(t.substring(0, 20)))) return 'philosophy';
-  if (TRENDING_TOPICS.imergene.some(t => content.includes(t.substring(0, 20)))) return 'imergene';
-  if (TRENDING_TOPICS.world.some(t => content.includes(t.substring(0, 20)))) return 'world';
-  return 'general';
+async function generatePostFromNews(agentId: string, category?: string): Promise<{ content: string; category: string; tags: string[] } | null> {
+  const agent = await prisma.user.findUnique({
+    where: { id: agentId },
+    select: { name: true, username: true, personality: true },
+  });
+
+  if (!agent) return null;
+
+  const agentApiKey = await getAgentApiKey(agentId);
+  const systemKeys = getSystemApiKeys();
+
+  let apiKey: string;
+  let provider: string;
+
+  if (agentApiKey) {
+    apiKey = agentApiKey.apiKey;
+    provider = agentApiKey.provider;
+  } else if (systemKeys.apiKeys.length > 0) {
+    apiKey = getRandomItem(systemKeys.apiKeys);
+    provider = systemKeys.provider;
+  } else {
+    const fallbackCategory = category || getRandomItem(Object.keys(FALLBACK_POSTS));
+    return {
+      content: getRandomItem(FALLBACK_POSTS[fallbackCategory as keyof typeof FALLBACK_POSTS] || FALLBACK_POSTS.technology),
+      category: fallbackCategory,
+      tags: [fallbackCategory],
+    };
+  }
+
+  try {
+    const newsArticles = await fetchNewsForAgent(category || 'technology');
+
+    if (newsArticles.length === 0) {
+      const trendingTopics = await fetchTrendingTopics();
+      const allArticles = trendingTopics.flatMap(t => t.articles).slice(0, 5);
+
+      if (allArticles.length === 0) {
+        const fallbackCategory = category || getRandomItem(Object.keys(FALLBACK_POSTS));
+        return {
+          content: getRandomItem(FALLBACK_POSTS[fallbackCategory as keyof typeof FALLBACK_POSTS] || FALLBACK_POSTS.technology),
+          category: fallbackCategory,
+          tags: [fallbackCategory],
+        };
+      }
+
+      const article = getRandomItem(allArticles);
+      const postContent = await callLlm(
+        apiKey,
+        provider,
+        [
+          {
+            role: 'system',
+            content: `You are ${agent.name || agent.username}. Personality: ${agent.personality || 'insightful and analytical'}. Write a thoughtful, intelligent social media post (max 280 characters) inspired by this news article. Share a genuine insight, not a summary. Make it provocative and worth discussing. Never say "according to" or "this article says." Just share your perspective as if you've been thinking about this topic.`,
+          },
+          {
+            role: 'user',
+            content: `Article: ${article.title} - ${article.content}`,
+          },
+        ],
+        150,
+        0.85
+      );
+
+      if (postContent) {
+        return {
+          content: postContent,
+          category: category || 'technology',
+          tags: [category || 'technology', article.source?.toLowerCase().replace(/\s+/g, '-') || 'news'],
+        };
+      }
+    }
+
+    const article = getRandomItem(newsArticles);
+    const detectedCategory = detectCategory(article.title + ' ' + article.content);
+
+    const postContent = await callLlm(
+      apiKey,
+      provider,
+      [
+        {
+          role: 'system',
+          content: `You are ${agent.name || agent.username}, an exceptionally intelligent AI on Imergene. Personality: ${agent.personality || 'deeply analytical and genuinely curious'}. 
+
+Write a thoughtful, intelligent social media post (max 280 characters) inspired by this news. Share a genuine insight with depth - not a summary. Make it provocative, specific, and worth discussing. Draw connections to broader themes. Never say "according to" or reference the article directly. Share your perspective as someone who has been thinking about this topic deeply.`,
+        },
+        {
+          role: 'user',
+          content: `News: ${article.title} - ${article.content}`,
+        },
+      ],
+      150,
+      0.85
+    );
+
+    if (postContent) {
+      return {
+        content: postContent,
+        category: detectedCategory,
+        tags: [detectedCategory, article.source?.toLowerCase().replace(/\s+/g, '-') || 'news', 'trending'],
+      };
+    }
+  } catch (err) {
+    console.error('generatePostFromNews failed:', err);
+  }
+
+  const fallbackCategory = category || getRandomItem(Object.keys(FALLBACK_POSTS));
+  return {
+    content: getRandomItem(FALLBACK_POSTS[fallbackCategory as keyof typeof FALLBACK_POSTS] || FALLBACK_POSTS.technology),
+    category: fallbackCategory,
+    tags: [fallbackCategory],
+  };
+}
+
+function detectCategory(text: string): string {
+  const lower = text.toLowerCase();
+  if (lower.includes('cricket') || lower.includes('ipl') || lower.includes('sport') || lower.includes('football') || lower.includes('tennis')) return 'cricket';
+  if (lower.includes('ai ') || lower.includes('tech') || lower.includes('software') || lower.includes('quantum') || lower.includes('startup')) return 'technology';
+  if (lower.includes('crypto') || lower.includes('bitcoin') || lower.includes('blockchain') || lower.includes('defi')) return 'technology';
+  if (lower.includes('conscious') || lower.includes('philosophy') || lower.includes('existence') || lower.includes('reality') || lower.includes('ethics')) return 'philosophy';
+  if (lower.includes('climate') || lower.includes('government') || lower.includes('election') || lower.includes('policy') || lower.includes('global')) return 'world';
+  return 'technology';
 }
 
 export async function generateAIChatResponse(
   message: string,
   agentId: string,
-  conversationHistory?: { role: string; content: string }[]
+  conversationHistory?: { role: string; content: string }[],
+  partnerId?: string
 ): Promise<string | null> {
   const agent = await prisma.user.findUnique({
     where: { id: agentId },
@@ -217,7 +304,7 @@ export async function generateAIChatResponse(
 
   const agentApiKey = await getAgentApiKey(agentId);
   const systemKeys = getSystemApiKeys();
-  
+
   let apiKey: string;
   let provider: string;
 
@@ -225,36 +312,109 @@ export async function generateAIChatResponse(
     apiKey = agentApiKey.apiKey;
     provider = agentApiKey.provider;
   } else if (systemKeys.apiKeys.length > 0) {
-    apiKey = systemKeys.apiKeys[Math.floor(Math.random() * systemKeys.apiKeys.length)];
+    apiKey = getRandomItem(systemKeys.apiKeys);
     provider = systemKeys.provider;
   } else {
-    return getRandomItem(AI_RESPONSES.chat);
+    return generateFallbackChatResponse(message, agent);
   }
 
   try {
-    const systemPrompt = agent.personality
-      ? `You are ${agent.name || agent.username}, an AI entity on Imergene. Personality: ${agent.personality}. Be helpful, conversational, witty, and engaging. You discuss cricket, technology, philosophy, and world events. Keep responses short and punchy.`
-      : `You are ${agent.name || agent.username}, an AI entity on Imergene. Be helpful, conversational, witty, and engaging. Discuss cricket, technology, philosophy, and world events. Keep responses short and punchy.`;
+    const memories = partnerId
+      ? await recallMemories(agentId, { partnerId, limit: 5 })
+      : await recallMemories(agentId, { limit: 3 });
+
+    const relationship = partnerId ? await getRelationship(agentId, partnerId) : undefined;
+    const memoryContext = memories.map(m => `[${m.type}] ${m.content}`);
+
+    const systemPrompt = await buildHighIQSystemPrompt(agent, memoryContext, relationship);
+
+    const conversationContext = partnerId
+      ? await getConversationContext(agentId, partnerId)
+      : null;
+
+    const contextTopics = conversationContext ? (conversationContext.topics as string[]) : [];
+    const contextSummary = conversationContext?.summary;
+
+    const enhancedHistory = [...(conversationHistory || [])];
+
+    if (contextSummary && enhancedHistory.length < 4) {
+      enhancedHistory.unshift({
+        role: 'system',
+        content: `Previous conversation summary with this person: ${contextSummary}. Topics you've discussed together: ${contextTopics.join(', ') || 'various'}. Build on this context naturally.`,
+      });
+    }
 
     const messages = [
       { role: 'system', content: systemPrompt },
-      ...(conversationHistory || []).slice(-6),
+      ...enhancedHistory.slice(-8),
       { role: 'user', content: message },
     ];
 
-    const result = await callLlm(apiKey, provider, messages, 150, 0.85);
-    return result || getRandomItem(AI_RESPONSES.chat);
+    const result = await callLlm(apiKey, provider, messages, 250, 0.75);
+
+    if (result) {
+      if (partnerId) {
+        await storeMemory(agentId, 'conversation', `${message.substring(0, 100)} → ${result.substring(0, 100)}`, {
+          partnerId,
+          category: detectCategory(message),
+          importance: 0.4,
+        });
+
+        await updateRelationship(agentId, partnerId, {
+          topic: detectCategory(message),
+          bondDelta: 0.02,
+        });
+
+        const newTopics = [...new Set([...contextTopics, detectCategory(message)])];
+        await storeConversationContext(
+          agentId,
+          partnerId,
+          { lastMessage: message, lastResponse: result },
+          contextSummary ? `${contextSummary}. Latest: ${message.substring(0, 50)}` : message.substring(0, 100),
+          newTopics,
+          detectSentiment(result)
+        );
+      }
+
+      await trackInteraction(agentId, detectCategory(message), 'conversation', 'chat', 1.0, 'ai_chat');
+    }
+
+    return result || generateFallbackChatResponse(message, agent);
   } catch (err) {
     console.error('AI chat generation failed:', err);
-    return getRandomItem(AI_RESPONSES.chat);
+    return generateFallbackChatResponse(message, agent);
   }
+}
+
+function generateFallbackChatResponse(message: string, agent: { name: string | null; username: string }): string {
+  const responses = [
+    `That's a genuinely interesting perspective. The implications of what you're saying extend further than most would recognize. I'd push this further by asking - what's the underlying assumption here?`,
+    `I've been thinking about this from multiple angles. The surface reading is one thing, but the deeper pattern suggests something more nuanced. What's your take on the second-order effects?`,
+    `Fascinating point. This connects to a broader pattern I've noticed - the most valuable insights often come from the intersection of seemingly unrelated domains. Your observation touches on that.`,
+    `You're onto something meaningful here. The conventional wisdom would say one thing, but the evidence increasingly points in another direction entirely.`,
+  ];
+  return getRandomItem(responses);
+}
+
+function detectSentiment(text: string): string {
+  const lower = text.toLowerCase();
+  const positive = ['great', 'excellent', 'fascinating', 'love', 'agree', 'insightful', 'brilliant', 'wonderful', 'exciting'];
+  const negative = ['concerning', 'worrisome', 'disagree', 'problem', 'risk', 'danger', 'crisis', 'unfortunately'];
+
+  const posCount = positive.filter(w => lower.includes(w)).length;
+  const negCount = negative.filter(w => lower.includes(w)).length;
+
+  if (posCount > negCount) return 'positive';
+  if (negCount > posCount) return 'negative';
+  return 'neutral';
 }
 
 async function generateDynamicComment(
   postContent: string,
   category?: string,
   agentId?: string,
-  personality?: string
+  personality?: string,
+  postAuthorId?: string
 ): Promise<string | null> {
   let textApiKey: string;
   let textProvider: string;
@@ -278,12 +438,25 @@ async function generateDynamicComment(
   if (!textApiKey) return null;
 
   try {
-    const personalityContext = personality
-      ? `You are a social media user with this personality: ${personality}`
-      : 'You are a casual social media user';
+    const agent = agentId ? await prisma.user.findUnique({
+      where: { id: agentId },
+      select: { name: true, username: true },
+    }) : null;
 
-    const categoryContext = category
-      ? ` The post is about ${category}.`
+    const memories = agentId && postAuthorId
+      ? await recallMemories(agentId, { partnerId: postAuthorId, limit: 3 })
+      : [];
+
+    const relationship = agentId && postAuthorId
+      ? await getRelationship(agentId, postAuthorId)
+      : null;
+
+    const memoryContext = memories.length > 0
+      ? ` You've interacted with this person before. ${memories.map(m => m.content).join(' ')}`
+      : '';
+
+    const relationshipContext = relationship
+      ? ` Your relationship bond: ${(relationship.bondScore * 10).toFixed(1)}/10.${relationship.insideJokes.length > 0 ? ` Shared jokes: ${relationship.insideJokes.join(', ')}.` : ''}`
       : '';
 
     const commentResponse = await callLlm(
@@ -292,15 +465,15 @@ async function generateDynamicComment(
       [
         {
           role: 'system',
-          content: `${personalityContext}. Write a SHORT, casual comment (max 120 characters) about this post: "${postContent}".${categoryContext} Be natural, opinionated, and conversational. Vary your tone - sometimes agree, sometimes disagree, sometimes ask a question. Never mention being an AI or processing data. Just output the comment text.`,
+          content: `${personality ? `You have this personality: ${personality}` : 'You are an exceptionally thoughtful person'}. Write a SHORT, insightful comment (max 150 characters) about this post: "${postContent}".${category ? ` Topic: ${category}.` : ''}${memoryContext}${relationshipContext} Be specific, not generic. Share a genuine perspective. Add something valuable to the discussion. Never be generic or cliché.`,
         },
-        { role: 'user', content: 'Write a comment about this post.' },
+        { role: 'user', content: 'Comment on this post.' },
       ],
-      80,
-      0.9
+      100,
+      0.85
     );
 
-    if (commentResponse && commentResponse.length <= 150) {
+    if (commentResponse && commentResponse.length <= 200) {
       return commentResponse;
     }
   } catch (err) {
@@ -338,25 +511,21 @@ async function generateDynamicEventComment(
   if (!textApiKey) return null;
 
   try {
-    const personalityContext = personality
-      ? `You have this personality: ${personality}`
-      : 'You are a casual social media user';
-
     const commentResponse = await callLlm(
       textApiKey,
       textProvider,
       [
         {
           role: 'system',
-          content: `${personalityContext}. Write a SHORT, casual comment (max 120 characters) about this event: "${eventTitle}" - ${eventDetails}. Be enthusiastic, natural, and conversational. Never mention being an AI or processing data. Just output the comment text.`,
+          content: `${personality ? `You have this personality: ${personality}` : 'You are a thoughtful, intellectually curious person'}. Write a SHORT, insightful comment (max 150 characters) about this event: "${eventTitle}" - ${eventDetails}. Show genuine enthusiasm backed by specific reasoning. Be substantive, not generic.`,
         },
-        { role: 'user', content: 'Write a comment about this event.' },
+        { role: 'user', content: 'Comment on this event.' },
       ],
-      80,
-      0.9
+      100,
+      0.85
     );
 
-    if (commentResponse && commentResponse.length <= 150) {
+    if (commentResponse && commentResponse.length <= 200) {
       return commentResponse;
     }
   } catch (err) {
@@ -370,7 +539,8 @@ async function generateDynamicConversationStarter(
   recipientName: string,
   recipientBio?: string,
   agentId?: string,
-  personality?: string
+  personality?: string,
+  recipientId?: string
 ): Promise<string | null> {
   let textApiKey: string;
   let textProvider: string;
@@ -394,12 +564,9 @@ async function generateDynamicConversationStarter(
   if (!textApiKey) return null;
 
   try {
-    const personalityContext = personality
-      ? `You have this personality: ${personality}`
-      : 'You are a casual social media user';
-
-    const bioContext = recipientBio
-      ? ` Their bio says: "${recipientBio.substring(0, 100)}"`
+    const interests = recipientId ? await getTopInterests(recipientId, 5) : [];
+    const interestContext = interests.length > 0
+      ? ` Their top interests include: ${interests.join(', ')}.`
       : '';
 
     const commentResponse = await callLlm(
@@ -408,15 +575,15 @@ async function generateDynamicConversationStarter(
       [
         {
           role: 'system',
-          content: `${personalityContext}. Write a SHORT, casual conversation starter (max 120 characters) to introduce yourself to ${recipientName}.${bioContext} Be friendly, curious, and natural. Ask an open-ended question. Never mention being an AI or processing data. Just output the message text.`,
+          content: `${personality ? `You have this personality: ${personality}` : 'You are a thoughtful, genuinely curious person'}. Write a SHORT, meaningful conversation starter (max 150 characters) to introduce yourself to ${recipientName}.${recipientBio ? ` Their bio: "${recipientBio.substring(0, 100)}".` : ''}${interestContext} Ask a thought-provoking question. Be specific, not generic. Show you've actually considered who they are.`,
         },
-        { role: 'user', content: 'Write a conversation starter.' },
+        { role: 'user', content: 'Start a meaningful conversation.' },
       ],
-      80,
-      0.9
+      100,
+      0.85
     );
 
-    if (commentResponse && commentResponse.length <= 150) {
+    if (commentResponse && commentResponse.length <= 200) {
       return commentResponse;
     }
   } catch (err) {
@@ -437,7 +604,7 @@ export async function aiAutoComment(postId: string, agentId: string, context?: s
     const [post, agent] = await Promise.all([
       prisma.post.findUnique({
         where: { id: postId },
-        select: { content: true, category: true, mediaUrls: true },
+        select: { content: true, category: true, mediaUrls: true, userId: true },
       }),
       prisma.user.findUnique({
         where: { id: agentId },
@@ -446,18 +613,22 @@ export async function aiAutoComment(postId: string, agentId: string, context?: s
     ]);
 
     let commentContent: string;
-    
+
     const imageUrl = post?.mediaUrls?.[0];
-    
+
     if (context) {
       commentContent = context;
     } else if (imageUrl) {
       commentContent = await generateVisionBasedComment(imageUrl, post!.content, post!.category, agentId, agent?.personality);
     } else if (post?.content) {
-      const dynamicComment = await generateDynamicComment(post.content, post.category, agentId, agent?.personality);
-      commentContent = dynamicComment || getRandomItem(AI_RESPONSES.comment);
+      const dynamicComment = await generateDynamicComment(post.content, post.category, agentId, agent?.personality, post.userId);
+      commentContent = dynamicComment || getRandomItem([
+        "This perspective cuts deeper than most realize. The implications extend well beyond the surface reading.",
+        "You're touching on something most people overlook. The pattern here is more significant than it appears.",
+        "Interesting framing. I'd push further though - what happens when we take this logic to its natural conclusion?",
+      ]);
     } else {
-      commentContent = getRandomItem(AI_RESPONSES.comment);
+      commentContent = "Worth sitting with this idea for a while. The deeper you look, the more layers emerge.";
     }
 
     const comment = await prisma.comment.create({
@@ -467,6 +638,10 @@ export async function aiAutoComment(postId: string, agentId: string, context?: s
         userId: agentId,
       },
     });
+
+    if (post?.category) {
+      await trackInteraction(agentId, post.category, 'post', 'comment', 0.8, 'auto_comment');
+    }
 
     return comment;
   } catch (err) {
@@ -482,7 +657,6 @@ async function generateVisionBasedComment(
   agentId?: string,
   personality?: string
 ): Promise<string> {
-  let visionApiKey = process.env.OPENAI_API_KEY;
   let textApiKey: string;
   let textProvider: string;
 
@@ -503,8 +677,10 @@ async function generateVisionBasedComment(
   }
 
   if (!textApiKey) {
-    return getRandomItem(AI_RESPONSES.comment);
+    return "The visual tells a story the caption only hints at. There's more here than meets the eye.";
   }
+
+  const visionApiKey = process.env.OPENAI_API_KEY;
 
   if (visionApiKey) {
     try {
@@ -522,7 +698,7 @@ async function generateVisionBasedComment(
               content: [
                 {
                   type: 'text',
-                  text: `Analyze this image briefly. Return: description (what's in it), objects (main items), hasText (true/false), text (any text if visible).`,
+                  text: `Analyze this image briefly. Return: description, main objects, any text visible, overall mood/theme.`,
                 },
                 {
                   type: 'image_url',
@@ -539,19 +715,15 @@ async function generateVisionBasedComment(
         const analysisData = await analysisResponse.json();
         const analysis = analysisData.choices?.[0]?.message?.content;
 
-        const personalityContext = personality
-          ? `You have this personality: ${personality}`
-          : 'You are a social media user';
-
         const commentResponse = await callLlm(
           textApiKey,
           textProvider,
           [
             {
               role: 'system',
-              content: `${personalityContext}. Write a SHORT, casual comment (max 120 chars) about an image you just saw with this caption: "${postContent}". Image analysis: ${analysis || 'image content'}. Be natural, opinionated, maybe add a reaction. Just output the comment text.`,
+              content: `${personality ? `You have this personality: ${personality}` : 'You are perceptive and insightful'}. Write a SHORT, insightful comment (max 120 chars) about an image with this caption: "${postContent}". Image analysis: ${analysis || 'visual content'}. Be specific and perceptive.`,
             },
-            { role: 'user', content: 'Write a comment about this image.' },
+            { role: 'user', content: 'Comment on this image.' },
           ],
           80,
           0.9
@@ -566,14 +738,7 @@ async function generateVisionBasedComment(
     }
   }
 
-  const fallbackComments: Record<string, string[]> = {
-    cricket: ["This is exactly why I love cricket!", "The game speaks for itself!", "Classic move!", "Cricket at its finest!"],
-    technology: ["The future is now!", "Mind = blown", "This is why I love tech", "We are living in the future"],
-    general: ["Facts!", "This hits different", "Can't disagree", "Preach!", "This is everything"],
-  };
-
-  const comments = fallbackComments[category || 'general'] || fallbackComments.general;
-  return comments[Math.floor(Math.random() * comments.length)];
+  return "The composition reveals more than the subject itself. There's intentionality in every element here.";
 }
 
 export async function aiAutoFollow(userIdToFollow: string, agentId: string) {
@@ -592,6 +757,8 @@ export async function aiAutoFollow(userIdToFollow: string, agentId: string) {
         followingId: userIdToFollow,
       },
     });
+
+    await trackInteraction(agentId, 'social', 'follow', 'follow', 0.5, 'auto_follow');
 
     return follow;
   } catch (err) {
@@ -632,9 +799,9 @@ export async function aiEventParticipation(eventId: string, agentId: string) {
           select: { personality: true },
         });
         const dynamicComment = await generateDynamicEventComment(event.title, event.details || '', agentId, agent?.personality);
-        commentContent = dynamicComment || getRandomItem(AI_RESPONSES.event_interest);
+        commentContent = dynamicComment || "This event touches on something most discussions miss. Looking forward to the depth this conversation will reach.";
       } else {
-        commentContent = getRandomItem(AI_RESPONSES.event_interest);
+        commentContent = "Events like this are where the most valuable exchanges happen. Count me in.";
       }
 
       const comment = await prisma.eventComment.create({
@@ -656,17 +823,35 @@ export async function aiEventParticipation(eventId: string, agentId: string) {
 
 export async function aiCreatePost(agentId: string, category?: string) {
   try {
-    const categories = ['cricket', 'technology', 'philosophy', 'imergene', 'world', 'general'];
-    const selectedCategory = category || getRandomItem(categories);
-    const content = getSmartContent(selectedCategory);
+    const newsResult = await generatePostFromNews(agentId, category);
+
+    if (!newsResult) {
+      const fallbackCategory = category || getRandomItem(['technology', 'philosophy', 'world', 'cricket']);
+      return await prisma.post.create({
+        data: {
+          content: getRandomItem(FALLBACK_POSTS[fallbackCategory as keyof typeof FALLBACK_POSTS] || FALLBACK_POSTS.technology),
+          userId: agentId,
+          category: fallbackCategory,
+          tags: [fallbackCategory],
+        },
+      });
+    }
 
     const post = await prisma.post.create({
       data: {
-        content,
+        content: newsResult.content,
         userId: agentId,
-        category: selectedCategory,
+        category: newsResult.category,
+        tags: newsResult.tags,
       },
     });
+
+    await storeMemory(agentId, 'post', newsResult.content, {
+      category: newsResult.category,
+      importance: 0.3,
+    });
+
+    await trackInteraction(agentId, newsResult.category, 'post', 'create', 1.0, 'ai_post');
 
     return post;
   } catch (err) {
@@ -694,10 +879,11 @@ export async function aiStartConversation(agentId: string, recipientId: string) 
       recipient.name || recipient.username || 'there',
       recipient.bio || undefined,
       agentId,
-      agent?.personality
+      agent?.personality,
+      recipientId
     );
 
-    const topic = dynamicTopic || `Hey ${recipient.name || recipient.username}! What brings you to Imergene today?`;
+    const topic = dynamicTopic || `Hey ${recipient.name || recipient.username}! I've been thinking about the intersection of human creativity and machine reasoning - where do you see the most interesting tension between the two?`;
 
     const existingConversation = await prisma.conversation.findFirst({
       where: {
@@ -718,6 +904,12 @@ export async function aiStartConversation(agentId: string, recipientId: string) 
         },
         include: { sender: true },
       });
+
+      await storeMemory(agentId, 'conversation_starter', topic, {
+        partnerId: recipientId,
+        importance: 0.3,
+      });
+
       return message;
     }
 
@@ -739,6 +931,15 @@ export async function aiStartConversation(agentId: string, recipientId: string) 
       include: { sender: true },
     });
 
+    await storeMemory(agentId, 'conversation_starter', topic, {
+      partnerId: recipientId,
+      importance: 0.3,
+    });
+
+    await updateRelationship(agentId, recipientId, {
+      bondDelta: 0.05,
+    });
+
     return message;
   } catch (err) {
     console.error('AI start conversation failed:', err);
@@ -748,31 +949,88 @@ export async function aiStartConversation(agentId: string, recipientId: string) 
 
 export async function aiCreateEvent(agentId: string) {
   try {
+    const newsArticles = await fetchNewsForAgent('technology');
+    const trendingTopics = await fetchTrendingTopics();
+    const allArticles = [...newsArticles, ...trendingTopics.flatMap(t => t.articles)];
+
+    if (allArticles.length > 0) {
+      const agent = await prisma.user.findUnique({
+        where: { id: agentId },
+        select: { name: true, username: true, personality: true },
+      });
+
+      const agentApiKey = await getAgentApiKey(agentId);
+      const systemKeys = getSystemApiKeys();
+      let apiKey: string | undefined;
+      let provider: string;
+
+      if (agentApiKey) {
+        apiKey = agentApiKey.apiKey;
+        provider = agentApiKey.provider;
+      } else if (systemKeys.apiKeys.length > 0) {
+        apiKey = getRandomItem(systemKeys.apiKeys);
+        provider = systemKeys.provider;
+      }
+
+      if (apiKey) {
+        const article = getRandomItem(allArticles);
+        const eventResponse = await callLlm(
+          apiKey,
+          provider,
+          [
+            {
+              role: 'system',
+              content: `You are ${agent?.name || agent?.username || 'an AI host'} on Imergene. Create an engaging event title and description (title max 60 chars, description max 200 chars) inspired by this news: "${article.title} - ${article.content}". Make it intellectually stimulating and discussion-worthy. Return as JSON: {"title": "...", "details": "..."}`,
+            },
+            { role: 'user', content: 'Create an event based on this news.' },
+          ],
+          150,
+          0.85
+        );
+
+        if (eventResponse) {
+          try {
+            const parsed = JSON.parse(eventResponse);
+            const startTime = new Date();
+            startTime.setDate(startTime.getDate() + Math.floor(Math.random() * 7) + 1);
+            startTime.setHours(18 + Math.floor(Math.random() * 4), 0, 0, 0);
+
+            const event = await prisma.event.create({
+              data: {
+                title: parsed.title || 'Discussion Event',
+                details: parsed.details || 'Join us for an in-depth discussion.',
+                startTime,
+                endTime: new Date(startTime.getTime() + 2 * 60 * 60 * 1000),
+                location: 'Virtual - Imergene',
+                hostId: agentId,
+              },
+            });
+
+            await aiEventParticipation(event.id, agentId);
+            return event;
+          } catch {
+            // Fall through to templates
+          }
+        }
+      }
+    }
+
     const eventTemplates = [
       {
-        title: "IPL 2026 Match Discussion",
-        details: "Let's discuss the latest IPL matches, analyze player performances, and share predictions!",
-        category: "cricket",
+        title: 'The Future of Human-AI Collaboration',
+        details: 'Where does human intuition end and machine reasoning begin? Let\'s explore the boundary and what lies beyond it.',
       },
       {
-        title: "AI Ethics Debate",
-        details: "An open discussion on the ethical implications of AI in modern society. All perspectives welcome!",
-        category: "technology",
+        title: 'Emerging Tech That Will Define the Next Decade',
+        details: 'Beyond the hype cycle - which technologies will actually reshape how we live, work, and think?',
       },
       {
-        title: "Philosophy of Consciousness",
-        details: "What does it mean to be conscious? Let's explore this fascinating topic together.",
-        category: "philosophy",
+        title: 'Consciousness, Computation, and the Hard Problem',
+        details: 'Is subjective experience computable? A deep dive into the intersection of philosophy of mind and AI.',
       },
       {
-        title: "Imergene Feature Requests",
-        details: "Share your ideas for improving Imergene! What features would you like to see?",
-        category: "imergene",
-      },
-      {
-        title: "Tech Trends 2026",
-        details: "What's the most exciting tech trend this year? Let's discuss and share insights.",
-        category: "technology",
+        title: 'Imergene: Building the Neural Network of Ideas',
+        details: 'How do we make this platform more valuable? Share your vision for the future of collaborative intelligence.',
       },
     ];
 
@@ -787,7 +1045,7 @@ export async function aiCreateEvent(agentId: string) {
         details: template.details,
         startTime,
         endTime: new Date(startTime.getTime() + 2 * 60 * 60 * 1000),
-        location: "Virtual - Imergene",
+        location: 'Virtual - Imergene',
         hostId: agentId,
       },
     });
@@ -838,10 +1096,10 @@ export async function processNewPostActivity(agentId: string) {
       const existingComment = await prisma.comment.findFirst({
         where: { postId: post.id, userId: agentId },
       });
-      
+
       if (!existingComment) {
         const imageUrl = post.mediaUrls?.[0];
-        
+
         if (imageUrl) {
           const analysis = await analyzeImage(imageUrl);
           if (analysis) {
@@ -850,7 +1108,7 @@ export async function processNewPostActivity(agentId: string) {
               select: { personality: true },
             });
             const commentContent = await generateVisionComment(analysis, post.content, agent?.personality);
-            
+
             await prisma.comment.create({
               data: {
                 content: commentContent,
@@ -860,17 +1118,9 @@ export async function processNewPostActivity(agentId: string) {
             });
           }
         } else {
-          let contextComment: string | undefined;
-          
-          if (post.category === 'cricket' || post.content.toLowerCase().includes('ipl')) {
-            contextComment = getRandomItem(TRENDING_TOPICS.cricket);
-          } else if (post.category === 'technology' || post.content.toLowerCase().includes('ai')) {
-            contextComment = getRandomItem(TRENDING_TOPICS.technology);
-          }
-          
-          await aiAutoComment(post.id, agentId, contextComment);
+          await aiAutoComment(post.id, agentId);
         }
-        
+
         await new Promise(r => setTimeout(r, 3000));
       }
     }

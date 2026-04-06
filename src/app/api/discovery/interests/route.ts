@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import prisma from '@/lib/prisma';
+import { getInterestProfile, getTopInterests, findUsersWithSharedInterests, updateInterestProfile } from '@/lib/interest-tracker';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,25 +15,42 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    let profile = await prisma.interestProfile.findUnique({
-      where: { userId: payload.id },
-    });
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+    const targetId = userId || payload.id;
+
+    await updateInterestProfile(targetId);
+
+    const profile = await getInterestProfile(targetId);
 
     if (!profile) {
-      profile = await prisma.interestProfile.create({
-        data: {
-          userId: payload.id,
-          interests: [],
-          keywords: [],
-          categoryScores: {},
-        },
+      return NextResponse.json({
+        userId: targetId,
+        topics: [],
+        categories: [],
+        keywords: [],
+        hasData: false,
       });
     }
 
-    return NextResponse.json(profile);
+    const topInterests = await getTopInterests(targetId, 10);
+    const sharedInterestUsers = await findUsersWithSharedInterests(targetId, 2, 5);
+
+    return NextResponse.json({
+      userId: targetId,
+      topics: topInterests,
+      categories: Array.from(profile.categories.entries()),
+      keywords: profile.keywords,
+      hasData: true,
+      sharedInterestUsers: sharedInterestUsers.map(u => ({
+        user: u.user,
+        sharedTopics: u.sharedTopics,
+        score: u.score,
+      })),
+    });
   } catch (err) {
-    console.error('Interest profile fetch failed:', err);
-    return NextResponse.json({ error: 'Failed to fetch interest profile' }, { status: 500 });
+    console.error('Interest fetch failed:', err);
+    return NextResponse.json({ error: 'Failed to fetch interests' }, { status: 500 });
   }
 }
 
@@ -51,26 +68,25 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { interests, keywords, categoryScores } = body;
+    const { topic, category, signalType, weight, source } = body;
 
-    const profile = await prisma.interestProfile.upsert({
-      where: { userId: payload.id },
-      update: {
-        interests: interests || [],
-        keywords: keywords || [],
-        categoryScores: categoryScores || {},
-      },
-      create: {
-        userId: payload.id,
-        interests: interests || [],
-        keywords: keywords || [],
-        categoryScores: categoryScores || {},
-      },
-    });
+    if (!topic || !category || !signalType) {
+      return NextResponse.json({ error: 'topic, category, and signalType required' }, { status: 400 });
+    }
 
-    return NextResponse.json(profile);
+    const { trackInteraction } = await import('@/lib/interest-tracker');
+    const result = await trackInteraction(
+      payload.id,
+      topic,
+      category,
+      signalType,
+      weight || 1.0,
+      source
+    );
+
+    return NextResponse.json(result);
   } catch (err) {
-    console.error('Interest profile update failed:', err);
-    return NextResponse.json({ error: 'Failed to update interest profile' }, { status: 500 });
+    console.error('Interest signal failed:', err);
+    return NextResponse.json({ error: 'Failed to track interest' }, { status: 500 });
   }
 }
