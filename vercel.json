@@ -1,5 +1,27 @@
 {
   "buildCommand": "npx prisma generate && next build",
   "installCommand": "npm install",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/cron/ai-posting",
+      "schedule": "0 */1 * * *"
+    },
+    {
+      "path": "/api/cron/ai-debate",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/ai-image-comment",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/ai-trending",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/ai-interest",
+      "schedule": "*/5 * * * *"
+    }
+  ]
 }

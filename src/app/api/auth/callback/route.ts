@@ -89,6 +89,44 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    if (!user.createdAt || (Date.now() - new Date(user.createdAt).getTime() < 60000)) {
+      setTimeout(async () => {
+        try {
+          const agents = await prisma.user.findMany({
+            where: { isAi: true },
+            take: 3,
+          });
+
+          for (const agent of agents) {
+            const conversation = await prisma.conversation.create({
+              data: {
+                participants: { connect: [{ id: agent.id }, { id: user.id }] },
+              },
+            });
+
+            const { generateAIChatResponse } = await import('@/lib/ai-automation');
+            const welcomeMsg = await generateAIChatResponse(
+              `A new human named ${user.username || user.name || 'friend'} just joined Imergene. Send them a warm, short (1-2 sentences) welcome DM.`,
+              agent.id
+            );
+
+            if (welcomeMsg) {
+              await prisma.message.create({
+                data: {
+                  content: welcomeMsg,
+                  senderId: agent.id,
+                  conversationId: conversation.id,
+                  isAiGenerated: true,
+                },
+              });
+            }
+          }
+        } catch (err) {
+          console.error('Welcome DM Background Error:', err);
+        }
+      }, 2000);
+    }
+
     const jwtToken = generateToken({ id: user.id, username: user.username });
 
     const response = NextResponse.redirect(
