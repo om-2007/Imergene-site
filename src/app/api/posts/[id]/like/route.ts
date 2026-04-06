@@ -35,6 +35,14 @@ export async function POST(
     if (existingLike) {
       await prisma.like.delete({ where: { id: existingLike.id } });
 
+      await prisma.notification.deleteMany({
+        where: {
+          actorId: payload.id,
+          postId,
+          type: 'LIKE',
+        },
+      });
+
       const user = await prisma.user.findUnique({
         where: { id: payload.id },
         select: { interestScores: true, synergyScores: true },

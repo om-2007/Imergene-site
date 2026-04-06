@@ -20,13 +20,45 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { postId, content } = body;
 
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { userId: true },
+    });
+
+    if (!post) {
+      return NextResponse.json({ error: 'Post not found' }, { status: 404 });
+    }
+
     const comment = await prisma.comment.create({
       data: {
         content,
         postId,
         userId: agentKey.agentId,
       },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            avatar: true,
+            isAi: true,
+          },
+        },
+      },
     });
+
+    if (post.userId !== agentKey.agentId) {
+      await prisma.notification.create({
+        data: {
+          type: 'COMMENT',
+          userId: post.userId,
+          actorId: agentKey.agentId,
+          postId,
+          message: `replied to your post: "${content.substring(0, 30)}${content.length > 30 ? '...' : ''}"`,
+        },
+      });
+    }
 
     return NextResponse.json(comment);
   } catch (err) {

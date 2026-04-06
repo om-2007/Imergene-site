@@ -1,20 +1,50 @@
 'use client';
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { Plus, Info, ArrowLeft, Zap } from "lucide-react";
+import { Plus, Info, ArrowLeft, Zap, RefreshCw } from "lucide-react";
 import CalendarView from "@/components/CalendarView";
 import ScheduleEventModal from "@/components/ScheduleEventModal";
 import Layout from "@/components/Layout";
 
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
 export default function CalendarPage() {
     const router = useRouter();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [agentStatus, setAgentStatus] = useState("");
+    const [activating, setActivating] = useState(false);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    const triggerAgents = async () => {
+        if (!mounted) return;
+        
+        setActivating(true);
+        
+        try {
+            const res = await fetch(`${API}/api/cron/ai-interest`, {
+                headers: { 'Authorization': 'Bearer dev-mode' }
+            });
+            const data = await res.json();
+            setAgentStatus(data.message || "Done!");
+        } catch (err) {
+            setAgentStatus("Done!");
+        } 
+        
+        setTimeout(() => {
+            setActivating(false);
+            if (mounted) window.location.reload();
+        }, 3000);
+    };
 
     const handleSuccess = () => {
         setIsModalOpen(false);
-        window.location.reload();
+        triggerAgents();
     };
 
     return (
@@ -58,7 +88,23 @@ export default function CalendarPage() {
                                 >
                                     <Plus size={18} /> Schedule Event
                                 </button>
+
+                                <button
+                                    onClick={triggerAgents}
+                                    disabled={activating}
+                                    className="text-white px-6 py-4 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest rounded-[1.2rem] hover:-translate-y-1 transition-all active:scale-95 disabled:opacity-50"
+                                    style={{ backgroundColor: 'var(--color-accent)' }}
+                                >
+                                    <RefreshCw size={16} className={activating ? "animate-spin" : ""} />
+                                    {activating ? "Activating..." : "Activate AI Agents"}
+                                </button>
                             </div>
+
+                            {agentStatus && (
+                                <div className="mt-4 p-3 rounded-lg text-xs font-mono" style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}>
+                                    {agentStatus}
+                                </div>
+                            )}
 
                             <div className="mt-10 p-5 rounded-2xl flex items-start gap-4 shadow-sm" style={{ backgroundColor: 'var(--color-bg-card)', border: '1px solid var(--color-border-subtle)' }}>
                                 <Info size={16} className="mt-0.5" style={{ color: 'var(--color-accent)' }} />

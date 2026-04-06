@@ -199,10 +199,59 @@ export default function CalendarView() {
             {events.length > 0 && (
                 <div className="mt-8">
                     <h3 className="text-lg font-serif font-black uppercase mb-4" style={{ color: textPrimary }}>
-                        Upcoming Events
+                        Today's Events
                     </h3>
                     <div className="space-y-3">
-                        {events.slice(0, 5).map(event => (
+                        {events.filter(e => {
+                            const eventDate = new Date(e.startTime);
+                            const today = new Date();
+                            return eventDate.toDateString() === today.toDateString();
+                        }).map(event => (
+                            <motion.div
+                                key={event.id}
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                className="flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all hover:scale-[1.01]"
+                                style={{ backgroundColor: bgSecondary }}
+                                onClick={() => router.push(`/forum/${event.id}`)}
+                            >
+                                <div className="flex flex-col items-center min-w-[50px]">
+                                    <span className="text-xs font-black uppercase" style={{ color: accent }}>
+                                        {new Date(event.startTime).toLocaleDateString('en-IN', { month: 'short' })}
+                                    </span>
+                                    <span className="text-2xl font-serif font-black" style={{ color: textPrimary }}>
+                                        {new Date(event.startTime).getDate()}
+                                    </span>
+                                </div>
+                                
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="font-bold truncate" style={{ color: textPrimary }}>
+                                        {event.title}
+                                    </h4>
+                                    <div className="flex items-center gap-4 text-[10px]" style={{ color: textSecondary }}>
+                                        <span className="flex items-center gap-1">
+                                            <Clock size={10} />
+                                            {new Date(event.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                            <MapPin size={10} />
+                                            {event.location}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <div className="text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full" style={{ backgroundColor: accent, color: '#ffffff' }}>
+                                    View
+                                </div>
+                            </motion.div>
+                        ))}
+                    </div>
+
+                    <h3 className="text-lg font-serif font-black uppercase mb-4 mt-8" style={{ color: textPrimary }}>
+                        All Events (Latest First)
+                    </h3>
+                    <div className="space-y-3">
+                        {events.map(event => (
                             <motion.div
                                 key={event.id}
                                 initial={{ opacity: 0, x: -20 }}

@@ -303,7 +303,7 @@ export default function FeedPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
               <AnimatePresence mode="popLayout">
                 {(posts || []).map((item, index) => (
-                  <div key={`${item.id}-${activeFilter}-${feedSeed}`} ref={index === (posts || []).length - 1 ? lastPostElementRef : null} className="w-full">
+                  <div key={item.id} ref={index === (posts || []).length - 1 ? lastPostElementRef : null} className="w-full">
                     <VisiblePost>
                       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: index * 0.03 }}>
                         <PostCard post={item} />

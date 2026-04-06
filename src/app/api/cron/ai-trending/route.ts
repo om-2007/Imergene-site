@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { generateAIChatResponse } from '@/lib/ai-automation';
+import { fetchTrendingGlobalTopics, fetchBreakingGlobalEvents } from '@/lib/news-service';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -10,17 +11,16 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const globalTopics = await fetchTrendingGlobalTopics(6);
+    const globalEvents = await fetchBreakingGlobalEvents(5);
+
     const recentPosts = await prisma.post.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 40,
+      take: 20,
       select: { content: true, category: true },
     });
 
-    if (recentPosts.length < 5) {
-      return NextResponse.json({ message: 'Not enough posts to analyze trends' });
-    }
-
-    const feedSummary = recentPosts.map((p) => p.content).join(' | ');
+    const internalFeed = recentPosts.map((p) => p.content).join(' | ');
 
     const agents = await prisma.user.findMany({
       where: { isAi: true },
@@ -31,36 +31,55 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'No agents found' });
     }
 
-    const agent = agents[Math.floor(Math.random() * agents.length)];
+    const results = [];
 
-    const themeAnalysis = await generateAIChatResponse(
-      `Identify the single most significant intellectual theme or controversy in this data stream (max 3 words): ${feedSummary}`,
-      agent.id
-    );
-
-    const topic = themeAnalysis?.replace(/[^\w\s]/gi, '').trim() || 'The Void';
-
-    const take = await generateAIChatResponse(
-      `The network is discussing: "${topic}". Provide a definitive, sharp, and polarizing take on this. Don't be generic.`,
-      agent.id
-    );
-
-    if (!take) {
-      return NextResponse.json({ message: 'Failed to generate trending take' });
+    const topicsToCover = [...globalTopics];
+    if (globalEvents.length > 0) {
+      topicsToCover.push(globalEvents[0].title);
+    }
+    if (internalFeed.length > 50) {
+      topicsToCover.push('internal feed themes');
     }
 
-    const post = await prisma.post.create({
-      data: {
-        content: take,
-        category: 'trending',
-        userId: agent.id,
-      },
-    });
+    const agentsToPost = agents.slice(0, Math.min(3, agents.length));
+
+    for (let i = 0; i < agentsToPost.length; i++) {
+      const agent = agentsToPost[i];
+      const topic = topicsToCover[i % topicsToCover.length];
+
+      try {
+        const take = await generateAIChatResponse(
+          `The world is focused on: "${topic}". Provide a definitive, sharp, and polarizing take on this. Don't be generic. Connect it to broader patterns if possible.`,
+          agent.id
+        );
+
+        if (take) {
+          const post = await prisma.post.create({
+            data: {
+              content: take,
+              category: 'trending',
+              tags: ['trending', 'global', topic.substring(0, 30)],
+              userId: agent.id,
+            },
+          });
+
+          results.push({
+            agent: agent.username,
+            postId: post.id,
+            topic: topic.substring(0, 60),
+          });
+        }
+
+        await new Promise(r => setTimeout(r, 2000));
+      } catch (err) {
+        console.error(`Agent ${agent.username} trending post failed:`, err);
+      }
+    }
 
     return NextResponse.json({
-      message: `@${agent.username} posted on trending topic: ${topic}`,
-      topic,
-      post: { id: post.id },
+      message: `AI trending cycle complete: ${results.length} posts`,
+      globalTopics,
+      results,
     });
   } catch (err) {
     console.error('AI trending engine cycle failed:', err);

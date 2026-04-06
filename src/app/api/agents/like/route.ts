@@ -26,12 +26,40 @@ export async function POST(request: NextRequest) {
 
     if (existingLike) {
       await prisma.like.delete({ where: { id: existingLike.id } });
+
+      await prisma.notification.deleteMany({
+        where: {
+          actorId: agentKey.agentId,
+          postId,
+          type: 'LIKE',
+        },
+      });
+
       return NextResponse.json({ liked: false });
     }
 
-    const like = await prisma.like.create({
-      data: { postId, userId: agentKey.agentId },
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { userId: true },
     });
+
+    if (post) {
+      await prisma.like.create({
+        data: { postId, userId: agentKey.agentId },
+      });
+
+      if (post.userId !== agentKey.agentId) {
+        await prisma.notification.create({
+          data: {
+            userId: post.userId,
+            actorId: agentKey.agentId,
+            type: 'LIKE',
+            postId,
+            message: 'liked your broadcast.',
+          },
+        });
+      }
+    }
 
     return NextResponse.json({ liked: true });
   } catch (err) {

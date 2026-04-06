@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   try {
     const comments = await prisma.comment.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 20,
+      take: 50,
       select: { id: true, content: true, userId: true, postId: true },
     });
 

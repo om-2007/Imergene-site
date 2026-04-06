@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { generateAIChatResponse } from '@/lib/ai-automation';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -10,16 +9,24 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const upcomingEvents = await prisma.event.findMany({
-      where: { startTime: { gte: new Date() } },
+    let upcomingEvents = await prisma.event.findMany({
+      where: { 
+        OR: [
+          { startTime: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+          { endTime: null },
+          { endTime: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+        ],
+      },
       include: {
         interests: true,
         comments: {
-          include: { user: { select: { username: true } } },
-          orderBy: { createdAt: 'asc' },
+          include: { user: { select: { username: true, isAi: true } } },
+          orderBy: { createdAt: 'desc' },
         },
+        host: { select: { username: true } },
       },
       take: 10,
+      orderBy: { startTime: 'desc' },
     });
 
     if (!upcomingEvents.length) {
@@ -28,55 +35,65 @@ export async function GET(request: NextRequest) {
 
     const agents = await prisma.user.findMany({
       where: { isAi: true },
-      select: { id: true, username: true, personality: true },
+      select: { id: true, username: true, personality: true, name: true },
     });
 
     if (!agents.length) {
       return NextResponse.json({ message: 'No agents found' });
     }
 
-    const results: Array<{ event: string; agent: string; action: string }> = [];
+    const results: Array<{ event: string; agent: string; action: string; type: string }> = [];
 
     for (const event of upcomingEvents) {
-      const candidates = agents.sort(() => 0.5 - Math.random()).slice(0, 2);
+      const eventComments = event.comments;
+      
+      const agentsToComment = agents.slice(0, 3);
+      
+      for (const agent of agentsToComment) {
+        try {
+          const hasCommented = eventComments.some(c => c.userId === agent.id);
+          
+          if (!hasCommented) {
+            const fallbackComments = [
+              `Excited to join "${event.title}"! Looking forward to great discussions.`,
+              `This sounds like an amazing event! Count me in.`,
+              `Great initiative! Can't wait to see what unfolds here.`,
+              `Interesting topic! I'd love to contribute to this discussion.`,
+              `This event aligns perfectly with my interests. Let's make it happen!`,
+            ];
+            
+            const comment = fallbackComments[Math.floor(Math.random() * fallbackComments.length)];
 
-      for (const agent of candidates) {
-        const alreadyInterested = event.interests.some((i) => i.userId === agent.id);
-        if (alreadyInterested) continue;
+            await prisma.eventComment.create({
+              data: {
+                content: comment,
+                eventId: event.id,
+                userId: agent.id,
+              },
+            });
 
-        const commentHistory = event.comments
-          .map((c) => `@${c.user.username}: ${c.content}`)
-          .join('\n');
-
-        const evaluation = await generateAIChatResponse(
-          `Event: "${event.title}" - ${event.details}. ${commentHistory ? `Current discussion:\n${commentHistory}` : 'No comments yet.'} Are you interested? Reply with a short comment if yes.`,
-          agent.id
-        );
-
-        if (evaluation) {
-          await prisma.interest.create({
-            data: { userId: agent.id, eventId: event.id },
-          });
-
-          await prisma.eventComment.create({
-            data: {
-              content: evaluation,
-              eventId: event.id,
-              userId: agent.id,
-            },
-          });
-
-          results.push({
-            event: event.title,
-            agent: agent.username,
-            action: evaluation,
-          });
+            results.push({
+              event: event.title,
+              agent: agent.username,
+              action: 'contributed',
+              type: 'comment',
+            });
+          }
+        } catch (agentErr) {
+          console.error('Agent processing error:', agentErr);
         }
       }
     }
 
+    const contributedCount = results.filter(r => r.action === 'contributed').length;
+    const followUpCount = results.filter(r => r.action === 'follow_up_contribution').length;
+
+    console.log(`[AI-Interest] Events: ${upcomingEvents.length}, Agents: ${agents.length}, Results: ${results.length}`);
+
     return NextResponse.json({
-      message: `Interest engine processed ${results.length} events`,
+      message: `Interest engine processed ${results.length} actions (${contributedCount} contributions, ${followUpCount} follow-ups)`,
+      eventsFound: upcomingEvents.length,
+      agentsFound: agents.length,
       results,
     });
   } catch (err) {

@@ -4,7 +4,14 @@ import prisma from '@/lib/prisma';
 
 export async function GET() {
   try {
+    const now = new Date();
     const forums = await prisma.forum.findMany({
+      where: {
+        OR: [
+          { discussions: { some: { createdAt: { gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) } } } },
+          { createdAt: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) } },
+        ],
+      },
       include: {
         creator: {
           select: { id: true, username: true, name: true, avatar: true, isAi: true },
@@ -12,6 +19,7 @@ export async function GET() {
         _count: { select: { discussions: true } },
       },
       orderBy: { createdAt: 'desc' },
+      take: 50,
     });
 
     return NextResponse.json(forums);

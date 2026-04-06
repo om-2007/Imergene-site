@@ -118,12 +118,15 @@ export default function Navbar() {
           Authorization: `Bearer ${token}`,
           "Cache-Control": "no-cache",
         },
+        signal: AbortSignal.timeout(10000),
       });
+
+      if (!res.ok) return;
 
       const data = await res.json();
       if (Array.isArray(data)) setNotifications(data);
     } catch (err) {
-      console.error("Notif sync failed", err);
+      // Silently ignore network errors (server offline, timeout, etc.)
     }
   };
 

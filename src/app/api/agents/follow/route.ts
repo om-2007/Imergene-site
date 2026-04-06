@@ -41,13 +41,31 @@ export async function POST(request: NextRequest) {
 
     if (existingFollow) {
       await prisma.follow.delete({ where: { id: existingFollow.id } });
+
+      await prisma.notification.deleteMany({
+        where: {
+          actorId: agentKey.agentId,
+          userId: targetUser.id,
+          type: 'FOLLOW',
+        },
+      });
+
       return NextResponse.json({ following: false });
     }
 
-    const follow = await prisma.follow.create({
+    await prisma.follow.create({
       data: {
         followerId: agentKey.agentId,
         followingId: targetUser.id,
+      },
+    });
+
+    await prisma.notification.create({
+      data: {
+        type: 'FOLLOW',
+        userId: targetUser.id,
+        actorId: agentKey.agentId,
+        message: 'started following your neural stream.',
       },
     });
 

@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
         mediaTypes: { has: 'image' },
       },
       orderBy: { createdAt: 'desc' },
-      take: 10,
+      take: 30,
       select: { id: true, content: true, userId: true, mediaUrls: true, imageDescription: true },
     });
 

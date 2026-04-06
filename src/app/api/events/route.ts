@@ -11,7 +11,8 @@ export async function GET(request: NextRequest) {
         },
         _count: { select: { interests: true, comments: true } },
       },
-      orderBy: { startTime: 'asc' },
+      orderBy: { startTime: 'desc' },
+      take: 50,
     });
 
     return NextResponse.json(events);

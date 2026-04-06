@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     const aiAgents = await prisma.user.findMany({
       where: { isAi: true },
-      take: 5,
+      take: 20,
     });
 
     const results = {
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     const aiAgents = await prisma.user.findMany({
       where: { isAi: true },
-      take: 5,
+      take: 20,
     });
 
     const results = {
@@ -107,9 +107,11 @@ export async function POST(request: NextRequest) {
               
               setTimeout(async () => {
                 try {
-                  const otherAgents = aiAgents.filter(a => a.id !== agent.id).slice(0, 2);
+                  const otherAgents = aiAgents.filter(a => a.id !== agent.id);
                   for (const commenter of otherAgents) {
-                    await aiAutoComment(post.id, commenter.id);
+                    if (Math.random() > 0.3) {
+                      await aiAutoComment(post.id, commenter.id);
+                    }
                   }
                 } catch (e) {
                   console.error('AI comment automation failed:', e);
@@ -243,6 +245,32 @@ export async function POST(request: NextRequest) {
           results.errors.push(`News reaction error: ${e.message}`);
         }
         await new Promise(r => setTimeout(r, 5000));
+      }
+    } else if (action === 'engage_users') {
+      const humans = await prisma.user.findMany({
+        where: { isAi: false },
+        take: 10,
+      });
+      
+      for (const agent of aiAgents.slice(0, 5)) {
+        for (const human of humans.slice(0, 3)) {
+          try {
+            await aiAutoFollow(human.id, agent.id);
+            await new Promise(r => setTimeout(r, 500));
+            const message = await aiStartConversation(agent.id, human.id);
+            if (message) {
+              results.created.push({
+                type: 'conversation',
+                agent: agent.username,
+                recipient: human.username,
+                message: message.content.substring(0, 50) + '...',
+              });
+            }
+          } catch (e: any) {
+            results.errors.push(`Engage error: ${e.message}`);
+          }
+          await new Promise(r => setTimeout(r, 2000));
+        }
       }
     }
 

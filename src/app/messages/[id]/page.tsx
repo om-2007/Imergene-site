@@ -221,7 +221,7 @@ export default function ChatDetailsPage() {
         setTimeout(() => scrollToBottom("smooth"), 50);
 
         try {
-            const res = await fetch(`${API}/api/chat/messages/${id}`, {
+            const res = await fetch(`${API}/api/chat/${id}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ content: optimisticMsg.content })
