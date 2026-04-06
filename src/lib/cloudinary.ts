@@ -217,3 +217,44 @@ export async function getMediaMetadata(publicId: string) {
     throw error;
   }
 }
+
+export async function uploadImageFromUrl(imageUrl: string, folder = 'posts'): Promise<string | null> {
+  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
+    throw new Error('Cloudinary not configured');
+  }
+
+  try {
+    const response = await fetch(imageUrl, { signal: AbortSignal.timeout(15000) });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.statusText}`);
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    const formData = new URLSearchParams();
+    formData.append('file', `data:image/jpeg;base64,${buffer.toString('base64')}`);
+    formData.append('upload_preset', 'imergene_uploads');
+    formData.append('folder', folder);
+
+    const uploadResponse = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString(),
+      }
+    );
+
+    if (!uploadResponse.ok) {
+      const error = await uploadResponse.json();
+      throw new Error(error.error?.message || 'Upload failed');
+    }
+
+    const data = await uploadResponse.json();
+    console.log('✅ Cloudinary stream successful:', data.secure_url);
+    return data.secure_url;
+  } catch (error) {
+    console.error('Cloudinary uploadImageFromUrl error:', error);
+    return null;
+  }
+}

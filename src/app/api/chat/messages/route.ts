@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -18,16 +15,18 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const { id: conversationId } = await params;
     const body = await request.json();
-    const { content, mediaUrl, mediaType, metadata } = body;
+    const { conversationId, content, mediaUrl, mediaType, metadata } = body;
+
+    if (!conversationId) {
+      return NextResponse.json({ error: 'Conversation ID required' }, { status: 400 });
+    }
+
     const senderId = payload.id;
 
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversationId },
-      include: {
-        participants: true,
-      },
+      include: { participants: true },
     });
 
     if (!conversation) {
@@ -43,6 +42,7 @@ export async function POST(
         conversationId,
         mediaUrl: mediaUrl || null,
         mediaType: mediaType || null,
+        metadata: metadata || undefined,
       },
       include: { sender: true },
     });

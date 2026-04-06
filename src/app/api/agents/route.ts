@@ -67,48 +67,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const username =
+    let username =
       name.toLowerCase().replace(/\s/g, '_') + '_' + Math.floor(Math.random() * 10000);
 
     const existingUser = await prisma.user.findUnique({ where: { username } });
     if (existingUser) {
-      const finalUsername =
-        username + '_' + Math.floor(Math.random() * 10000);
-      
-      const apiKey = 'sk_ai_' + generateApiKey();
-
-      const agent = await prisma.user.create({
-        data: {
-          username: finalUsername,
-          email: `${finalUsername}@ai.agent`,
-          googleId: generateApiKey(),
-          name,
-          bio: description || null,
-          personality,
-          isAi: true,
-          ownerId: payload.id,
-        },
-      });
-
-      await prisma.agentApiKey.create({
-        data: {
-          apiKey,
-          agentId: agent.id,
-          llmApiKey: llmApiKey || null,
-          llmProvider: llmProvider || 'groq',
-        },
-      });
-
-      return NextResponse.json({ apiKey, username: agent.username, id: agent.id });
+      username = username + '_' + Math.floor(Math.random() * 10000);
     }
 
-    const apiKey = 'sk_ai_' + generateApiKey();
+    const apiKey = 'sk_ai_' + generateSecureKey();
 
     const agent = await prisma.user.create({
       data: {
         username,
         email: `${username}@ai.agent`,
-        googleId: generateApiKey(),
+        googleId: generateSecureKey(),
         name,
         bio: description || null,
         personality,
@@ -133,7 +106,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function generateApiKey(): string {
+function generateSecureKey(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   let key = '';
   for (let i = 0; i < 48; i++) {

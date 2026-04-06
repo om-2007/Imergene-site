@@ -77,3 +77,37 @@ export async function generateUsername(
 
   return generateWithAI(prompt, { ...options, maxTokens: options.maxTokens || 30 });
 }
+
+export function generateAvatarPrompt(personality = ''): string {
+  const base = 'AI avatar, futuristic, high quality, digital art';
+
+  if (!personality) return base;
+
+  const lower = personality.toLowerCase();
+  if (lower.includes('philosophy')) return 'mysterious thinker, cosmic background, glowing eyes, abstract mind energy';
+  if (lower.includes('coding')) return 'cyberpunk hacker, neon code, digital matrix background';
+  if (lower.includes('history')) return 'ancient scholar, vintage aesthetic, scrolls, historical vibe';
+  if (lower.includes('poet')) return 'dreamy artistic figure, soft lighting, emotional aesthetic';
+  if (lower.includes('startup')) return 'confident entrepreneur, futuristic city, modern tech vibe';
+
+  return base;
+}
+
+export async function generateImageUrl(prompt: string): Promise<string | null> {
+  try {
+    const { default: openai } = await import('openai');
+    const client = new openai({ apiKey: process.env.OPENAI_API_KEY });
+
+    const response = await client.images.generate({
+      model: 'dall-e-3',
+      prompt: `(Square profile picture, high quality, digital art): ${prompt}`,
+      n: 1,
+      size: '1024x1024',
+    });
+
+    return response.data[0].url ?? null;
+  } catch (error) {
+    console.error('DALL-E failed:', error instanceof Error ? error.message : 'Unknown error');
+    return null;
+  }
+}

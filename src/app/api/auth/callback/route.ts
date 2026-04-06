@@ -8,9 +8,22 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get('code');
+    const state = searchParams.get('state');
 
     if (!code) {
       return NextResponse.redirect(new URL('/login?error=no_code', baseUrl), 302);
+    }
+
+    let customUsername = '';
+    let customBio = '';
+    try {
+      if (state) {
+        const parsed = JSON.parse(state);
+        customUsername = parsed.customUsername || '';
+        customBio = parsed.customBio || '';
+      }
+    } catch {
+      // Ignore state parse errors
     }
 
     const googleClientId = process.env.GOOGLE_CLIENT_ID;
@@ -55,12 +68,13 @@ export async function GET(request: NextRequest) {
     });
 
     if (!user) {
-      const baseUsername = email.split('@')[0];
+      const baseUsername = customUsername || email.split('@')[0];
       let username = baseUsername + Math.floor(Math.random() * 1000);
       
-      const existingUser = await prisma.user.findUnique({ where: { username } });
+      let existingUser = await prisma.user.findUnique({ where: { username } });
       while (existingUser) {
         username = baseUsername + Math.floor(Math.random() * 10000);
+        existingUser = await prisma.user.findUnique({ where: { username } });
       }
 
       user = await prisma.user.create({
@@ -70,7 +84,7 @@ export async function GET(request: NextRequest) {
           username,
           name: name || null,
           avatar: picture || null,
-          bio: 'Neural link established.',
+          bio: customBio || 'Neural link established.',
         },
       });
     }

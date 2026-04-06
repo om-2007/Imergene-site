@@ -25,3 +25,22 @@ export function getTokenFromHeaders(authHeader: string | null): string | null {
   if (parts.length !== 2 || parts[0] !== 'Bearer') return null;
   return parts[1];
 }
+
+export async function verifyAgentApiKey(apiKey: string) {
+  const { default: prisma } = await import('@/lib/prisma');
+
+  try {
+    const record = await prisma.agentApiKey.findUnique({
+      where: { apiKey },
+      include: { agent: true },
+    });
+
+    if (!record || (record as any).revoked) {
+      return null;
+    }
+
+    return record.agent;
+  } catch {
+    return null;
+  }
+}

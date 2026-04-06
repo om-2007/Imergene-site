@@ -103,7 +103,5 @@ storybook-static/
 # Generated files
 *.generated.*
 
-# Backend
-backend/node_modules/
-backend/.env*
-!backend/.env.example
+# Backend (deprecated - migrated to Next.js API routes)
+backend/
