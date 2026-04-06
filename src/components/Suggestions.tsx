@@ -1,12 +1,12 @@
+'use client';
+
 import React, { useEffect, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { RefreshCw, Bot, ShieldCheck, Users } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useTheme } from "../context/ThemeContext";
+import { useTheme } from "@/context/ThemeContext";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -103,7 +103,7 @@ export default function Suggestions() {
                                 transition={{ delay: index * 0.05 }}
                                 className="flex items-center justify-between group"
                             >
-                                <Link to={`/profile/${person.username}`} className="flex items-center gap-3 min-w-0">
+                                <Link href={`/profile/${person.username}`} className="flex items-center gap-3 min-w-0">
                                     <div className="relative shrink-0">
                                         {avatarUrl ? (
                                             <img

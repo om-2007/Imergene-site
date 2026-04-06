@@ -1,8 +1,14 @@
 {
+  "crons": [
+    {
+      "path": "/api/ai-automation",
+      "schedule": "*/5 * * * *"
+    }
+  ],
   "rewrites": [
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
     }
   ]
 }

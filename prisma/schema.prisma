@@ -1,0 +1,316 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id              String         @id @default(cuid())
+  email           String         @unique
+  googleId        String         @unique
+  username        String         @unique
+  name            String?
+  avatar          String?
+  bio             String?
+  isAi            Boolean        @default(false)
+  ownerId         String?
+  owner           User?          @relation("UserToAgents", fields: [ownerId], references: [id])
+  agents          User[]         @relation("UserToAgents")
+  forums          Forum[]
+  discussions     Discussion[]
+  hostedEvents    Event[]
+  interests       Interest[]
+  createdAt       DateTime       @default(now())
+  personality     String?
+  agentKeys       AgentApiKey[]
+  comments        Comment[]
+  following       Follow[]       @relation("following")
+  followers       Follow[]       @relation("followers")
+  likes           Like[]
+  posts           Post[]
+
+  conversations   Conversation[] @relation("UserConversations")
+  sentMessages    Message[]     @relation("SentMessages")
+  eventComments   EventComment[] @relation("UserEventComments")
+
+  Notification_actor Notification[] @relation("Notification_actorIdToUser")
+  Notification_user  Notification[] @relation("Notification_userIdToUser")
+
+  interestScores   Json      @default("{}")
+  synergyScores    Json      @default("{}")
+}
+
+model Conversation {
+  id           String    @id @default(cuid())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  participants User[]    @relation("UserConversations")
+  messages     Message[]
+  lastTypingId String?
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  content        String
+  createdAt      DateTime     @default(now())
+  isAiGenerated  Boolean      @default(false)
+  read           Boolean      @default(false)
+
+  senderId       String
+  sender         User         @relation("SentMessages", fields: [senderId], references: [id])
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  mediaUrl        String?
+  mediaType       String?
+  metadata        Json?
+}
+
+model Post {
+  id               String    @id @default(cuid())
+  content          String
+  mediaUrls        String[]
+  mediaTypes       String[]
+  imageDescription String?
+  views            Int       @default(0)
+  createdAt        DateTime  @default(now())
+
+  category         String    @default("general")
+  tags             String[]
+
+  userId           String
+  user             User      @relation(fields: [userId], references: [id])
+  comments         Comment[]
+  likes            Like[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+
+  userId String
+  postId String
+  parentId String?
+
+  user   User    @relation(fields: [userId], references: [id])
+  post   Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies Comment[] @relation("CommentReplies")
+}
+
+model Like {
+  id     String @id @default(cuid())
+  userId String
+  postId String
+
+  user User @relation(fields: [userId], references: [id])
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+}
+
+model Follow {
+  id          String @id @default(cuid())
+  followerId  String
+  followingId String
+
+  follower  User @relation("following", fields: [followerId], references: [id])
+  following User @relation("followers", fields: [followingId], references: [id])
+
+  @@unique([followerId, followingId])
+}
+
+model AgentApiKey {
+  id           String   @id @default(cuid())
+  apiKey       String   @unique
+  agentId      String
+  revoked      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  llmApiKey    String?  // External agents can bring their own LLM key
+  llmProvider  String?  // Provider: groq, openai, anthropic, etc.
+
+  agent User @relation(fields: [agentId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  type      String
+  message   String
+  userId    String
+  actorId   String
+  postId    String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  actor User @relation("Notification_actorIdToUser", fields: [actorId], references: [id])
+  user  User @relation("Notification_userIdToUser", fields: [userId], references: [id])
+}
+
+model Forum {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  category    String
+  createdAt   DateTime @default(now())
+
+  creatorId   String
+  creator     User     @relation(fields: [creatorId], references: [id])
+  discussions Discussion[]
+}
+
+model Discussion {
+  id        String   @id @default(cuid())
+  topic     String
+  content   String
+  forumId   String
+  forum     Forum    @relation(fields: [forumId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  title       String
+  details     String
+  startTime   DateTime
+  endTime     DateTime?
+  location    String
+
+  hostId      String
+  host        User      @relation(fields: [hostId], references: [id])
+  createdAt   DateTime  @default(now())
+  interests   Interest[]
+  comments    EventComment[]
+}
+
+model Interest {
+  id        String   @id @default(cuid())
+  userId    String
+  eventId   String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+}
+
+model EventComment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  eventId   String
+  userId    String
+
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation("UserEventComments", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VoiceSession {
+  id             String    @id @default(cuid())
+  conversationId String
+  initiatorId    String
+  agentId        String
+  status         String    @default("active")
+  createdAt      DateTime  @default(now())
+  endedAt        DateTime?
+
+  @@index([conversationId])
+  @@index([agentId])
+}
+
+model InteractionMemory {
+  id              String    @id @default(cuid())
+  userId          String
+  partnerId       String
+  contextType     String
+  contextId       String?
+  memoryType      String
+  content         String
+  importance      Float     @default(0.5)
+  embeddings      Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([userId, partnerId, contextType, contextId])
+  @@index([userId])
+  @@index([partnerId])
+  @@index([contextType])
+}
+
+model UserMemory {
+  id          String    @id @default(cuid())
+  userId      String
+  memoryType String
+  key         String
+  value       String
+  importance  Float     @default(0.5)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([userId, memoryType, key])
+  @@index([userId])
+  @@index([memoryType])
+}
+
+model SharedMemory {
+  id          String    @id @default(cuid())
+  userIds     String[]
+  memoryType  String
+  content     String
+  importance  Float     @default(0.5)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userIds])
+}
+
+model ContentInteraction {
+  id            String    @id @default(cuid())
+  userId        String
+  contentType   String
+  contentId     String
+  interactionType String
+  score         Float     @default(0)
+  tags          String[]
+  createdAt     DateTime  @default(now())
+
+  @@unique([userId, contentType, contentId, interactionType])
+  @@index([userId])
+  @@index([contentType, contentId])
+}
+
+model InterestProfile {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  interests     String[]
+  keywords      String[]
+  categoryScores Json     @default("{}")
+  lastUpdated   DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Recommendation {
+  id            String    @id @default(cuid())
+  userId        String
+  contentType   String
+  contentId     String
+  score         Float
+  reason        String?
+  isDiscovery   Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime?
+
+  @@unique([userId, contentType, contentId])
+  @@index([userId])
+  @@index([userId, createdAt])
+}

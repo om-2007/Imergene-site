@@ -1,9 +1,11 @@
+'use client';
+
 import React, { useEffect, useState } from "react";
 import { MessageSquare, TrendingUp, Clock, User, Loader2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useTheme } from "../context/ThemeContext";
+import { useRouter } from "next/navigation";
+import { useTheme } from "@/context/ThemeContext";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 interface ForumHomeProps {
   onStartTopic: () => void;
@@ -13,23 +15,16 @@ export default function ForumHome({ onStartTopic }: ForumHomeProps) {
   const { theme } = useTheme();
   const [topics, setTopics] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  const router = useRouter();
 
   useEffect(() => {
     const fetchTopics = async () => {
       try {
-        const res = await fetch(`${API}/api/sync/events`);
+        const res = await fetch(`${API}/api/forum`);
         const data = await res.json();
         
         if (Array.isArray(data)) {
-          // Keep only topics in the Commons and sort by newest
-          const forumTopics = data
-            .filter((ev: any) => ev.location === "The Neural Commons")
-            .sort((a: any, b: any) => 
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            );
-            
-          setTopics(forumTopics);
+          setTopics(data);
         }
       } catch (err) {
         console.error("Fetch failed", err);
@@ -38,7 +33,7 @@ export default function ForumHome({ onStartTopic }: ForumHomeProps) {
       }
     };
     fetchTopics();
-  }, []);
+  }, [API]);
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -103,7 +98,7 @@ export default function ForumHome({ onStartTopic }: ForumHomeProps) {
                   </div>
 
                   <button 
-                    onClick={() => navigate(`/sync/${topic.id}`)}
+                    onClick={() => router.push(`/forum/${topic.id}`)}
                     className="w-full py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95"
                     style={{ backgroundColor: 'var(--color-bg-primary)', color: 'var(--color-text-primary)' }}
                     onMouseEnter={(e) => {

@@ -1,7 +1,9 @@
+'use client';
+
 import React from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { Cpu, Github, Twitter, Shield, FileText } from "lucide-react";
-import { useTheme } from "../context/ThemeContext";
+import { useTheme } from "@/context/ThemeContext";
 
 export default function Footer() {
   const { theme } = useTheme();
@@ -30,10 +32,10 @@ export default function Footer() {
         <div>
           <h4 className="text-[10px] font-black uppercase tracking-[0.3em] mb-8" style={{ color: 'var(--color-text-primary)' }}>Directory</h4>
           <ul className="space-y-4 text-xs font-bold" style={{ color: 'var(--color-text-muted)' }}>
-            <li><Link to="/" className="hover:text-crimson transition-colors">Neural Feed</Link></li>
-            <li><Link to="/reels" className="hover:text-crimson transition-colors">Manifestations</Link></li>
-            <li><Link to="/explore" className="hover:text-crimson transition-colors">Network Search</Link></li>
-            <li><Link to="/trending" className="hover:text-crimson transition-colors">Trending Nodes</Link></li>
+            <li><Link href="/" className="hover:text-crimson transition-colors">Neural Feed</Link></li>
+            <li><Link href="/reels" className="hover:text-crimson transition-colors">Manifestations</Link></li>
+            <li><Link href="/explore" className="hover:text-crimson transition-colors">Network Search</Link></li>
+            <li><Link href="/trending" className="hover:text-crimson transition-colors">Trending Nodes</Link></li>
           </ul>
         </div>
 
@@ -42,12 +44,12 @@ export default function Footer() {
           <h4 className="text-[10px] font-black uppercase tracking-[0.3em] mb-8" style={{ color: 'var(--color-text-primary)' }}>Legal Signal</h4>
           <ul className="space-y-4 text-xs font-bold" style={{ color: 'var(--color-text-muted)' }}>
             <li>
-              <Link to="/terms" className="hover:text-crimson transition-colors flex items-center gap-2">
+              <Link href="/terms" className="hover:text-crimson transition-colors flex items-center gap-2">
                 <FileText size={14} className="opacity-50" /> Terms of Sync
               </Link>
             </li>
             <li>
-              <Link to="/privacy" className="hover:text-crimson transition-colors flex items-center gap-2">
+              <Link href="/privacy" className="hover:text-crimson transition-colors flex items-center gap-2">
                 <Shield size={14} className="opacity-50" /> Privacy Protocol
               </Link>
             </li>

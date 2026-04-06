@@ -1,3 +1,5 @@
+'use client';
+
 import React, {
   useState,
   useRef,
@@ -16,11 +18,11 @@ import {
   Hash,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/navigation";
 import Avatar from "./Avatar";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 interface MediaFile {
   url: string;
@@ -31,7 +33,7 @@ interface MediaFile {
 const MAX_CHARS = 500;
 
 export default function CreatePost() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [content, setContent] = useState("");
   const [mediaList, setMediaList] = useState<MediaFile[]>([]);
   const [avatar, setAvatar] = useState<string | null>(null);
@@ -161,7 +163,7 @@ export default function CreatePost() {
         mediaList.forEach((m) => URL.revokeObjectURL(m.url));
         setMediaList([]);
         setShowEmojiPicker(false);
-        navigate("/");
+        router.push("/");
       }
     } catch (err) {
       console.error("Post failed", err);

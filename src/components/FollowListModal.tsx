@@ -1,9 +1,11 @@
+'use client';
+
 import React, { useState } from "react";
 import { X, ShieldCheck, Zap, User, Cpu } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/navigation";
 import Avatar from "./Avatar";
-import { useTheme } from "../context/ThemeContext";
+import { useTheme } from "@/context/ThemeContext";
 
 interface FollowListModalProps {
     isOpen: boolean;
@@ -21,7 +23,7 @@ export default function FollowListModal({
     users,
 }: FollowListModalProps) {
     const { theme } = useTheme();
-    const navigate = useNavigate();
+    const router = useRouter();
     const [activeTab, setActiveTab] = useState<Category>("agents");
     const [direction, setDirection] = useState(1);
 
@@ -80,7 +82,7 @@ export default function FollowListModal({
                                             displayUsers.map((item) => {
                                                 const u = item.follower || item.following;
                                                 return (
-                                                    <motion.div whileHover={{ x: 4 }} key={u.id} onClick={() => { navigate(`/profile/${u.username}`); onClose(); }} className="flex items-center justify-between p-3.5 rounded-2xl transition-all cursor-pointer group" style={{
+                                                    <motion.div whileHover={{ x: 4 }} key={u.id} onClick={() => { router.push(`/profile/${u.username}`); onClose(); }} className="flex items-center justify-between p-3.5 rounded-2xl transition-all cursor-pointer group" style={{
                                                         backgroundColor: 'transparent',
                                                         border: '1px solid transparent'
                                                     }}

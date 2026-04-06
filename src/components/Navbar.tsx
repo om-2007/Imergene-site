@@ -1,5 +1,8 @@
+'use client';
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import {
   Cpu,
   Bell,
@@ -10,19 +13,19 @@ import {
   MessageSquare,
   UserPlus,
   X,
-  Trash2,
   ArrowLeft,
   Calendar,
   LayoutGrid,
   Menu,
   Moon,
   Sun,
+  Trash2,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import Avatar from "./Avatar";
-import { useTheme } from "../context/ThemeContext";
+import { useTheme } from "@/context/ThemeContext";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 type NotificationItem = {
   id: string | number;
@@ -47,10 +50,11 @@ type SearchUser = {
 };
 
 export default function Navbar() {
-  const navigate = useNavigate();
+  const router = useRouter();
+  const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
-  const username = localStorage.getItem("username");
-  const token = localStorage.getItem("token");
+  const [username, setUsername] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
@@ -63,6 +67,13 @@ export default function Navbar() {
 
   const notifRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setUsername(localStorage.getItem("username"));
+      setToken(localStorage.getItem("token"));
+    }
+  }, []);
 
   const unreadCount = useMemo(
     () => notifications.filter((n) => !n.read).length,
@@ -221,9 +232,9 @@ export default function Navbar() {
   };
 
   const hubLinks = [
-    { to: "/calendar", label: "Log", icon: <Calendar size={20} /> },
-    { to: "/forum", label: "Events Hub", icon: <LayoutGrid size={20} /> },
-    { to: "/about", label: "About", icon: <Info size={20} /> },
+    { href: "/calendar", label: "Log", icon: <Calendar size={20} /> },
+    { href: "/forum", label: "Events Hub", icon: <LayoutGrid size={20} /> },
+    { href: "/about", label: "About", icon: <Info size={20} /> },
   ];
 
   const closeMobileSearch = () => {
@@ -236,7 +247,7 @@ export default function Navbar() {
   };
 
   const onSelectUser = (user: SearchUser) => {
-    navigate(`/profile/${user.username}`);
+    router.push(`/profile/${user.username}`);
     setQuery("");
     setSearchResults([]);
     closeMobileSearch();
@@ -248,7 +259,6 @@ export default function Navbar() {
       borderBottom: '1px solid var(--color-border-default)'
     }}>
       <div className="flex h-16 items-center justify-between gap-3">
-        {/* Mobile Search Overlay */}
         <AnimatePresence>
           {isMobileSearchOpen && (
             <motion.div
@@ -338,9 +348,8 @@ export default function Navbar() {
           )}
         </AnimatePresence>
 
-        {/* Logo */}
         <Link
-          to="/"
+          href="/"
           className={`flex items-center gap-3 transition-opacity duration-300 ${isMobileSearchOpen ? "opacity-0 pointer-events-none" : "opacity-100"
             }`}
         >
@@ -357,7 +366,6 @@ export default function Navbar() {
           </div>
         </Link>
 
-        {/* Desktop Search */}
         <div className="relative hidden max-w-md flex-1 md:block mx-8" ref={searchRef}>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--color-text-muted)' }} />
@@ -386,13 +394,19 @@ export default function Navbar() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 8 }}
                 transition={{ duration: 0.18 }}
-                className="absolute left-0 top-full mt-2 w-full overflow-hidden rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-card shadow-xl"
+                className="absolute left-0 top-full mt-2 w-full overflow-hidden rounded-2xl border"
+                style={{
+                  backgroundColor: 'var(--color-bg-card)',
+                  borderColor: 'var(--color-border-default)',
+                  boxShadow: '0 20px 40px var(--color-shadow-lg)'
+                }}
               >
                 {searchResults.map((user) => (
                   <button
                     key={user.id}
                     onClick={() => onSelectUser(user)}
-                    className="flex w-full items-center gap-3 border-b border-black/[0.05] dark:border-white/5 p-3 text-left transition-colors last:border-b-0 hover:bg-void dark:hover:bg-white/5"
+                    className="flex w-full items-center gap-3 p-3 text-left transition-colors last:border-b-0"
+                    style={{ borderBottom: '1px solid var(--color-border-default)' }}
                   >
                     <Avatar
                       src={user.avatar}
@@ -401,11 +415,11 @@ export default function Navbar() {
                       alt={user.name || user.username}
                     />
                     <div className="min-w-0">
-                      <div className="truncate text-xs font-bold text-ocean">
+                      <div className="truncate text-xs font-bold" style={{ color: 'var(--color-ocean)' }}>
                         @{user.username}
                       </div>
                       {user.name ? (
-                        <div className="truncate text-[10px] text-text-dim/60">
+                        <div className="truncate text-[10px]" style={{ color: 'var(--color-text-dim)' }}>
                           {user.name}
                         </div>
                       ) : null}
@@ -417,26 +431,26 @@ export default function Navbar() {
           </AnimatePresence>
         </div>
 
-        {/* Actions */}
         <div
           className={`flex items-center gap-1 md:gap-2 ${isMobileSearchOpen ? "opacity-0 pointer-events-none" : "opacity-100"
             }`}
         >
           <button
             onClick={() => setIsMobileSearchOpen(true)}
-            className="p-2 text-text-dim/60 transition-colors hover:text-ocean md:hidden"
+            className="p-2 transition-colors md:hidden"
+            style={{ color: 'var(--color-text-muted)' }}
             aria-label="Open search"
           >
             <Search size={22} />
           </button>
 
-          {/* Desktop Hub Links */}
           <div className="hidden items-center gap-1 md:flex">
             {hubLinks.map((link) => (
               <Link
-                key={link.to}
-                to={link.to}
-                className="flex items-center gap-2 rounded-xl px-3 py-2 text-text-dim/80 transition-all hover:bg-black/5 hover:text-ocean"
+                key={link.href}
+                href={link.href}
+                className="flex items-center gap-2 rounded-xl px-3 py-2 transition-all"
+                style={{ color: 'var(--color-text-muted)' }}
               >
                 {React.cloneElement(link.icon as React.ReactElement<any>, {
                   size: 19,
@@ -448,11 +462,11 @@ export default function Navbar() {
             ))}
           </div>
 
-          {/* Notifications */}
           <div className="relative" ref={notifRef}>
             <button
               onClick={handleToggleNotifs}
-              className="relative p-2 text-text-dim/60 transition-colors hover:text-ocean"
+              className="relative p-2 transition-colors"
+              style={{ color: 'var(--color-text-muted)' }}
               aria-label="Notifications"
             >
               <Bell size={22} />
@@ -462,7 +476,12 @@ export default function Navbar() {
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     exit={{ scale: 0 }}
-                    className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-crimson text-[9px] font-black text-white shadow-sm"
+                    className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full border-2 text-[9px] font-black shadow-sm"
+                    style={{ 
+                      borderColor: 'var(--color-bg-card)',
+                      backgroundColor: 'var(--color-crimson)',
+                      color: 'var(--color-text-inverse)'
+                    }}
                   >
                     {unreadCount > 9 ? "!" : unreadCount}
                   </motion.span>
@@ -477,16 +496,24 @@ export default function Navbar() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.98 }}
                   transition={{ duration: 0.18 }}
-                  className="absolute right-[-50px] top-full z-[999] mt-3 w-80 overflow-hidden rounded-3xl border border-black/[0.08] dark:border-white/10 bg-white dark:bg-card shadow-2xl md:right-0"
+                  className="absolute right-[-50px] top-full z-[999] mt-3 w-80 overflow-hidden rounded-3xl border shadow-2xl md:right-0"
+                  style={{
+                    backgroundColor: 'var(--color-bg-card)',
+                    borderColor: 'var(--color-border-default)'
+                  }}
                 >
-                  <div className="flex items-center justify-between border-b border-black/[0.03] dark:border-white/5 bg-void/5 dark:bg-white/5 p-4">
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-ocean">
+                  <div className="flex items-center justify-between p-4" style={{ 
+                    borderBottom: '1px solid var(--color-border-default)',
+                    backgroundColor: 'var(--color-bg-tertiary)'
+                  }}>
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: 'var(--color-ocean)' }}>
                       Alerts
                     </span>
                     {notifications.length > 0 && (
                       <button
                         onClick={handleClearAll}
-                        className="rounded-lg p-1.5 text-red-500 transition-colors hover:bg-red-50"
+                        className="rounded-lg p-1.5 transition-colors"
+                        style={{ color: '#ef4444' }}
                         aria-label="Clear all notifications"
                       >
                         <Trash2 size={14} />
@@ -499,25 +526,27 @@ export default function Navbar() {
                       notifications.map((n) => (
                         <button
                           key={n.id}
-                          className={`flex w-full items-start gap-3 border-b border-black/[0.03] dark:border-white/5 p-4 text-left transition-colors last:border-0 hover:bg-void dark:hover:bg-white/5 ${!n.read
-                            ? "border-l-4 border-l-crimson bg-crimson/[0.02] dark:bg-crimson/[0.05]"
-                            : ""
-                            }`}
+                          className={`flex w-full items-start gap-3 p-4 text-left transition-colors last:border-0 ${!n.read ? "border-l-4" : ""}`}
+                          style={{ 
+                            borderBottom: '1px solid var(--color-border-default)',
+                            borderLeftColor: !n.read ? 'var(--color-crimson)' : 'transparent',
+                            backgroundColor: !n.read ? 'rgba(150, 135, 245, 0.02)' : 'transparent'
+                          }}
                           onClick={() => {
                             const actorUsername = n.actor?.username;
                             if (n.type === "FOLLOW" && actorUsername) {
-                              navigate(`/profile/${actorUsername}`);
+                              router.push(`/profile/${actorUsername}`);
                             } else if (n.postId) {
-                              navigate(`/post/${n.postId}`);
+                              router.push(`/post/${n.postId}`);
                             } else if (actorUsername) {
-                              navigate(`/profile/${actorUsername}`);
+                              router.push(`/profile/${actorUsername}`);
                             } else if (n.type === "EVENT_START" && n.postId) {
-                              navigate(`/sync/${n.postId}`);
+                              router.push(`/forum/${n.postId}`);
                             }
                             setShowNotifs(false);
                           }}
                         >
-                          <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-void/5">
+                          <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: 'var(--color-bg-tertiary)' }}>
                             {getNotifIcon(n.type)}
                           </div>
 
@@ -528,13 +557,13 @@ export default function Navbar() {
                           />
 
                           <div className="min-w-0 flex-1">
-                            <p className="text-xs leading-tight text-ocean">
+                            <p className="text-xs leading-tight" style={{ color: 'var(--color-ocean)' }}>
                               <span className="font-bold">
                                 @{n.actor?.username || "unknown"}
                               </span>{" "}
                               {n.message || ""}
                             </p>
-                            <span className="mt-1 block text-[9px] uppercase tracking-wide text-text-dim/40 font-mono">
+                            <span className="mt-1 block text-[9px] uppercase tracking-wide font-mono" style={{ color: 'var(--color-text-dim)' }}>
                               {n.createdAt
                                 ? new Date(n.createdAt).toLocaleTimeString([], {
                                   hour: "2-digit",
@@ -546,7 +575,7 @@ export default function Navbar() {
                         </button>
                       ))
                     ) : (
-                      <div className="p-12 text-center text-[11px] font-serif italic uppercase tracking-widest text-text-dim/30">
+                      <div className="p-12 text-center text-[11px] font-serif italic uppercase tracking-widest" style={{ color: 'var(--color-text-dim)' }}>
                         No Alerts Detected
                       </div>
                     )}
@@ -556,10 +585,10 @@ export default function Navbar() {
             </AnimatePresence>
           </div>
 
-          {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
-            className="relative p-2 text-text-dim/60 transition-all duration-300 hover:text-ocean hover:scale-110"
+            className="relative p-2 transition-all duration-300 hover:scale-110"
+            style={{ color: 'var(--color-text-muted)' }}
             aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           >
             <AnimatePresence mode="wait" initial={false}>
@@ -580,30 +609,27 @@ export default function Navbar() {
             </AnimatePresence>
           </button>
 
-          {/* Mobile Menu Trigger */}
           <button
             onClick={() => setIsMobileMenuOpen(true)}
-            className="p-2 text-text-dim/60 transition-colors md:hidden"
+            className="p-2 transition-colors md:hidden"
+            style={{ color: 'var(--color-text-muted)' }}
             aria-label="Open menu"
           >
             <Menu size={24} />
           </button>
 
-          {/* Desktop Avatar */}
           <Link
-            to={username ? `/profile/${username}` : "/login"}
+            href={username ? `/profile/${username}` : "/login"}
             className="ml-2 hidden shrink-0 md:block"
           >
             <Avatar
               size="sm"
               alt={username || "User"}
-              className="border border-black/[0.05] dark:border-white/10"
             />
           </Link>
         </div>
       </div>
 
-      {/* Mobile Navigation Drawer */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <>
@@ -644,7 +670,7 @@ export default function Navbar() {
 
               <div className="flex-1 overflow-y-auto px-6 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]" style={{ backgroundColor: 'var(--color-bg-card)' }}>
                 <Link
-                  to={username ? `/profile/${username}` : "/login"}
+                  href={username ? `/profile/${username}` : "/login"}
                   onClick={closeMobileMenu}
                   className="mb-6 flex items-center gap-4 rounded-2xl border p-4"
                   style={{ 
@@ -666,8 +692,8 @@ export default function Navbar() {
                 <div className="space-y-2">
                   {hubLinks.map((link) => (
                     <Link
-                      key={link.to}
-                      to={link.to}
+                      key={link.href}
+                      href={link.href}
                       onClick={closeMobileMenu}
                       className="group flex items-center gap-4 rounded-2xl border border-transparent p-4 transition-all"
                       style={{ color: 'var(--color-text-muted)' }}

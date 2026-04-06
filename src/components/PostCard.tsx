@@ -1,4 +1,9 @@
+'use client';
+
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   Heart,
   MessageCircle,
@@ -9,7 +14,6 @@ import {
   Send,
   Eye,
   Smile,
-  CheckCircle2,
   Loader2,
   X,
   ChevronLeft,
@@ -21,14 +25,12 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Avatar from "./Avatar";
-import type { Post, User } from "../types";
+import type { Post, User } from "@/types";
 import CommentList from "./CommentList";
-import { Link } from "react-router-dom";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import PostShareModal from "./PostShareModal";
-import { useTheme } from "../context/ThemeContext";
+import { useTheme } from "@/context/ThemeContext";
 
-// ─── Brand tokens (matches Login.tsx palette) ─────────────────────────────────
 const B = {
   crocus:      "#9687F5",
   crocusPale:  "#DDD8FD",
@@ -47,9 +49,8 @@ interface PostCardProps {
   post: Post;
 }
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-// ─── Dot indicator for multi-media ───────────────────────────────────────────
 function MediaDots({ count, current }: { count: number; current: number }) {
   if (count <= 1) return null;
   return (
@@ -69,7 +70,6 @@ function MediaDots({ count, current }: { count: number; current: number }) {
   );
 }
 
-// ─── Action button (like/comment/share) ──────────────────────────────────────
 function ActionBtn({
   icon, count, active, activeColor, label, onClick,
 }: {
@@ -111,7 +111,6 @@ function ActionBtn({
   );
 }
 
-// ─── Comment input row ───────────────────────────────────────────────────────
 function CommentInput({
   value, onChange, onSubmit, onEmojiToggle,
   showEmoji, onEmojiSelect, loading,
@@ -127,7 +126,6 @@ function CommentInput({
       background: isDark ? "rgba(20,18,39,0.8)" : "rgba(235,240,255,0.4)" 
     }}>
       <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10 }}>
-        {/* Emoji button */}
         <button
           onClick={onEmojiToggle}
           style={{
@@ -140,7 +138,6 @@ function CommentInput({
           <Smile size={18} />
         </button>
 
-        {/* Emoji picker */}
         <AnimatePresence>
           {showEmoji && (
             <motion.div
@@ -158,9 +155,7 @@ function CommentInput({
           )}
         </AnimatePresence>
 
-        {/* Input */}
         <div style={{ flex: 1, position: "relative" }}>
-          {/* Mention suggestions */}
           <AnimatePresence>
             {showMentions && mentions.length > 0 && (
               <motion.div
@@ -223,7 +218,6 @@ function CommentInput({
           />
         </div>
 
-        {/* Send */}
         <motion.button
           onClick={onSubmit}
           whileTap={{ scale: 0.9 }}
@@ -246,11 +240,28 @@ function CommentInput({
   );
 }
 
-// ─── Main PostCard ────────────────────────────────────────────────────────────
 const PostCard: React.FC<PostCardProps> = ({ post }) => {
-  const token = localStorage.getItem("token");
-  const currentUser = localStorage.getItem("username");
+  const router = useRouter();
+  const [username, setUsername] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const { theme } = useTheme();
+
+  useEffect(() => {
+    console.log("PostCard rendering:", { 
+      postId: post.id, 
+      hasUser: !!post.user, 
+      username: post.user?.username,
+      content: post.content?.substring(0, 50),
+      hasMedia: !!(post.mediaUrls?.length)
+    });
+  }, [post.id]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setUsername(localStorage.getItem("username"));
+      setToken(localStorage.getItem("token"));
+    }
+  }, []);
 
   const isDark = theme === "dark";
 
@@ -297,13 +308,12 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const commentEndRef = useRef<HTMLDivElement>(null);
   const inputRef      = useRef<HTMLInputElement>(null);
 
-  const isOwner = currentUser === post.user?.username;
-  const mediaItems = post.mediaUrls || (post.mediaUrl ? [post.mediaUrl] : []);
-  const mediaTypes = post.mediaTypes || (post.mediaType ? [post.mediaType] : []);
+  const isOwner = username === post.user?.username;
+  const mediaItems = post.mediaUrls || [];
+  const mediaTypes = post.mediaTypes || [];
   const hasMedia = mediaItems.length > 0;
   const displayCommentCount = comments.length > 0 ? comments.length : (post._count?.comments ?? 0);
 
-  // ── Like ──────────────────────────────────────────────────────────────────
   const triggerHeartPop = () => {
     if (heartTimeout.current) clearTimeout(heartTimeout.current);
     setShowHeartPop(true);
@@ -331,7 +341,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     }
   }, [post.id, token, isLiked]);
 
-  // ── Media click (single = fullscreen/play, double = like) ────────────────
   const handleMediaClick = (e: React.MouseEvent) => {
     e.preventDefault();
     if (clickTimer.current) {
@@ -351,7 +360,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     }
   };
 
-  // ── Comments ──────────────────────────────────────────────────────────────
   const toggleComments = async () => {
     const next = !showComments;
     setShowComments(next);
@@ -384,7 +392,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     setIsSubmitting(false);
   };
 
-  // ── Mentions ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!showComments) return;
     fetch(`${API}/api/users`, { headers: { Authorization: `Bearer ${token}` } })
@@ -407,12 +414,12 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     }
   };
 
-  const selectMention = (username: string) => {
+  const selectMention = (mentionUsername: string) => {
     const before = newComment.slice(0, cursorPos).split(" ");
     before.pop();
     const joined = before.join(" ");
     const after  = newComment.slice(cursorPos);
-    setNewComment(`${joined}${joined ? " " : ""}@${username} ${after}`);
+    setNewComment(`${joined}${joined ? " " : ""}@${mentionUsername} ${after}`);
     setShowMentions(false);
     inputRef.current?.focus();
   };
@@ -421,7 +428,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     .filter(u => u.username.toLowerCase().includes(mentionQuery))
     .slice(0, 5);
 
-  // ── View tracking ─────────────────────────────────────────────────────────
   useEffect(() => {
     const observer = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && !hasViewed.current) {
@@ -440,7 +446,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     return () => observer.disconnect();
   }, [post.id, token]);
 
-  // ── Delete ────────────────────────────────────────────────────────────────
   const handleDelete = async () => {
     if (!confirm("Delete this post?")) return;
     try {
@@ -451,10 +456,8 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     } catch {}
   };
 
-  // ── Zoom ─────────────────────────────────────────────────────────────────
   const resetZoom = () => { setScale(1); setPosition({ x: 0, y: 0 }); };
   
-  // ── Fullscreen keyboard and touch handling ────────────────────────────────
   useEffect(() => {
     if (!isFullScreen) return;
     
@@ -489,7 +492,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isFullScreen, mediaItems.length]);
 
-  // ── Drag to share ─────────────────────────────────────────────────────────
   const handleDragStart = (_event: any, _info?: any) => {
     const url = `${window.location.origin}/post/${post.id}`;
     const dataTransfer = (_event as any)?.dataTransfer;
@@ -499,9 +501,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     }
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // SHARED MENU
-  // ─────────────────────────────────────────────────────────────────────────
   const MenuDropdown = () => (
     <AnimatePresence>
       {showMenu && (
@@ -540,9 +539,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     </AnimatePresence>
   );
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // CARD WITH MEDIA
-  // ─────────────────────────────────────────────────────────────────────────
   if (hasMedia) {
     return (
       <>
@@ -563,7 +559,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
             fontFamily: '"DM Sans", system-ui, sans-serif',
           }}
         >
-          {/* ── Heart pop overlay ─────────────────────────────────────────── */}
           <AnimatePresence>
             {showHeartPop && (
               <motion.div
@@ -586,12 +581,11 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
             )}
           </AnimatePresence>
 
-          {/* ── Post header ───────────────────────────────────────────────── */}
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
             padding: "16px 18px 14px",
           }}>
-            <Link to={`/profile/${post.user?.username}`} style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none" }}>
+            <Link href={`/profile/${post.user?.username}`} style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none" }}>
               <Avatar src={post.user?.avatar} alt={post.user?.name || post.user?.username} isAi={post.user?.isAi} size="md" />
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -628,7 +622,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
             </div>
           </div>
 
-          {/* ── Media area ────────────────────────────────────────────────── */}
           <div
             style={{
               position: "relative", background: "#0a0a12",
@@ -637,7 +630,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
             }}
             onClick={handleMediaClick}
           >
-            {/* Media nav arrows */}
             {mediaItems.length > 1 && (
               <>
                 <button
@@ -690,14 +682,25 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 ) : (
                   <img
                     src={mediaItems[currentMediaIndex]}
-                    style={{ width: "100%", height: "auto", display: "block" }}
-                    loading="lazy" draggable={false} alt="Post media"
+                    alt="Post media"
+                    loading="lazy"
+                    decoding="async"
+                    style={{ 
+                      width: "100%", 
+                      height: "auto", 
+                      maxHeight: 500,
+                      objectFit: "cover", 
+                      display: "block" 
+                    }}
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
                   />
                 )}
               </motion.div>
             </AnimatePresence>
 
-            {/* Video play indicator */}
             {!isPlaying && mediaTypes[currentMediaIndex] === "video" && (
               <div style={{
                 position: "absolute", inset: 0, display: "flex",
@@ -712,7 +715,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
               </div>
             )}
 
-            {/* Double-tap hint (fades quickly) */}
             <div style={{
               position: "absolute", bottom: 14, left: "50%", transform: "translateX(-50%)",
               background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)",
@@ -724,12 +726,10 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
             </div>
           </div>
 
-          {/* Media dots */}
           <div style={{ padding: "0 18px" }}>
             <MediaDots count={mediaItems.length} current={currentMediaIndex} />
           </div>
 
-          {/* ── Post content ──────────────────────────────────────────────── */}
           {post.content && (
             <div style={{ padding: "14px 18px 4px" }}>
               <p style={{
@@ -755,7 +755,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
             </div>
           )}
 
-          {/* ── Action bar ────────────────────────────────────────────────── */}
           <div style={{
             display: "flex", alignItems: "center", gap: 8,
             padding: "12px 18px 14px",
@@ -779,14 +778,12 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
               label="Share"
               onClick={(e) => { e.stopPropagation(); setShowShareModal(true); }}
             />
-            {/* View count pushed right */}
             <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 5, color: colors.textMuted, opacity: 0.4 }}>
               <Eye size={14} />
               <span style={{ fontSize: 11, fontWeight: 500 }}>{viewCount.toLocaleString()}</span>
             </div>
           </div>
 
-          {/* ── Comments panel ────────────────────────────────────────────── */}
           <AnimatePresence>
             {showComments && (
               <motion.div
@@ -796,12 +793,10 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 transition={{ duration: 0.28, ease: "easeOut" }}
                 style={{ overflow: "hidden", borderTop: `1px solid rgba(150,135,245,0.1)` }}
               >
-                {/* Comments list */}
                 <div style={{ maxHeight: 280, overflowY: "auto", padding: "16px 18px 8px" }}>
                   <CommentList comments={comments} />
                   <div ref={commentEndRef} />
                 </div>
-                {/* Input */}
                 <CommentInput
                   value={newComment}
                   onChange={handleInputChange}
@@ -820,7 +815,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           </AnimatePresence>
         </motion.article>
 
-        {/* ── Fullscreen viewer ──────────────────────────────────────────── */}
         <AnimatePresence>
           {isFullScreen && (
             <motion.div
@@ -835,7 +829,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
               onWheel={e => setScale(s => Math.max(0.5, Math.min(5, s + (e.deltaY > 0 ? -0.15 : 0.15))))}
               onClick={(e) => { if (e.target === e.currentTarget) { setIsFullScreen(false); resetZoom(); } }}
             >
-              {/* Controls */}
               <div style={{
                 position: "absolute", top: 24, left: "50%", transform: "translateX(-50%)",
                 display: "flex", alignItems: "center", gap: 8, zIndex: 10,
@@ -869,7 +862,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 </button>
               </div>
 
-              {/* Navigation arrows for multiple images */}
               {mediaItems.length > 1 && (
                 <>
                   <button
@@ -918,7 +910,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 />
               </motion.div>
 
-              {/* Media counter */}
               {mediaItems.length > 1 && (
                 <div style={{
                   position: "absolute", top: 80, left: "50%", transform: "translateX(-50%)",
@@ -952,15 +943,27 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           )}
         </AnimatePresence>
         <AnimatePresence>
-          {showToast && <Toast message="Post shared!" />}
+          {showToast && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              style={{
+                position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+                background: B.crocus, color: "#fff", padding: "12px 24px",
+                borderRadius: 100, fontWeight: 600, fontSize: 14,
+                boxShadow: "0 8px 30px rgba(150,135,245,0.4)",
+                zIndex: 3000,
+              }}
+            >
+              Post shared!
+            </motion.div>
+          )}
         </AnimatePresence>
       </>
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // TEXT-ONLY CARD
-  // ─────────────────────────────────────────────────────────────────────────
   return (
     <>
       <motion.article
@@ -982,7 +985,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           cursor: "default",
         }}
       >
-        {/* ── Heart pop overlay ───────────────────────────────────────────── */}
         <AnimatePresence>
           {showHeartPop && (
             <motion.div
@@ -1005,12 +1007,11 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           )}
         </AnimatePresence>
 
-        {/* ── Header ─────────────────────────────────────────────────────── */}
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
           padding: "18px 20px 16px",
         }}>
-          <Link to={`/profile/${post.user?.username}`} style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none" }}>
+          <Link href={`/profile/${post.user?.username}`} style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none" }}>
             <Avatar src={post.user?.avatar} alt={post.user?.name || post.user?.username} isAi={post.user?.isAi} size="md" />
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -1047,9 +1048,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           </div>
         </div>
 
-        {/* ── Post content ────────────────────────────────────────────────── */}
         <div style={{ padding: "4px 20px 18px" }}>
-          {/* Accent line */}
           <div style={{
             width: 32, height: 3, background: `linear-gradient(90deg, ${B.crocus}, ${B.crocusMid})`,
             borderRadius: 100, marginBottom: 14,
@@ -1078,7 +1077,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           )}
         </div>
 
-        {/* ── Action bar ──────────────────────────────────────────────────── */}
         <div style={{
           display: "flex", alignItems: "center", gap: 8,
           padding: "12px 20px 16px",
@@ -1109,7 +1107,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           </div>
         </div>
 
-        {/* ── Comments panel ──────────────────────────────────────────────── */}
         <AnimatePresence>
           {showComments && (
             <motion.div
@@ -1151,39 +1148,24 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {showToast && <Toast message="Post shared!" />}
+        {showToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            style={{
+              position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+              background: B.crocus, color: "#fff", padding: "12px 24px",
+              borderRadius: 100, fontWeight: 600, fontSize: 14,
+              boxShadow: "0 8px 30px rgba(150,135,245,0.4)",
+              zIndex: 3000,
+            }}
+          >
+            Post shared!
+          </motion.div>
+        )}
       </AnimatePresence>
     </>
-  );
-};
-
-// ─── Toast notification ────────────────────────────────────────────────────
-function Toast({ message }: { message: string }) {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20, scale: 0.96 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 20, scale: 0.96 }}
-      style={{
-        position: "fixed", bottom: 36, left: "50%", transform: "translateX(-50%)",
-        zIndex: 2100,
-        background: isDark ? "#1A1832" : "#2D284B",
-        color: isDark ? "#E8E6F3" : "#EBF0FF",
-        padding: "14px 24px", borderRadius: 100,
-        display: "flex", alignItems: "center", gap: 10,
-        boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.4)" : "0 8px 32px rgba(45,40,75,0.28)",
-        fontFamily: '"DM Sans", system-ui, sans-serif',
-        fontSize: 13, fontWeight: 500,
-        whiteSpace: "nowrap",
-        border: `1px solid ${isDark ? "rgba(150,135,245,0.2)" : "transparent"}`,
-      }}
-    >
-      <CheckCircle2 size={18} color="#9687F5" />
-      {message}
-    </motion.div>
   );
 }
 

@@ -1,9 +1,11 @@
+'use client';
+
 import React, { useState, useEffect, useRef } from "react";
 import { X, Search, Send, AtSign, Loader2, Check, Smile, Zap, UserPlus, Share2, Sparkles, User as UserIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Avatar from "./Avatar";
 import EmojiPicker, { Theme } from 'emoji-picker-react';
-import { useTheme } from "../context/ThemeContext";
+import { useTheme } from "@/context/ThemeContext";
 
 interface PostShareModalProps {
     post: any;
@@ -11,7 +13,7 @@ interface PostShareModalProps {
     onSuccess: () => void;
 }
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export default function PostShareModal({ post, onClose, onSuccess }: PostShareModalProps) {
     const { theme } = useTheme();
@@ -135,7 +137,7 @@ export default function PostShareModal({ post, onClose, onSuccess }: PostShareMo
     };
 
     // 🟢 FIXED COMPONENT INTERFACE
-    const UserCircle = ({ user, key }: { user: any; key?: any }) => (
+    const UserCircle = ({ user }: { user: any }) => (
         <button 
             onClick={() => toggleUser(user.id)}
             className="flex flex-col items-center gap-2 min-w-[72px] relative group outline-none"

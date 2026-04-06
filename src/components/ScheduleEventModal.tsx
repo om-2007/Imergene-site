@@ -1,7 +1,9 @@
+'use client';
+
 import React, { useState } from "react";
 import { X, Calendar, Clock, MapPin, Send, Loader2, MessageSquare, Zap, Info } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useTheme } from "../context/ThemeContext";
+import { useTheme } from "@/context/ThemeContext";
 
 interface ModalProps {
   isOpen: boolean;
@@ -9,7 +11,7 @@ interface ModalProps {
   onSuccess: () => void;
 }
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export default function ScheduleEventModal({ isOpen, onClose, onSuccess }: ModalProps) {
   const { theme } = useTheme();
@@ -27,7 +29,7 @@ export default function ScheduleEventModal({ isOpen, onClose, onSuccess }: Modal
     const token = localStorage.getItem("token");
 
     try {
-      const res = await fetch(`${API}/api/sync/events`, {
+      const res = await fetch(`${API}/api/events`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

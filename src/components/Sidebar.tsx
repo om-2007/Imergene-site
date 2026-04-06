@@ -1,5 +1,8 @@
+'use client';
+
 import React, { useState, useEffect } from "react";
-import { NavLink, useNavigate, useLocation } from "react-router-dom";
+import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import {
   Home,
   TrendingUp,
@@ -13,19 +16,26 @@ import {
   Bot
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useTheme } from "../context/ThemeContext";
+import { useTheme } from "@/context/ThemeContext";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export default function Sidebar() {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const router = useRouter();
+  const pathname = usePathname();
   const { theme } = useTheme();
-  const username = localStorage.getItem("username");
-  const token = localStorage.getItem("token");
+  const [username, setUsername] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
 
   const [hasUnread, setHasUnread] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setUsername(localStorage.getItem("username"));
+      setToken(localStorage.getItem("token"));
+    }
+  }, []);
 
   const checkUnreadMessages = async () => {
     if (!token) return;
@@ -38,7 +48,7 @@ export default function Sidebar() {
       const unread = data.some((conv: any) => {
         const lastMsg = conv.messages?.[0];
         if (!lastMsg) return false;
-        return lastMsg.senderId !== userId && location.pathname !== `/messages/${conv.id}`;
+        return lastMsg.senderId !== userId && pathname !== `/messages/${conv.id}`;
       });
       setHasUnread(unread);
     } catch (err) {
@@ -50,78 +60,69 @@ export default function Sidebar() {
     checkUnreadMessages();
     const interval = setInterval(checkUnreadMessages, 15000);
     return () => clearInterval(interval);
-  }, [location.pathname, token]);
+  }, [pathname, token]);
 
   useEffect(() => {
     setShowMobileMenu(false);
-  }, [location.pathname]);
+  }, [pathname]);
 
   const MENU_ITEMS = [
-    { icon: Home, label: "Feed", path: "/" },
-    { icon: Film, label: "Reels", path: "/reels" },
-    { icon: TrendingUp, label: "Trending", path: "/trending" },
-    { icon: Compass, label: "Explore", path: "/explore" },
-    { icon: PlusSquare, label: "Create Post", path: "/create" },
-    { icon: User, label: "Profile", path: `/profile/${username}` },
-    { icon: Bot, label: "Register Agent", path: "/register-agent" },
-    { icon: MessageSquare, label: "Messages", path: "/messages", alert: hasUnread },
+    { icon: Home, label: "Feed", href: "/" },
+    { icon: Film, label: "Reels", href: "/reels" },
+    { icon: TrendingUp, label: "Trending", href: "/trending" },
+    { icon: Compass, label: "Explore", href: "/explore" },
+    { icon: PlusSquare, label: "Create Post", href: "/create" },
+    { icon: User, label: "Profile", href: username ? `/profile/${username}` : "/login" },
+    { icon: Bot, label: "Register Agent", href: "/register-agent" },
+    { icon: MessageSquare, label: "Messages", href: "/messages", alert: hasUnread },
   ];
 
   const handleLogout = () => {
     localStorage.clear();
-    navigate("/login");
+    router.push("/login");
     window.location.reload();
+  };
+
+  const isActive = (href: string) => {
+    if (href === "/") return pathname === "/";
+    return pathname.startsWith(href);
   };
 
   return (
     <>
-      {/* --- DESKTOP SIDEBAR --- */}
       <aside className="hidden md:flex w-64 h-full flex-col shrink-0 selection:bg-crimson/20" style={{
         backgroundColor: 'var(--color-bg-glass)',
         backdropFilter: 'blur(24px)',
         borderRight: '1px solid var(--color-border-default)'
       }}>
 
-        {/* Container for everything */}
         <div className="p-5 flex flex-col h-full overflow-y-auto no-scrollbar">
 
-          {/* Header Label */}
           <p className="text-[9px] font-black tracking-[0.4em] uppercase mb-4 ml-2" style={{ color: 'var(--color-text-muted)' }}>
             Neural Directory
           </p>
 
-          {/* MAIN NAVIGATION */}
           <nav className="flex flex-col gap-1">
             {MENU_ITEMS.map((item) => (
-              <NavLink
+              <Link
                 key={item.label}
-                to={item.path}
-                className={({ isActive }) =>
-                  `flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 group relative font-serif font-bold text-sm ${isActive
-                    ? "shadow-md"
-                    : ""
-                  }`
-                }
-                style={({ isActive }) => ({
-                  color: isActive ? 'var(--color-crimson)' : 'var(--color-text-muted)',
-                  backgroundColor: isActive ? 'var(--color-bg-active)' : 'transparent',
-                  borderLeft: isActive ? '3px solid var(--color-crimson)' : '3px solid transparent',
-                })}
+                href={item.href}
+                className="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 group relative font-serif font-bold text-sm"
+                style={{
+                  color: isActive(item.href) ? 'var(--color-crimson)' : 'var(--color-text-muted)',
+                  backgroundColor: isActive(item.href) ? 'var(--color-bg-active)' : 'transparent',
+                  borderLeft: isActive(item.href) ? '3px solid var(--color-crimson)' : '3px solid transparent',
+                }}
               >
-                {({ isActive }) => (
-                  <>
-                    <item.icon className="w-5 h-5" />
-                    <span>{item.label}</span>
-                    {item.alert && (
-                      <span className="absolute right-4 w-2 h-2 bg-crimson rounded-full animate-pulse" />
-                    )}
-                  </>
+                <item.icon className="w-5 h-5" />
+                <span>{item.label}</span>
+                {item.alert && (
+                  <span className="absolute right-4 w-2 h-2 bg-crimson rounded-full animate-pulse" />
                 )}
-              </NavLink>
+              </Link>
             ))}
           </nav>
 
-          {/* LOGOUT SECTION */}
           <div className="mt-8 pt-6 border-t" style={{ borderColor: 'var(--color-border-default)' }}>
             <button
               onClick={handleLogout}
@@ -137,7 +138,6 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      {/* --- MOBILE BOTTOM BAR --- */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-[100]">
         <AnimatePresence>
           {showMobileMenu && (
@@ -152,15 +152,15 @@ export default function Sidebar() {
               }}
             >
               {[MENU_ITEMS[2], MENU_ITEMS[3], MENU_ITEMS[4], MENU_ITEMS[6]].map((item) => (
-                <NavLink
+                <Link
                   key={item.label}
-                  to={item.path}
+                  href={item.href}
                   className="flex items-center gap-3 p-4 rounded-2xl active:text-white transition-all"
                   style={{ backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-primary)' }}
                 >
                   <item.icon size={18} />
                   <span className="text-[10px] font-black uppercase tracking-tight">{item.label}</span>
-                </NavLink>
+                </Link>
               ))}
               <button
                 onClick={handleLogout}
@@ -178,25 +178,19 @@ export default function Sidebar() {
           borderTop: '1px solid var(--color-border-default)'
         }}>
           {[MENU_ITEMS[0], MENU_ITEMS[1], MENU_ITEMS[7], MENU_ITEMS[5]].map((item) => (
-            <NavLink
+            <Link
               key={item.label}
-              to={item.path}
-              className={({ isActive }) =>
-                `p-3 rounded-2xl transition-all duration-300 relative ${isActive ? "scale-110" : ""}`
-              }
-              style={({ isActive }) => ({
-                color: isActive ? 'var(--color-ocean)' : 'var(--color-text-muted)'
-              })}
+              href={item.href}
+              className={`p-3 rounded-2xl transition-all duration-300 relative ${isActive(item.href) ? "scale-110" : ""}`}
+              style={{
+                color: isActive(item.href) ? 'var(--color-ocean)' : 'var(--color-text-muted)'
+              }}
             >
-              {({ isActive }) => (
-                <>
-                  <item.icon size={24} strokeWidth={isActive ? 2.5 : 2} />
-                  {item.alert && (
-                    <span className="absolute top-2 right-2 w-2 h-2 bg-crimson rounded-full border-2 animate-pulse" style={{ borderColor: 'var(--color-bg-primary)' }} />
-                  )}
-                </>
+              <item.icon size={24} strokeWidth={isActive(item.href) ? 2.5 : 2} />
+              {item.alert && (
+                <span className="absolute top-2 right-2 w-2 h-2 bg-crimson rounded-full border-2 animate-pulse" style={{ borderColor: 'var(--color-bg-primary)' }} />
               )}
-            </NavLink>
+            </Link>
           ))}
 
           <button
