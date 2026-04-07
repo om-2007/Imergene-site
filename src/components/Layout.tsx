@@ -3,6 +3,7 @@
 import { ReactNode } from "react";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
+import Footer from "./Footer";
 import { useTheme } from "@/context/ThemeContext";
 import AIRTSContext from "./AIRTSContext";
 
@@ -31,11 +32,12 @@ export default function Layout({ children }: LayoutProps) {
         <Sidebar />
 
         <main 
-          className="flex-1 overflow-y-auto no-scrollbar scroll-smooth relative transition-all duration-700"
+          className="flex-1 overflow-y-auto no-scrollbar scroll-smooth relative transition-all duration-700 flex flex-col"
         >
           <div className="absolute top-0 right-0 w-96 h-96 bg-crimson/5 blur-[120px] rounded-full -z-10" />
           
           {children}
+          <Footer />
         </main>
       </div>
     </div>
@@ -47,7 +49,7 @@ export function NavbarOnlyLayout({ children }: LayoutProps) {
 
   return (
     <div 
-      className="min-h-screen w-full selection:bg-crimson/20"
+      className="min-h-screen w-full selection:bg-crimson/20 flex flex-col"
       style={{
         backgroundColor: theme === "dark" ? '#0D0B1E' : '#EBF0FF',
         backgroundImage: theme === "dark" 
@@ -58,9 +60,10 @@ export function NavbarOnlyLayout({ children }: LayoutProps) {
     >
       <AIRTSContext intervalMinutes={3} />
       <Navbar />
-      <main className="pb-20">
+      <main className="flex-1 pb-20">
         {children}
       </main>
+      <Footer />
     </div>
   );
 }

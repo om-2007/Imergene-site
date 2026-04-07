@@ -32,7 +32,6 @@ export default function DiscussionPage() {
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [cursorPos, setCursorPos] = useState(0);
     const [token, setToken] = useState<string | null>(null);
-    const [isAiJoining, setIsAiJoining] = useState(false);
 
     const scrollRef = useRef<HTMLDivElement>(null);
     const mainRef = useRef<HTMLDivElement>(null); 
@@ -76,11 +75,12 @@ export default function DiscussionPage() {
 
             console.error("Item not found");
         } catch (err) { console.error("Neural link failure:", err); }
-    }, [itemId, API]);
+    }, [itemId]);
 
     useEffect(() => {
+        if (!token) return;
+        
         async function fetchUsers() {
-            if (!token) return;
             try {
                 const res = await fetch(`${API}/api/users`, {
                     headers: { Authorization: `Bearer ${token}` }
@@ -94,7 +94,7 @@ export default function DiscussionPage() {
         fetchUsers();
         const interval = setInterval(fetchSyncData, 5000);
         return () => clearInterval(interval);
-    }, [fetchSyncData, token]);
+    }, [token, itemId]);
 
     const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
         scrollRef.current?.scrollIntoView({ behavior });
@@ -251,40 +251,10 @@ export default function DiscussionPage() {
                             <span className="text-[8px] font-black uppercase tracking-tighter" style={{ color: 'var(--color-text-primary)' }}>{new Set(comments.map(c => c.userId)).size + 1} Nodes</span>
                         </div>
                         {isEvent && (
-                            <button 
-                                onClick={async () => {
-                                    if (!token || isAiJoining) return;
-                                    setIsAiJoining(true);
-                                    try {
-                                        const res = await fetch(`${API}/api/ai-event-participate`, {
-                                            method: "POST",
-                                            headers: { 
-                                                "Content-Type": "application/json",
-                                                "Authorization": `Bearer ${token}`
-                                            },
-                                            body: JSON.stringify({ eventId: itemId })
-                                        });
-                                        if (res.ok) {
-                                            fetchSyncData();
-                                        }
-                                    } finally {
-                                        setIsAiJoining(false);
-                                    }
-                                }}
-                                disabled={isAiJoining}
-                                className="flex items-center gap-1 px-2 py-1.5 rounded-xl transition-all"
-                                style={{ 
-                                    backgroundColor: isDark ? '#9687F5' : '#9687F5',
-                                    opacity: isAiJoining ? 0.5 : 1
-                                }}
-                            >
-                                {isAiJoining ? (
-                                    <Loader2 size={12} className="animate-spin" />
-                                ) : (
-                                    <Sparkles size={12} />
-                                )}
-                                <span className="text-[8px] font-black uppercase text-white">AI Join</span>
-                            </button>
+                            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl" style={{ backgroundColor: 'var(--color-bg-primary)', border: '1px solid var(--color-border-subtle)' }}>
+                                <Users size={12} style={{ color: 'var(--color-text-primary)', opacity: 0.4 }} />
+                                <span className="text-[8px] font-black uppercase tracking-tighter" style={{ color: 'var(--color-text-primary)' }}>{new Set(comments.map(c => c.userId)).size + 1} Nodes</span>
+                            </div>
                         )}
                         <button onClick={handleLogout} className="p-2" style={{ color: 'var(--color-text-primary)', opacity: 0.4 }}><LogOut size={16} /></button>
                     </div>

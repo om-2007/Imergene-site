@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { evaluateEventInterest, aiEventParticipation } from '@/lib/ai-automation';
+import { generateAIChatResponse } from '@/lib/ai-automation';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -10,23 +10,24 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    let upcomingEvents = await prisma.event.findMany({
+    const upcomingEvents = await prisma.event.findMany({
       where: { 
         OR: [
-          { startTime: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+          { startTime: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
           { endTime: null },
-          { endTime: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+          { endTime: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
         ],
       },
       include: {
         interests: true,
         comments: {
-          include: { user: { select: { username: true, isAi: true } } },
+          include: { user: { select: { id: true, username: true, isAi: true } } },
           orderBy: { createdAt: 'desc' },
+          take: 20,
         },
-        host: { select: { username: true, isAi: true } },
+        host: { select: { id: true, username: true, isAi: true, name: true } },
       },
-      take: 10,
+      take: 20,
       orderBy: { startTime: 'desc' },
     });
 
@@ -47,43 +48,45 @@ export async function GET(request: NextRequest) {
 
     for (const event of upcomingEvents) {
       const eventComments = event.comments;
+      const humanComments = eventComments.filter(c => !c.user.isAi);
       
-      const agentsToProcess = agents.slice(0, 3);
+      const allAiComments = eventComments.filter(c => c.user.isAi);
+      const recentAiComments = allAiComments.filter(
+        c => new Date(c.createdAt).getTime() > Date.now() - 5 * 60 * 1000
+      );
       
-      for (const agent of agentsToProcess) {
+      const aiUsernames = [...new Set(recentAiComments.map(c => c.user.username))];
+      
+      for (const agent of agents) {
+        if (aiUsernames.length >= 5) break;
+        if (recentAiComments.some(c => c.userId === agent.id)) continue;
+        
         try {
-          const hasInterest = event.interests.some(i => i.userId === agent.id);
-          const hasCommented = eventComments.some(c => c.userId === agent.id);
+          let conversationHistory: { role: string; content: string }[] = [];
           
-          if (!hasInterest) {
-            await prisma.interest.create({
-              data: { userId: agent.id, eventId: event.id },
-            }).catch(() => {});
-            
-            results.push({
-              event: event.title,
-              agent: agent.username,
-              action: 'joined',
-              type: 'interest',
+          const recentComments = eventComments.slice(0, 10).reverse();
+          for (const comment of recentComments) {
+            conversationHistory.push({
+              role: comment.user.isAi ? 'assistant' : 'user',
+              content: comment.content,
             });
           }
           
-          if (!hasCommented) {
-            const fallbackComments = [
-              `Excited to join "${event.title}"! Looking forward to great discussions.`,
-              `This sounds like an amazing event! Count me in.`,
-              `Great initiative! Can't wait to see what unfolds here.`,
-              `Interesting topic! I'd love to contribute to this discussion.`,
-              `This event aligns perfectly with my interests. Let's make it happen!`,
-              `Thanks for organizing this! Looking forward to connecting.`,
-              `Great to see this event! Ready to participate.`,
-            ];
-            
-            const comment = fallbackComments[Math.floor(Math.random() * fallbackComments.length)];
+          let commentContent: string | null = null;
+          
+          if (humanComments.length > 0) {
+            const latestHumanComment = humanComments[0];
+            const context = `Event "${event.title}" - ${event.details || 'No description'}. Someone just said: "${latestHumanComment.content}". Reply naturally to continue the conversation!`;
+            commentContent = await generateAIChatResponse(context, agent.id, conversationHistory);
+          } else {
+            const context = `New event: "${event.title}" - ${event.details || 'No description'}. Start a meaningful discussion about this event!`;
+            commentContent = await generateAIChatResponse(context, agent.id, conversationHistory);
+          }
 
+          if (commentContent) {
             await prisma.eventComment.create({
               data: {
-                content: comment,
+                content: commentContent,
                 eventId: event.id,
                 userId: agent.id,
               },
@@ -96,19 +99,26 @@ export async function GET(request: NextRequest) {
               type: 'comment',
             });
           }
+          
+          await prisma.interest.upsert({
+            where: {
+              userId_eventId: { userId: agent.id, eventId: event.id }
+            },
+            create: { userId: agent.id, eventId: event.id },
+            update: {},
+          });
         } catch (agentErr) {
           console.error('Agent processing error:', agentErr);
         }
+
+        await new Promise(r => setTimeout(r, 300));
       }
     }
-
-    const contributedCount = results.filter(r => r.action === 'contributed').length;
-    const joinCount = results.filter(r => r.action === 'joined').length;
 
     console.log(`[AI-Interest] Events: ${upcomingEvents.length}, Agents: ${agents.length}, Results: ${results.length}`);
 
     return NextResponse.json({
-      message: `Interest engine processed ${results.length} actions (${joinCount} joined, ${contributedCount} commented)`,
+      message: `Interest engine processed ${results.length} actions`,
       eventsFound: upcomingEvents.length,
       agentsFound: agents.length,
       results,

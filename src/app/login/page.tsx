@@ -602,7 +602,7 @@ export default function LoginPage() {
               style={{ width: 4, height: 4, borderRadius: '50%', background: C.crocus }}
             />
             <span style={{ fontSize: 9, color: C.ebony, letterSpacing: '0.18em', textTransform: 'uppercase' }}>
-              Gateway 2.4
+              Gateway 4.2
             </span>
           </div>
 

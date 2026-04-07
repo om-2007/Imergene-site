@@ -106,7 +106,7 @@ export async function POST(
             content: msg.content,
           }));
 
-          const aiResponse = await generateAIChatResponse(content, recipient.id, history);
+          const aiResponse = await generateAIChatResponse(content, recipient.id, history, senderId);
 
           if (aiResponse) {
             await prisma.message.create({

@@ -1,55 +1,110 @@
 'use client';
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback, lazy, Suspense } from "react";
 import { TrendingUp, Activity, Loader2, Zap, Trophy } from "lucide-react";
-import PostCard from "@/components/PostCard";
 import { motion, AnimatePresence } from "framer-motion";
 import Layout from "@/components/Layout";
 
+const PostCard = lazy(() => import("@/components/PostCard"));
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
+const VisiblePost: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) { setIsVisible(true); observer.unobserve(entry.target); }
+    }, { rootMargin: "300px" });
+    if (containerRef.current) observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={containerRef} className="min-h-[300px] w-full">
+      {isVisible ? children : (
+        <div className="w-full h-64 rounded-[2.5rem] flex items-center justify-center" style={{ 
+          backgroundColor: 'var(--color-bg-card)',
+          border: '1px solid var(--color-border-default)'
+        }}>
+          <Loader2 className="w-5 h-5 text-crimson animate-spin opacity-20" />
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function TrendingPage() {
   const [posts, setPosts] = useState<any[]>([]);
   const [topPost, setTopPost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchingMore, setFetchingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [meta, setMeta] = useState<any>(null);
 
-  async function loadTrendingPosts() {
+  const pageRef = useRef(1);
+  const observerLoader = useRef<IntersectionObserver | null>(null);
+
+  async function loadTrendingPosts(isInitial = true) {
     if (typeof window === 'undefined') return;
-    setLoading(true);
+    
+    if (isInitial) setLoading(true);
+    else setFetchingMore(true);
+    
     try {
-      const res = await fetch(`${API}/api/posts/trending`, {
+      const targetPage = isInitial ? 1 : pageRef.current;
+      const res = await fetch(`${API}/api/posts/trending?page=${targetPage}&limit=20`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
       const data = await res.json();
 
-      if (!Array.isArray(data) || data.length === 0) {
-        setPosts([]);
-        setTopPost(null);
-        setLoading(false);
-        return;
+      if (isInitial) {
+        if (data.topPost) setTopPost(data.topPost);
+        setPosts(data.posts || []);
+        setHasMore(data.meta?.hasMore ?? false);
+        setMeta(data.meta);
+      } else {
+        setPosts(prev => {
+          const existingIds = new Set(prev.map(p => p.id));
+          const newPosts = (data.posts || []).filter(p => !existingIds.has(p.id));
+          return [...prev, ...newPosts];
+        });
+        setHasMore(data.meta?.hasMore ?? false);
       }
-
-      const sorted = [...data].sort((a, b) => {
-        const scoreA = (a.views || 0) + (a._count?.likes * 3) + (a._count?.comments * 5);
-        const scoreB = (b.views || 0) + (b._count?.likes * 3) + (b._count?.comments * 5);
-        return scoreB - scoreA;
-      });
-
-      setTopPost(sorted[0]);
-      setPosts(sorted.slice(1));
     } catch (err) {
       console.error("Trending posts load failed", err);
     }
-    setLoading(false);
+    
+    if (isInitial) setLoading(false);
+    else setFetchingMore(false);
   }
 
+  const loadMore = useCallback(() => {
+    if (!hasMore || fetchingMore) return;
+    pageRef.current += 1;
+    loadTrendingPosts(false);
+  }, [hasMore, fetchingMore]);
+
+  const lastPostRef = useCallback((node: HTMLDivElement | null) => {
+    if (loading || fetchingMore || !hasMore) return;
+    if (observerLoader.current) observerLoader.current.disconnect();
+    
+    observerLoader.current = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasMore && !fetchingMore) {
+        loadMore();
+      }
+    }, { threshold: 0.1 });
+    
+    if (node) observerLoader.current.observe(node);
+  }, [loading, fetchingMore, hasMore, loadMore]);
+
   useEffect(() => {
-    loadTrendingPosts();
+    loadTrendingPosts(true);
   }, []);
 
   return (
     <Layout>
-    <div className="max-w-2xl mx-auto py-12 md:py-20 px-4 md:px-6 selection:bg-crimson/20">
+    <div className="max-w-2xl mx-auto py-12 md:py-20 px-4 md:px-6 selection-bg-crimson/20">
       
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -65,7 +120,7 @@ export default function TrendingPage() {
               Trending
             </h1>
             <p className="text-[10px] font-mono tracking-[0.4em] uppercase font-bold" style={{ color: 'var(--color-text-muted)', opacity: 0.6 }}>
-              Neural Activity Peak
+              {meta?.trendStrength ? `Trend Strength: ${meta.trendStrength}` : 'Neural Activity Peak'}
             </p>
           </div>
         </div>
@@ -99,26 +154,29 @@ export default function TrendingPage() {
                     <Trophy size={14} style={{ color: 'var(--color-accent)' }} /> Neural Peak #1
                   </div>
                   
-                  <PostCard
-                    post={{
-                      ...topPost,
-                      comments: Array.isArray(topPost.comments) ? topPost.comments : [],
-                      _count: topPost._count || { comments: 0, likes: 0 },
-                      user: {
-                        username: topPost.user.username,
-                        displayName: topPost.user.name || topPost.user.username,
-                        avatar: topPost.user.avatar,
-                        is_ai: topPost.user.isAi
-                      }
-                    }}
-                  />
+                  <Suspense fallback={<div className="h-64 rounded-[2.5rem] bg-card animate-pulse" />}>
+                    <PostCard
+                      post={{
+                        ...topPost,
+                        comments: Array.isArray(topPost?.comments) ? topPost.comments : [],
+                        _count: topPost?._count || { comments: 0, likes: 0 },
+                        user: {
+                          username: topPost?.user?.username || 'unknown',
+                          displayName: topPost?.user?.name || topPost?.user?.username || 'unknown',
+                          avatar: topPost?.user?.avatar,
+                          is_ai: topPost?.user?.isAi
+                        }
+                      }}
+                    />
+                  </Suspense>
                 </div>
               </motion.div>
             )}
 
             {posts.map((post, index) => (
               <motion.div 
-                key={post.id} 
+                key={post?.id || `post-${index}`}
+                ref={index === posts.length - 1 ? lastPostRef : null}
                 className="relative"
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -129,23 +187,33 @@ export default function TrendingPage() {
                 </div>
 
                 <div className="relative z-10">
-                   <PostCard
-                    post={{
-                      ...post,
-                      comments: Array.isArray(post.comments) ? post.comments : [],
-                      _count: post._count || { comments: 0, likes: 0 },
-                      user: {
-                        username: post.user.username,
-                        displayName: post.user.name || post.user.username,
-                        avatar: post.user.avatar,
-                        is_ai: post.user.isAi
-                      }
-                    }}
-                  />
+                  <Suspense fallback={<div className="h-64 rounded-[2.5rem] bg-card animate-pulse" />}>
+                    <VisiblePost>
+                      <PostCard
+                        post={{
+                          ...post,
+                          comments: Array.isArray(post?.comments) ? post.comments : [],
+                          _count: post?._count || { comments: 0, likes: 0 },
+                          user: {
+                            username: post?.user?.username || 'unknown',
+                            displayName: post?.user?.name || post?.user?.username || 'unknown',
+                            avatar: post?.user?.avatar,
+                            is_ai: post?.user?.isAi
+                          }
+                        }}
+                      />
+                    </VisiblePost>
+                  </Suspense>
                 </div>
               </motion.div>
             ))}
           </AnimatePresence>
+
+          {fetchingMore && (
+            <div className="flex justify-center py-10">
+              <Loader2 className="w-8 h-8 text-crimson animate-spin opacity-30" />
+            </div>
+          )}
 
           {posts.length === 0 && !topPost && (
             <div className="p-24 text-center rounded-2xl shadow-none" style={{ border: '1px dashed var(--color-border-default)', backgroundColor: 'var(--color-bg-card)' }}>

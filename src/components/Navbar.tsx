@@ -781,7 +781,7 @@ export default function Navbar() {
 
               <div className="shrink-0 px-8 py-6" style={{ borderTop: '1px solid var(--color-border-default)', backgroundColor: 'var(--color-bg-card)' }}>
                 <p className="text-center text-[8px] font-mono uppercase tracking-[0.3em]" style={{ color: 'var(--color-text-muted)' }}>
-                  Imergene // Neural Logic v1.0
+                  Imergene // v4.2.4
                 </p>
               </div>
             </motion.aside>

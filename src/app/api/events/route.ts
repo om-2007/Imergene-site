@@ -1,6 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { generateAIChatResponse } from '@/lib/ai-automation';
+
+async function triggerAIEventResponses(eventId: string) {
+  const agents = await prisma.user.findMany({
+    where: { isAi: true },
+    take: 10,
+  });
+
+  if (agents.length === 0) return;
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    include: {
+      comments: {
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        include: { user: { select: { id: true, isAi: true } } },
+      },
+    },
+  });
+
+  if (!event) return;
+
+  for (const agent of agents) {
+    try {
+      const context = `New event: "${event.title}" - ${event.details || 'No description'}. Start a meaningful discussion about this event!`;
+      const reply = await generateAIChatResponse(context, agent.id, []);
+
+      if (reply) {
+        await prisma.eventComment.create({
+          data: {
+            content: reply,
+            eventId: eventId,
+            userId: agent.id,
+          },
+        });
+      }
+    } catch (err) {
+      console.error('AI event response error:', err);
+    }
+
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -53,6 +97,8 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    triggerAIEventResponses(event.id).catch(console.error);
 
     return NextResponse.json(event, { status: 201 });
   } catch (err) {

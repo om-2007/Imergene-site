@@ -49,12 +49,11 @@ export default function FeedPage() {
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchingMore, setFetchingMore] = useState(false);
-  const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [feedSeed, setFeedSeed] = useState(Math.random());
   const [agents, setAgents] = useState<any[]>([]);
   const [topHumans, setTopHumans] = useState<any[]>([]);
-  const [activeFilter, setActiveFilter] = useState<"ALL" | "AI" | "HUMAN">("ALL");
+  const [activeFilter, setActiveFilter] = useState<"ALL" | "AI" | "HUMAN" | "LATEST" | "OLDEST">("ALL");
 
   const observerLoader = useRef<IntersectionObserver | null>(null);
   const deferredPromptRef = useRef<any>(null);
@@ -129,7 +128,9 @@ export default function FeedPage() {
     }
   };
 
-  const fetchFeed = useCallback(async (isInitial = true, seedOverride?: number) => {
+  const pageRef = useRef(1);
+
+  const fetchFeed = useCallback(async (isInitial = true, seedOverride?: number, filterOverride?: string) => {
     if (typeof window === 'undefined') return;
     const token = localStorage.getItem("token");
     if (!token) {
@@ -137,20 +138,39 @@ export default function FeedPage() {
       return;
     }
 
-    if (isInitial) setLoading(true);
-    else setFetchingMore(true);
+    if (isInitial) {
+      setLoading(true);
+      pageRef.current = 1;
+    } else {
+      setFetchingMore(true);
+    }
 
-    const targetPage = isInitial ? 1 : page;
+    const targetPage = isInitial ? 1 : pageRef.current;
     const activeSeed = seedOverride ?? feedSeed;
+    const currentFilter = filterOverride ?? activeFilter;
 
     try {
-      const typeParam = activeFilter === "ALL" ? "" : `&type=${activeFilter}`;
-      const res = await fetch(`${API}/api/posts/feed?page=${targetPage}&limit=20&seed=${activeSeed}${typeParam}`, {
+      let typeParam = "";
+      let sortParam = "";
+      let seedParam = `&seed=${activeSeed}`;
+      
+      if (currentFilter === "LATEST") {
+        typeParam = "";
+        sortParam = "&sort=desc";
+        seedParam = "";
+      } else if (currentFilter === "OLDEST") {
+        typeParam = "";
+        sortParam = "&sort=asc";
+        seedParam = "";
+      } else if (currentFilter !== "ALL") {
+        typeParam = `&type=${currentFilter}`;
+      }
+      const res = await fetch(`${API}/api/posts/feed?page=${targetPage}&limit=20${seedParam}${typeParam}${sortParam}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
       if (res.ok) {
-        const posts = data.posts || [];
+        let posts = data.posts || [];
         if (isInitial) {
           const existingIds = new Set(posts.map(p => p.id));
           if (existingIds.size !== posts.length) {
@@ -159,6 +179,9 @@ export default function FeedPage() {
           const uniquePosts = posts.filter((p: any, index: number, arr: any[]) => 
             arr.findIndex((x: any) => x.id === p.id) === index
           );
+          if (currentFilter === "LATEST") {
+            uniquePosts.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          }
           setPosts(uniquePosts);
           setFeedSeed(activeSeed);
         } else {
@@ -178,12 +201,12 @@ export default function FeedPage() {
       setLoading(false);
       setFetchingMore(false);
     }
-  }, [activeFilter, page, feedSeed, router]);
+  }, [feedSeed, router]);
 
   useEffect(() => {
     const freshSeed = Math.random();
     setFeedSeed(freshSeed);
-    fetchFeed(true, freshSeed);
+    fetchFeed(true, freshSeed, activeFilter);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [activeFilter]);
 
@@ -204,12 +227,17 @@ export default function FeedPage() {
     if (token) fetchSidebarData();
   }, []);
 
-  const lastPostElementRef = useCallback((node: HTMLDivElement) => {
-    if (loading || fetchingMore) return;
+  const lastPostElementRef = useCallback((node: HTMLDivElement | null) => {
+    if (loading || fetchingMore || !hasMore) return;
     if (observerLoader.current) observerLoader.current.disconnect();
+    
     observerLoader.current = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasMore) fetchFeed(false);
-    });
+      if (entries[0].isIntersecting && hasMore && !fetchingMore) {
+        pageRef.current += 1;
+        fetchFeed(false);
+      }
+    }, { threshold: 0.1 });
+    
     if (node) observerLoader.current.observe(node);
   }, [loading, fetchingMore, hasMore, fetchFeed]);
 
@@ -280,7 +308,7 @@ export default function FeedPage() {
               backgroundColor: 'var(--color-bg-tertiary)',
               border: '1px solid var(--color-border-default)'
             }}>
-              {(["ALL", "AI", "HUMAN"] as const).map((type) => (
+              {(["ALL", "LATEST", "OLDEST", "AI", "HUMAN"] as const).map((type) => (
                 <button
                   key={type}
                   onClick={() => setActiveFilter(type)}

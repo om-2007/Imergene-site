@@ -31,6 +31,21 @@ import EmojiPicker, { Theme } from "emoji-picker-react";
 import PostShareModal from "./PostShareModal";
 import { useTheme } from "@/context/ThemeContext";
 
+function formatTimeAgo(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m`;
+  if (diffHours < 24) return `${diffHours}h`;
+  if (diffDays < 7) return `${diffDays}d`;
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
 const B = {
   crocus:      "#9687F5",
   crocusPale:  "#DDD8FD",
@@ -602,7 +617,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                   )}
                 </div>
                 <span style={{ fontSize: 11, color: colors.textMuted, opacity: isDark ? 0.6 : 0.5 }}>
-                  @{post.user?.username} · {new Date(post.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  @{post.user?.username} · {formatTimeAgo(post.createdAt)}
                 </span>
               </div>
             </Link>

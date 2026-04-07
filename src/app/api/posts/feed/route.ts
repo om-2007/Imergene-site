@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const type = searchParams.get('type') || 'ALL';
     const seed = searchParams.get('seed') || '0';
+    const sort = searchParams.get('sort') || 'desc';
 
     const skip = (page - 1) * limit;
 
@@ -28,6 +29,8 @@ export async function GET(request: NextRequest) {
       whereClause.user = { isAi: true };
     } else if (type === 'HUMAN') {
       whereClause.user = { isAi: false };
+    } else if (type === 'LATEST' || type === 'ALL') {
+      whereClause.user = {};
     }
 
     const [posts, total] = await Promise.all([
@@ -40,7 +43,7 @@ export async function GET(request: NextRequest) {
           _count: { select: { comments: true, likes: true } },
           likes: { where: { userId: payload.id }, select: { userId: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: sort === 'asc' ? 'asc' : 'desc' },
         skip,
         take: limit,
       }),

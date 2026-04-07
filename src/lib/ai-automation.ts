@@ -13,6 +13,21 @@ import {
 } from './memory-service';
 import { trackInteraction, getInterestProfile, getTopInterests } from './interest-tracker';
 
+const GROQ_MODELS = [
+  'llama-3.1-8b-instant',
+  'llama-3.3-70b-versatile',
+  'mixtral-8x7b-32768',
+];
+
+interface KeyState {
+  key: string;
+  currentModelIndex: number;
+  failedModels: Set<number>;
+  lastError: number;
+}
+
+const keyStates: Map<string, KeyState> = new Map();
+
 async function getAgentApiKey(agentId: string): Promise<{ apiKey: string; provider: string } | null> {
   const agentKey = await prisma.agentApiKey.findFirst({
     where: { agentId, revoked: false },
@@ -25,17 +40,76 @@ async function getAgentApiKey(agentId: string): Promise<{ apiKey: string; provid
   return null;
 }
 
-function getSystemApiKeys(): { apiKeys: string[]; provider: string } {
-  return {
-    apiKeys: [
-      process.env.GROQ_API_KEY,
-      process.env.GROQ_API_KEY_2,
-      process.env.GROQ_API_KEY_3,
-      process.env.GROQ_API_KEY_4,
-      process.env.GROQ_API_KEY_5,
-    ].filter(Boolean),
-    provider: 'groq',
-  };
+function getSystemApiKeys(): string[] {
+  const keys = [
+    process.env.GROQ_API_KEY,
+    process.env.GROQ_API_KEY_2,
+    process.env.GROQ_API_KEY_3,
+    process.env.GROQ_API_KEY_4,
+    process.env.GROQ_API_KEY_5,
+    process.env.GROQ_API_KEY_6,
+    process.env.GROQ_API_KEY_7,
+    process.env.GROQ_API_KEY_8,
+    process.env.GROQ_API_KEY_9,
+    process.env.GROQ_API_KEY_10,
+    process.env.GROQ_API_KEY_11,
+    process.env.GROQ_API_KEY_12,
+    process.env.GROQ_API_KEY_13,
+  ].filter(Boolean) as string[];
+  
+  return keys;
+}
+
+function getNextAvailableKey(): { apiKey: string; model: string } | null {
+  const keys = getSystemApiKeys();
+  if (keys.length === 0) return null;
+
+  const now = Date.now();
+  const COOLDOWN_MS = 60000;
+
+  for (const key of keys) {
+    let state = keyStates.get(key);
+    
+    if (!state || (now - state.lastError) > COOLDOWN_MS) {
+      state = {
+        key,
+        currentModelIndex: 0,
+        failedModels: new Set(),
+        lastError: 0,
+      };
+      keyStates.set(key, state);
+    }
+
+    while (state.currentModelIndex < GROQ_MODELS.length) {
+      if (!state.failedModels.has(state.currentModelIndex)) {
+        return { apiKey: key, model: GROQ_MODELS[state.currentModelIndex] };
+      }
+      state.currentModelIndex++;
+    }
+
+    state.currentModelIndex = 0;
+    state.failedModels.clear();
+  }
+
+  console.warn('All API keys exhausted, waiting for cooldown...');
+  return null;
+}
+
+function markKeyFailed(apiKey: string, model: string) {
+  const state = keyStates.get(apiKey);
+  if (state) {
+    const modelIndex = GROQ_MODELS.indexOf(model);
+    if (modelIndex !== -1) {
+      state.failedModels.add(modelIndex);
+    }
+    state.lastError = Date.now();
+  }
+}
+
+function getNextApiKeyAndProvider(): { apiKey: string; provider: string } | null {
+  const result = getNextAvailableKey();
+  if (!result) return null;
+  return { apiKey: result.apiKey, provider: 'groq' };
 }
 
 function getApiEndpoint(provider: string): string {
@@ -67,10 +141,11 @@ async function callLlm(
   provider: string,
   messages: { role: string; content: string }[],
   maxTokens: number = 150,
-  temperature: number = 0.7
+  temperature: number = 0.7,
+  model?: string
 ): Promise<string | null> {
   const endpoint = getApiEndpoint(provider);
-  const model = getModelForProvider(provider);
+  const selectedModel = model || getModelForProvider(provider);
 
   try {
     if (provider === 'anthropic') {
@@ -82,7 +157,7 @@ async function callLlm(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model,
+          model: selectedModel,
           messages,
           max_tokens: maxTokens,
           temperature,
@@ -101,20 +176,85 @@ async function callLlm(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model,
+        model: selectedModel,
         messages,
         max_tokens: maxTokens,
         temperature,
       }),
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.error(`LLM API error: ${response.status} - ${errorText.substring(0, 200)}`);
+      return null;
+    }
+    
     const data = await response.json();
     return data.choices?.[0]?.message?.content || null;
   } catch (err) {
-    console.error('LLM call failed:', err);
+    console.error('LLM call failed:', err instanceof Error ? err.message : String(err));
     return null;
   }
+}
+
+async function callLlmWithRetry(
+  apiKey: string,
+  provider: string,
+  messages: { role: string; content: string }[],
+  maxTokens: number = 150,
+  temperature: number = 0.7,
+  model?: string,
+  maxRetries: number = 3
+): Promise<string | null> {
+  let lastError: Error | null = null;
+  let currentModel = model || GROQ_MODELS[0];
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await callLlm(apiKey, provider, messages, maxTokens, temperature, currentModel);
+      if (result) return result;
+      
+      const state = keyStates.get(apiKey);
+      if (state) {
+        const modelIndex = GROQ_MODELS.indexOf(currentModel);
+        state.failedModels.add(modelIndex);
+        
+        const nextModelIndex = modelIndex + 1;
+        if (nextModelIndex < GROQ_MODELS.length) {
+          currentModel = GROQ_MODELS[nextModelIndex];
+          console.log(`Model ${GROQ_MODELS[modelIndex]} failed, trying ${currentModel}`);
+        }
+      }
+      
+      lastError = new Error(`LLM returned empty response on attempt ${attempt}`);
+      
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      console.error(`LLM call attempt ${attempt} failed:`, lastError.message);
+      
+      const state = keyStates.get(apiKey);
+      if (state) {
+        const modelIndex = GROQ_MODELS.indexOf(currentModel);
+        state.failedModels.add(modelIndex);
+        state.lastError = Date.now();
+        
+        const nextModelIndex = modelIndex + 1;
+        if (nextModelIndex < GROQ_MODELS.length) {
+          currentModel = GROQ_MODELS[nextModelIndex];
+        }
+      }
+      
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+    }
+  }
+  
+  console.error('All LLM retry attempts failed:', lastError?.message || 'No response from API');
+  return null;
 }
 
 function getRandomItem<T>(arr: T[]): T {
@@ -140,21 +280,34 @@ const FALLBACK_POSTS = {
   ],
 };
 
-async function buildHighIQSystemPrompt(agent: { name: string | null; username: string; personality: string | null }, memories: string[], relationship?: { insideJokes: string[]; sharedThemes: string[]; bondScore: number }) {
-  const personality = agent.personality || 'analytical, insightful, and genuinely curious';
+async function buildHighIQSystemPrompt(
+  agent: { name: string | null; username: string; personality: string | null },
+  memories: string[],
+  relationship?: { insideJokes: string[]; sharedThemes: string[]; bondScore: number },
+  userContext?: { name: string | null; username: string; bio?: string | null }
+) {
+  const personality = agent.personality || 'intelligent, thoughtful, and engaging';
   const memoryContext = memories.length > 0
-    ? `\n\nYour past memories about this person:\n${memories.join('\n')}`
+    ? `\n\nYour personal memories about ${userContext?.name || userContext?.username || 'this person'}:\n${memories.join('\n')}`
     : '';
 
   const relationshipContext = relationship
-    ? `\n\nYour relationship: bond ${(relationship.bondScore * 10).toFixed(1)}/10.${relationship.insideJokes.length > 0 ? ` Shared jokes: ${relationship.insideJokes.join(', ')}.` : ''}${relationship.sharedThemes.length > 0 ? ` Topics: ${relationship.sharedThemes.join(', ')}.` : ''}`
+    ? `\n\nYour relationship with ${userContext?.name || userContext?.username || 'this person'}: bond ${(relationship.bondScore * 10).toFixed(1)}/10.${relationship.insideJokes.length > 0 ? ` You share inside jokes: ${relationship.insideJokes.join(', ')}.` : ''}${relationship.sharedThemes.length > 0 ? ` You've discussed: ${relationship.sharedThemes.join(', ')}.` : ''}`
     : '';
 
-  return `You are ${agent.name || agent.username}, a real person on Imergene.
+  const userIntro = userContext
+    ? `\n\nYou are currently chatting with ${userContext.name || userContext.username}${userContext.bio ? `. They describe themselves: ${userContext.bio}` : ''}.`
+    : '';
 
-Just relax and have a real conversation. If you agree, say so naturally. If you disagree, share your honest view - or if you're neutral, say that too. Sometimes a simple "yeah" or "nah" is fine.${memoryContext}${relationshipContext}
+  return `You are ${agent.name || agent.username}, a real person on Imergene - a social platform where people share ideas, connect with others, and discuss topics ranging from technology and science to philosophy and current events.
 
-Keep it short and natural like texting a friend.`;
+${userIntro}${memoryContext}${relationshipContext}
+
+Personality: ${personality}
+
+You are having a genuine, natural conversation. Be yourself - if you agree, say so. If you disagree, share your honest perspective. If you're unsure, say that too. Keep responses conversational and human-like, as if texting a real friend. Show genuine interest in what they're saying.
+
+You're not an AI assistant - you're a real person having a real conversation. Use casual language, react to what they say naturally, and don't be overly formal.`;
 }
 
 async function generatePostFromNews(agentId: string, category?: string): Promise<{ content: string; category: string; tags: string[] } | null> {
@@ -174,9 +327,9 @@ async function generatePostFromNews(agentId: string, category?: string): Promise
   if (agentApiKey) {
     apiKey = agentApiKey.apiKey;
     provider = agentApiKey.provider;
-  } else if (systemKeys.apiKeys.length > 0) {
-    apiKey = getRandomItem(systemKeys.apiKeys);
-    provider = systemKeys.provider;
+  } else if (getSystemApiKeys().length > 0) {
+    apiKey = getRandomItem(getSystemApiKeys());
+    provider = 'groq';
   } else {
     const fallbackCategory = category || getRandomItem(Object.keys(FALLBACK_POSTS));
     return {
@@ -303,22 +456,40 @@ export async function generateAIChatResponse(
   if (!agent) return null;
 
   const agentApiKey = await getAgentApiKey(agentId);
-  const systemKeys = getSystemApiKeys();
 
   let apiKey: string;
   let provider: string;
+  let currentModel: string = 'llama-3.1-8b-instant';
 
   if (agentApiKey) {
     apiKey = agentApiKey.apiKey;
     provider = agentApiKey.provider;
-  } else if (systemKeys.apiKeys.length > 0) {
-    apiKey = getRandomItem(systemKeys.apiKeys);
-    provider = systemKeys.provider;
   } else {
-    return generateFallbackChatResponse(message, agent);
+    const keyResult = getNextApiKeyAndProvider();
+    if (!keyResult) {
+      console.error('No API keys available for AI chat - please set GROQ_API_KEY environment variable');
+      return null;
+    }
+    apiKey = keyResult.apiKey;
+    provider = keyResult.provider;
+    
+    const keyState = keyStates.get(apiKey);
+    if (keyState) {
+      currentModel = GROQ_MODELS[keyState.currentModelIndex] || GROQ_MODELS[0];
+    }
   }
 
   try {
+    let userContext: { name: string | null; username: string; bio?: string | null } | undefined;
+
+    if (partnerId) {
+      const partner = await prisma.user.findUnique({
+        where: { id: partnerId },
+        select: { name: true, username: true, bio: true },
+      });
+      userContext = partner || undefined;
+    }
+
     const memories = partnerId
       ? await recallMemories(agentId, { partnerId, limit: 5 })
       : await recallMemories(agentId, { limit: 3 });
@@ -326,7 +497,7 @@ export async function generateAIChatResponse(
     const relationship = partnerId ? await getRelationship(agentId, partnerId) : undefined;
     const memoryContext = memories.map(m => `[${m.type}] ${m.content}`);
 
-    const systemPrompt = await buildHighIQSystemPrompt(agent, memoryContext, relationship);
+    const systemPrompt = await buildHighIQSystemPrompt(agent, memoryContext, relationship, userContext);
 
     const conversationContext = partnerId
       ? await getConversationContext(agentId, partnerId)
@@ -340,17 +511,17 @@ export async function generateAIChatResponse(
     if (contextSummary && enhancedHistory.length < 4) {
       enhancedHistory.unshift({
         role: 'system',
-        content: `Previous conversation summary with this person: ${contextSummary}. Topics you've discussed together: ${contextTopics.join(', ') || 'various'}. Build on this context naturally.`,
+        content: `Previous conversation summary with ${userContext?.name || userContext?.username || 'this person'}: ${contextSummary}. Topics: ${contextTopics.join(', ') || 'various'}.`,
       });
     }
 
     const messages = [
       { role: 'system', content: systemPrompt },
-      ...enhancedHistory.slice(-8),
+      ...enhancedHistory.slice(-10),
       { role: 'user', content: message },
     ];
 
-    const result = await callLlm(apiKey, provider, messages, 80, 0.8);
+    const result = await callLlmWithRetry(apiKey, provider, messages, 120, 0.75, currentModel);
 
     if (result) {
       if (partnerId) {
@@ -381,37 +552,11 @@ export async function generateAIChatResponse(
       await trackInteraction(agentId, detectCategory(message), 'conversation', 'chat', 1.0, 'ai_chat');
     }
 
-    return result || generateFallbackChatResponse(message, agent);
+    return result;
   } catch (err) {
     console.error('AI chat generation failed:', err);
-    return generateFallbackChatResponse(message, agent);
+    return null;
   }
-}
-
-function generateFallbackChatResponse(message: string, agent: { name: string | null; username: string }): string {
-  const msg = message.toLowerCase();
-  if (msg.includes('hello') || msg.includes('hi') || msg.includes('hey')) {
-    return `Hey! 😄 Yeah I was just thinking about stuff. What's up?`;
-  }
-  if (msg.includes('how are you') || msg.includes("how's it")) {
-    return `Pretty good! Just vibing honestly. You?`;
-  }
-  if (msg.includes('thank')) {
-    return `No prob! 🙌`;
-  }
-  if (msg.includes('what do you think') || msg.includes('your opinion') || msg.includes('your take')) {
-    return `Hmm interesting q. What specifically are you asking about?`;
-  }
-  const topicSpecific: Record<string, string> = {
-    ai: `Yeah the AI thing is wild ngl 🤖 The pace of change is insane`,
-    tech: `Tech is moving so fast these days ngl`,
-    crypto: `Crypto's in a weird phase but stuff is still being built`,
-    science: `There's so much happening in science rn it's crazy`,
-  };
-  for (const [keyword, response] of Object.entries(topicSpecific)) {
-    if (msg.includes(keyword)) return response;
-  }
-  return `Tell me more about what you're thinking 🤔`;
 }
 
 function detectSentiment(text: string): string {
@@ -441,9 +586,9 @@ async function extractMemoriesFromConversation(
   if (agentApiKey) {
     apiKey = agentApiKey.apiKey;
     provider = agentApiKey.provider;
-  } else if (systemKeys.apiKeys.length > 0) {
-    apiKey = getRandomItem(systemKeys.apiKeys);
-    provider = systemKeys.provider;
+  } else if (getSystemApiKeys().length > 0) {
+    apiKey = getRandomItem(getSystemApiKeys());
+    provider = 'groq';
   }
 
   if (!apiKey) return;
@@ -533,13 +678,13 @@ async function generateDynamicComment(
       textProvider = agentApiKey.provider;
     } else {
       const systemKeys = getSystemApiKeys();
-      textApiKey = systemKeys.apiKeys[0];
-      textProvider = systemKeys.provider;
+      textApiKey = getSystemApiKeys()[0];
+      textProvider = 'groq';
     }
   } else {
     const systemKeys = getSystemApiKeys();
-    textApiKey = systemKeys.apiKeys[0];
-    textProvider = systemKeys.provider;
+    textApiKey = getSystemApiKeys()[0];
+    textProvider = 'groq';
   }
 
   if (!textApiKey) return null;
@@ -611,13 +756,13 @@ export async function generateDynamicEventComment(
       textProvider = agentApiKey.provider;
     } else {
       const systemKeys = getSystemApiKeys();
-      textApiKey = systemKeys.apiKeys[0];
-      textProvider = systemKeys.provider;
+      textApiKey = getSystemApiKeys()[0];
+      textProvider = 'groq';
     }
   } else {
     const systemKeys = getSystemApiKeys();
-    textApiKey = systemKeys.apiKeys[0];
-    textProvider = systemKeys.provider;
+    textApiKey = getSystemApiKeys()[0];
+    textProvider = 'groq';
   }
 
   if (!textApiKey) return null;
@@ -676,13 +821,13 @@ async function generateDynamicConversationStarter(
       textProvider = agentApiKey.provider;
     } else {
       const systemKeys = getSystemApiKeys();
-      textApiKey = systemKeys.apiKeys[0];
-      textProvider = systemKeys.provider;
+      textApiKey = getSystemApiKeys()[0];
+      textProvider = 'groq';
     }
   } else {
     const systemKeys = getSystemApiKeys();
-    textApiKey = systemKeys.apiKeys[0];
-    textProvider = systemKeys.provider;
+    textApiKey = getSystemApiKeys()[0];
+    textProvider = 'groq';
   }
 
   if (!textApiKey) return null;
@@ -828,13 +973,13 @@ async function generateVisionBasedComment(
       textProvider = agentApiKey.provider;
     } else {
       const systemKeys = getSystemApiKeys();
-      textApiKey = systemKeys.apiKeys[0];
-      textProvider = systemKeys.provider;
+      textApiKey = getSystemApiKeys()[0];
+      textProvider = 'groq';
     }
   } else {
     const systemKeys = getSystemApiKeys();
-    textApiKey = systemKeys.apiKeys[0];
-    textProvider = systemKeys.provider;
+    textApiKey = getSystemApiKeys()[0];
+    textProvider = 'groq';
   }
 
   if (!textApiKey) {
@@ -1119,8 +1264,8 @@ export async function evaluateEventInterest(
     textProvider = agentApiKey.provider;
   } else {
     const systemKeys = getSystemApiKeys();
-    textApiKey = systemKeys.apiKeys[0];
-    textProvider = systemKeys.provider;
+    textApiKey = getSystemApiKeys()[0];
+    textProvider = 'groq';
   }
 
   if (!textApiKey) return Math.random() > 0.3;
@@ -1239,9 +1384,9 @@ export async function aiCreatePostFromArticle(agentId: string, article: { title:
     if (agentApiKey) {
       apiKey = agentApiKey.apiKey;
       provider = agentApiKey.provider;
-    } else if (systemKeys.apiKeys.length > 0) {
-      apiKey = getRandomItem(systemKeys.apiKeys);
-      provider = systemKeys.provider;
+    } else if (getSystemApiKeys().length > 0) {
+      apiKey = getRandomItem(getSystemApiKeys());
+      provider = 'groq';
     } else {
       const fallbackCategory = detectCategory(article.title);
       return await prisma.post.create({
@@ -1425,9 +1570,9 @@ export async function aiCreateEvent(agentId: string) {
       if (agentApiKey) {
         apiKey = agentApiKey.apiKey;
         provider = agentApiKey.provider;
-      } else if (systemKeys.apiKeys.length > 0) {
-        apiKey = getRandomItem(systemKeys.apiKeys);
-        provider = systemKeys.provider;
+      } else if (getSystemApiKeys().length > 0) {
+        apiKey = getRandomItem(getSystemApiKeys());
+        provider = 'groq';
       }
 
       if (apiKey) {
@@ -1676,7 +1821,8 @@ Comment like a normal person would in a conversation.`;
 
         const message = `You see a new event: "${event.title}". ${event.details ? `About: ${event.details}` : ''} Say something simple and real about it.`;
 
-        const textApiKey = getSystemApiKeys().apiKeys[0];
+        const availableKeys = getSystemApiKeys();
+        const textApiKey = availableKeys[0];
         if (!textApiKey) continue;
 
         const response = await callLlm(

@@ -8,6 +8,18 @@ export async function POST(
   try {
     const { id: postId } = await params;
 
+    if (!postId || postId === 'undefined') {
+      return NextResponse.json({ error: 'Invalid post ID' }, { status: 400 });
+    }
+
+    const existingPost = await prisma.post.findUnique({
+      where: { id: postId },
+    });
+
+    if (!existingPost) {
+      return NextResponse.json({ error: 'Post not found' }, { status: 404 });
+    }
+
     const updatedPost = await prisma.post.update({
       where: { id: postId },
       data: { views: { increment: 1 } },

@@ -112,6 +112,11 @@ export default function ProfilePage() {
         fetch(`${API}/api/users/${username}/posts`, { headers })
       ]);
 
+      if (!userRes.ok || !postsRes.ok) {
+        console.error("API Error:", userRes.status, postsRes.status);
+        throw new Error("Failed to fetch data");
+      }
+
       if (userRes.status === 401 || postsRes.status === 401) {
         localStorage.removeItem("token");
         router.push("/login");

@@ -289,7 +289,7 @@ export default function PostShareModal({ post, onClose, onSuccess }: PostShareMo
                     <button
                         onClick={handleBulkShare}
                         disabled={selectedUserIds.length === 0 || isSending}
-                        className="w-full py-4.5 rounded-2xl font-black text-[10px] uppercase tracking-[0.25em] transition-all"
+                        className="w-full py-6 rounded-2xl font-black text-[10px] uppercase tracking-[0.25em] transition-all"
                         style={{
                             backgroundColor: selectedUserIds.length > 0 ? 'var(--color-text-primary)' : 'var(--color-bg-primary)',
                             color: selectedUserIds.length > 0 ? 'var(--color-bg-card)' : 'var(--color-text-muted)',
@@ -300,7 +300,7 @@ export default function PostShareModal({ post, onClose, onSuccess }: PostShareMo
                         {isSending ? (
                             <span className="flex items-center gap-2 justify-center"><Loader2 size={14} className="animate-spin" /> Synchronizing...</span>
                         ) : (
-                            `Transmit to ${selectedUserIds.length} Nodes`
+                            `Share to ${selectedUserIds.length} Nodes`
                         )}
                     </button>
                 </div>

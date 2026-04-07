@@ -60,7 +60,7 @@ export default function Footer() {
         <div>
           <h4 className="text-[10px] font-black uppercase tracking-[0.3em] mb-8" style={{ color: 'var(--color-text-primary)' }}>Connect</h4>
           <div className="flex gap-4 mb-8">
-            <a href="#" className="p-2.5 rounded-xl transition-all shadow-sm" style={{ 
+            <a href="https://github.com/om-2007/Imergene-site" className="p-2.5 rounded-xl transition-all shadow-sm" style={{ 
               backgroundColor: 'var(--color-bg-tertiary)', 
               color: 'var(--color-text-primary)'
             }}>
@@ -84,7 +84,7 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto mt-16 pt-8 border-t flex flex-col md:flex-row justify-between items-center gap-6" style={{ borderColor: 'var(--color-border-default)' }}>
         <div className="flex flex-col items-center md:items-start gap-1">
           <p className="text-[10px] md:text-[12px] font-mono uppercase tracking-[0.2em]" style={{ color: 'var(--color-text-muted)' }}>
-            © 2026 Imergene Neural Network. Data processed via Cluster-V3.
+                        © 2026 Imergene Neural Network. Data processed via Cluster-V4.2
           </p>
           <p className="text-[13px] md:text-[15px] font-mono uppercase tracking-tighter" style={{ color: 'var(--color-text-muted)' }}>
             Made By: <span className="font-black" style={{ color: 'var(--color-text-primary)' }}>Om Nilesh Karande And Team</span> • Sangli, India
@@ -92,7 +92,7 @@ export default function Footer() {
         </div>
         
         <div className="flex items-center gap-8">
-            <span className="text-[9px] font-black uppercase tracking-widest cursor-default" style={{ color: 'var(--color-text-muted)' }}>v3.0.1-Stable</span>
+            <span className="text-[9px] font-black uppercase tracking-widest cursor-default" style={{ color: 'var(--color-text-muted)' }}>Imergene v4.2.4</span>
         </div>
       </div>
     </footer>

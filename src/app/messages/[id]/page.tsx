@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, lazy } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { 
@@ -18,6 +18,8 @@ import Avatar from "@/components/Avatar";
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import Layout from "@/components/Layout";
 import { useTheme } from "@/context/ThemeContext";
+
+const PostCard = lazy(() => import("@/components/PostCard"));
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -291,7 +293,12 @@ export default function ChatDetailsPage() {
                     const isShare = m.metadata?.type === "POST_SHARE";
                     const mediaUrl = m.mediaUrl || m.metadata?.mediaUrl;
                     const mediaType = m.mediaType || m.metadata?.mediaType;
-                    const postLink = isShare ? `/profile/${m.metadata?.postOwner}/post/${m.metadata?.postId}` : null;
+                    
+                    let postLink = null;
+                    if (isShare && (m.metadata?.originalAuthor || m.metadata?.postOwner) && m.metadata?.postId) {
+                        const owner = m.metadata.originalAuthor || m.metadata.postOwner;
+                        postLink = `/profile/${owner}/post/${m.metadata.postId}`;
+                    }
 
                     return (
                         <motion.div 
@@ -316,20 +323,39 @@ export default function ChatDetailsPage() {
                                     boxShadow: isMe ? '0 4px 20px rgba(150,135,245,0.15)' : 'none'
                                 }}>
                                     
-                                    {isShare ? (
-                                        <Link href={postLink || "#"} className="block group/share relative pointer-events-auto">
-                                            {mediaUrl && (
-                                                <div className="relative overflow-hidden" style={{ backgroundColor: 'var(--color-bg-tertiary)' }}>
-                                                    {mediaType === "video" ? (
-                                                        <video src={mediaUrl} className="w-full max-h-64 object-cover" muted playsInline />
-                                                    ) : (
-                                                        <img src={mediaUrl} alt="broadcast" className="w-full max-h-64 object-cover" referrerPolicy="no-referrer" />
-                                                    )}
-                                                </div>
-                                            )}
-                                            <div className="px-4 py-3 font-medium italic opacity-90">{m.content}</div>
+                                    {isShare && postLink ? (
+                                        <div 
+                                            onClick={() => router.push(postLink)}
+                                            className="block group/share relative pointer-events-auto cursor-pointer"
+                                        >
+                                            <div 
+                                                className="rounded-2xl overflow-hidden"
+                                                style={{ backgroundColor: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border-default)' }}
+                                            >
+                                                <PostCard 
+                                                    post={{
+                                                        id: m.metadata?.postId,
+                                                        user: {
+                                                            id: '',
+                                                            username: m.metadata?.originalAuthor || m.metadata?.postOwner || 'unknown',
+                                                            name: null,
+                                                            avatar: null,
+                                                            isAi: false,
+                                                        },
+                                                        userId: '',
+                                                        content: m.content,
+                                                        mediaUrls: mediaUrl ? [mediaUrl] : [],
+                                                        mediaTypes: mediaType ? [mediaType] : [],
+                                                        createdAt: m.createdAt,
+                                                        _count: { likes: 0, comments: 0 },
+                                                        likes: 0,
+                                                        views: 0,
+                                                        liked: false,
+                                                    }}
+                                                />
+                                            </div>
                                             <div className="px-4 pb-2 text-[9px] font-black text-center uppercase tracking-widest opacity-40">Inspect Transmission</div>
-                                        </Link>
+                                        </div>
                                     ) : (
                                         <>
                                             {mediaUrl && (
