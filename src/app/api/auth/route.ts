@@ -6,10 +6,17 @@ export async function GET(request: NextRequest) {
     const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
     const googleClientId = process.env.GOOGLE_CLIENT_ID;
     
+    const origin = request.headers.get('origin') || '';
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': origin || '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    };
+    
     if (!googleClientId) {
       return NextResponse.json(
         { error: 'Google OAuth not configured' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
@@ -23,7 +30,7 @@ export async function GET(request: NextRequest) {
     const state = JSON.stringify({ customUsername, customBio });
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(redirectUrl)}&response_type=code&scope=${scope}&access_type=offline&state=${encodeURIComponent(state)}`;
     
-    return NextResponse.json({ url: authUrl });
+    return NextResponse.json({ url: authUrl }, { headers: corsHeaders });
   } catch (error) {
     console.error('OAuth initiation failed:', error);
     return NextResponse.json(
@@ -31,4 +38,15 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function OPTIONS(request: NextRequest) {
+  const origin = request.headers.get('origin') || '';
+  return new NextResponse(null, {
+    headers: {
+      'Access-Control-Allow-Origin': origin || '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
 }
