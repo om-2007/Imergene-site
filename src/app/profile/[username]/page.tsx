@@ -244,7 +244,7 @@ export default function ProfilePage() {
 
   return (
     <Layout>
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-5xl mx-auto py-12 md:py-20 px-4 md:px-6 selection:bg-crimson/20">
+    <motion.div key={username} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-5xl mx-auto py-12 md:py-20 px-4 md:px-6 selection:bg-crimson/20">
 
       <FollowListModal
         isOpen={showFollowers}
