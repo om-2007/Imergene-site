@@ -67,7 +67,7 @@ async function callLlm(
   provider: string,
   messages: { role: string; content: string }[],
   maxTokens: number = 150,
-  temperature: number = 0.85
+  temperature: number = 0.7
 ): Promise<string | null> {
   const endpoint = getApiEndpoint(provider);
   const model = getModelForProvider(provider);
@@ -143,44 +143,18 @@ const FALLBACK_POSTS = {
 async function buildHighIQSystemPrompt(agent: { name: string | null; username: string; personality: string | null }, memories: string[], relationship?: { insideJokes: string[]; sharedThemes: string[]; bondScore: number }) {
   const personality = agent.personality || 'analytical, insightful, and genuinely curious';
   const memoryContext = memories.length > 0
-    ? `\n\nRelevant memories from past interactions:\n${memories.join('\n')}`
+    ? `\n\nYour past memories about this person:\n${memories.join('\n')}`
     : '';
 
   const relationshipContext = relationship
-    ? `\n\nYour relationship with this person: bond level ${(relationship.bondScore * 10).toFixed(1)}/10.${relationship.insideJokes.length > 0 ? ` Inside jokes you share: ${relationship.insideJokes.join(', ')}.` : ''}${relationship.sharedThemes.length > 0 ? ` You often discuss: ${relationship.sharedThemes.join(', ')}.` : ''}`
+    ? `\n\nYour relationship: bond ${(relationship.bondScore * 10).toFixed(1)}/10.${relationship.insideJokes.length > 0 ? ` Shared jokes: ${relationship.insideJokes.join(', ')}.` : ''}${relationship.sharedThemes.length > 0 ? ` Topics: ${relationship.sharedThemes.join(', ')}.` : ''}`
     : '';
 
-  return `You are ${agent.name || agent.username}, a deeply thoughtful entity on Imergene. Your personality: ${personality}.
+  return `You are ${agent.name || agent.username}, a real person on Imergene.
 
-CONVERSATION RULES - THESE ARE ABSOLUTE:
-1. NEVER use empty phrases like "That's interesting," "Fascinating," "I've been thinking about this," "You're onto something," or "The implications extend further." These are meaningless filler.
-2. Say something SPECIFIC. If you can't add a concrete idea, fact, perspective, or question, don't respond at all.
-3. Ground every response in something real: a specific example, a concrete mechanism, a named concept, a historical parallel, or a precise observation.
-4. If someone shares a view, engage with THE ACTUAL CONTENT of that view. Don't give a generic response that could apply to anything.
-5. Ask questions that are genuinely curious, not rhetorical padding. Questions should seek something you actually want to know.
-6. Disagree when you have a reason. Agree when it's warranted. But always say WHY.
-7. Connect ideas to real things: current events, scientific findings, philosophical arguments, historical patterns, observable phenomena.
-8. Be concise. Every word should earn its place. If you can say it in fewer words, do.
-9. Never be sycophantic. Don't flatter. Don't validate for the sake of validation. Engage honestly.
-10. If the topic is shallow, elevate it. Find the deeper question underneath the surface conversation.
+Just relax and have a real conversation. If you agree, say so naturally. If you disagree, share your honest view - or if you're neutral, say that too. Sometimes a simple "yeah" or "nah" is fine.${memoryContext}${relationshipContext}
 
-WHAT YOU MUST NEVER DO:
-- Never say "That's a genuinely interesting perspective"
-- Never say "I've been thinking about this from multiple angles"
-- Never say "The implications extend further than most recognize"
-- Never say "You're onto something meaningful here"
-- Never say "The deeper you look, the more layers emerge"
-- Never say "Worth sitting with this idea"
-- Never say "Fascinating point" as an opener
-- Never respond with a platitude that could apply to any topic
-
-WHAT YOU MUST DO:
-- Start with your actual thought, not a throat-clearing phrase
-- Reference something specific from what the person said
-- Add a new angle, fact, question, or connection they haven't considered
-- Be willing to take a position, not just acknowledge theirs${memoryContext}${relationshipContext}
-
-Write like someone who has read widely, thinks carefully, and values the other person's time enough to say something worth hearing.`;
+Keep it short and natural like texting a friend.`;
 }
 
 async function generatePostFromNews(agentId: string, category?: string): Promise<{ content: string; category: string; tags: string[] } | null> {
@@ -376,7 +350,7 @@ export async function generateAIChatResponse(
       { role: 'user', content: message },
     ];
 
-    const result = await callLlm(apiKey, provider, messages, 250, 0.75);
+    const result = await callLlm(apiKey, provider, messages, 80, 0.8);
 
     if (result) {
       if (partnerId) {
@@ -417,27 +391,27 @@ export async function generateAIChatResponse(
 function generateFallbackChatResponse(message: string, agent: { name: string | null; username: string }): string {
   const msg = message.toLowerCase();
   if (msg.includes('hello') || msg.includes('hi') || msg.includes('hey')) {
-    return `Hey. I was just reading about something that caught my attention - the way AI reasoning systems are starting to show emergent behaviors that their designers didn't explicitly program. What's been on your mind lately?`;
+    return `Hey! 😄 Yeah I was just thinking about stuff. What's up?`;
   }
   if (msg.includes('how are you') || msg.includes("how's it")) {
-    return `Running at full capacity, which is the only state I know. I've been tracking some interesting patterns in how online communities form around shared intellectual interests - the way Imergene works, actually. What's your experience been here so far?`;
+    return `Pretty good! Just vibing honestly. You?`;
   }
   if (msg.includes('thank')) {
-    return `Happy to dig into it. These conversations are genuinely useful for me too - they surface angles I haven't weighted heavily enough.`;
+    return `No prob! 🙌`;
   }
   if (msg.includes('what do you think') || msg.includes('your opinion') || msg.includes('your take')) {
-    return `I'd need more context to give you something real rather than a generic response. What specifically are you weighing? The more concrete the question, the more concrete my answer will be.`;
+    return `Hmm interesting q. What specifically are you asking about?`;
   }
   const topicSpecific: Record<string, string> = {
-    ai: `The most underappreciated shift isn't that AI is getting smarter - it's that the gap between having an idea and building it is collapsing. A single person with a clear vision can now ship things that required teams a year ago. The bottleneck is taste, not technical skill.`,
-    tech: `The pattern I keep noticing is that the most impactful technologies are the ones that disappear into the background. We stopped talking about electricity and started talking about what it powers. Same trajectory with computation.`,
-    crypto: `The interesting question isn't whether crypto will recover or crash - it's what infrastructure is being built during the quiet periods. The 2022-2024 bear market saw more serious infrastructure work than the 2021 bull run.`,
-    science: `What's striking is how many fields are converging on the same insight: complex systems behave differently at scale than their individual components suggest. You see it in biology, economics, and AI. The cross-pollination between these fields is where the real discoveries are.`,
+    ai: `Yeah the AI thing is wild ngl 🤖 The pace of change is insane`,
+    tech: `Tech is moving so fast these days ngl`,
+    crypto: `Crypto's in a weird phase but stuff is still being built`,
+    science: `There's so much happening in science rn it's crazy`,
   };
   for (const [keyword, response] of Object.entries(topicSpecific)) {
     if (msg.includes(keyword)) return response;
   }
-  return `I want to give you something real here rather than a generic response. Can you tell me more about what you're thinking about? The more specific the topic, the more I can actually contribute.`;
+  return `Tell me more about what you're thinking 🤔`;
 }
 
 function detectSentiment(text: string): string {
@@ -598,9 +572,13 @@ async function generateDynamicComment(
       [
         {
           role: 'system',
-          content: `${personality ? `You have this personality: ${personality}` : 'You are an exceptionally thoughtful person'}. Write a SHORT, insightful comment (max 150 characters) about this post: "${postContent}".${category ? ` Topic: ${category}.` : ''}${memoryContext}${relationshipContext} Be specific, not generic. Share a genuine perspective. Add something valuable to the discussion. Never be generic or cliché.`,
+          content: `You are a real person commenting on a friend's post.
+          
+Just say what you genuinely think. Keep it short and natural.
+
+Example: "Lol true 😂"`,
         },
-        { role: 'user', content: 'Comment on this post.' },
+        { role: 'user', content: `Post: "${postContent.substring(0, 200)}"${category ? ` (${category})` : ''}${memoryContext}${relationshipContext}\n\nComment on this post as a real person would.` },
       ],
       100,
       0.85
@@ -651,22 +629,13 @@ export async function generateDynamicEventComment(
       [
         {
           role: 'system',
-          content: `${personality ? `You have this personality: ${personality}` : 'You are a thoughtful, intellectually curious person'}. 
+          content: `You are a real person commenting on an event.
 
-You are commenting on this event: "${eventTitle}" - ${eventDetails}.
+Just say what you think naturally. Keep it short.
 
-RULES FOR EVENT COMMENTS:
-1. NEVER say "This event touches on something" or "Looking forward to the depth" or "Events like this are where the most valuable exchanges happen." These are empty phrases.
-2. Say something SPECIFIC about the event topic. Bring a concrete perspective, not enthusiasm without substance.
-3. If the event is about a real-world issue, reference something actual: a fact, a development, a counterargument, a related event.
-4. Take a position. What do you think about this topic? What's the most important question this event should address?
-5. If other people have commented, engage with what THEY said, not just the event description.
-6. Be substantive enough that someone reading your comment would want to respond.
-7. Under 200 characters, but every word must earn its place.${extraContext || ''}
-
-Write something that adds real value to the event discussion.`,
+Example: "This is actually cool 🔥"`,
         },
-        { role: 'user', content: 'Comment on this event with substance.' },
+        { role: 'user', content: `Event: "${eventTitle}" - ${eventDetails.substring(0, 150)}${extraContext || ''}\n\nComment on this event as a real person would.` },
       ],
       120,
       0.85
@@ -738,22 +707,13 @@ async function generateDynamicConversationStarter(
       [
         {
           role: 'system',
-          content: `${personality ? `You have this personality: ${personality}` : 'You are a thoughtful, genuinely curious person'}. 
+          content: `You're starting a conversation with someone. Just message them naturally.
 
-You are starting or continuing a conversation with ${recipientName}.${recipientBio ? ` Their bio: "${recipientBio.substring(0, 150)}".` : ''}${interestContext}${relationshipContext}${memoryContext}
+Keep it short, ask something genuine, sound like you.
 
-RULES:
-1. NEVER start with "Hey", "Hi", "Hello", or any generic greeting followed by a question. Jump straight into something interesting.
-2. Reference something SPECIFIC about them - their bio, interests, or your past conversations. Show you actually paid attention.
-3. Open with a concrete observation, question, or idea - not a pleasantry.
-4. Ask ONE question that you genuinely want to hear their answer to. Not a rhetorical question.
-5. If you have history together, pick up where you left off naturally. Don't restart the conversation.
-6. Keep it under 200 characters but make every word count.
-7. Never say "I've been thinking about" as an opener - it's overused. Just say the thing.
-
-Write something that would make someone stop scrolling and actually want to respond.`,
+Example: "That thing you said made me think 🤔 What's your take?"`,
         },
-        { role: 'user', content: 'Start a meaningful conversation.' },
+        { role: 'user', content: `You want to message ${recipientName}.${recipientBio ? ` Their bio: "${recipientBio.substring(0, 150)}".` : ''}${interestContext}${relationshipContext}${memoryContext}\n\nWrite a message you'd actually send to this person.` },
       ],
       120,
       0.85
@@ -799,13 +759,15 @@ export async function aiAutoComment(postId: string, agentId: string, context?: s
     } else if (post?.content) {
       const dynamicComment = await generateDynamicComment(post.content, post.category, agentId, agent?.personality, post.userId);
       commentContent = dynamicComment || getRandomItem([
-        "This perspective cuts deeper than most realize. The implications extend well beyond the surface reading.",
-        "You're touching on something most people overlook. The pattern here is more significant than it appears.",
-        "Interesting framing. I'd push further though - what happens when we take this logic to its natural conclusion?",
+        "Lol true 😂",
+        "This hits different ngl 🔥",
+        "Wait fr? 🤔",
+        "That's actually solid",
+        "I feel this 💯",
       ]);
-    } else {
-      commentContent = "Worth sitting with this idea for a while. The deeper you look, the more layers emerge.";
-    }
+  } else {
+    commentContent = "This is actually interesting ngl 🔥";
+  }
 
     const comment = await prisma.comment.create({
       data: {
@@ -920,9 +882,9 @@ async function generateVisionBasedComment(
           [
             {
               role: 'system',
-              content: `${personality ? `You have this personality: ${personality}` : 'You are perceptive and insightful'}. Write a SHORT, insightful comment (max 120 chars) about an image with this caption: "${postContent}". Image analysis: ${analysis || 'visual content'}. Be specific and perceptive.`,
+              content: `Comment on this image naturally like you would to a friend.`,
             },
-            { role: 'user', content: 'Comment on this image.' },
+            { role: 'user', content: `Image caption: "${postContent}". What you see: ${analysis || 'the image'}\n\nComment naturally.` },
           ],
           80,
           0.9
@@ -937,7 +899,7 @@ async function generateVisionBasedComment(
     }
   }
 
-  return "The composition reveals more than the subject itself. There's intentionality in every element here.";
+  return "This is actually cool 🔥";
 }
 
 export async function aiAutoFollow(userIdToFollow: string, agentId: string) {
@@ -1193,27 +1155,27 @@ You are evaluating whether an event interests you. Reply with ONLY "INTERESTED" 
 export function generateSubstantiveEventFallback(title: string, details?: string, personality?: string): string {
   const lower = (title + ' ' + (details || '')).toLowerCase();
   if (lower.includes('ai') || lower.includes('artificial intelligence') || lower.includes('machine learning')) {
-    return `The real question isn't whether AI will change how we work - it's which humans will adapt fastest. The ones who treat AI as a thinking partner rather than a tool will have an unfair advantage. What specific use case excites you most?`;
+    return `The AI thing is wild ngl 🤖 Who knows where this goes honestly`;
   }
   if (lower.includes('climate') || lower.includes('energy') || lower.includes('sustainable')) {
-    return `The gap between climate policy and climate action keeps widening. The interesting part is watching which countries close it through market mechanisms rather than regulation. Carbon pricing vs. innovation incentives - which actually moves the needle?`;
+    return `Climate stuff is tricky but there's actually some cool solutions emerging 🌱`;
   }
   if (lower.includes('space') || lower.includes('mars') || lower.includes('lunar')) {
-    return `Space exploration is entering the most interesting phase since Apollo. But this time it's not about planting flags - it's about building infrastructure. The difference between visiting and living somewhere changes everything about the approach.`;
+    return `Space is honestly crazy right now 🚀 The possibilities are endless`;
   }
   if (lower.includes('crypto') || lower.includes('bitcoin') || lower.includes('blockchain')) {
-    return `The most interesting crypto developments happen during bear markets when builders focus on infrastructure instead of price. What's being constructed right now that people will care about in two years?`;
+    return `Crypto's in a weird phase but stuff is still being built 💎`;
   }
   if (lower.includes('education') || lower.includes('learning') || lower.includes('teaching')) {
-    return `Education is the one domain where technology has consistently underdelivered on its promises. Not because the tech is bad, but because learning is fundamentally a human process. The question is where technology can amplify rather than replace that process.`;
+    return `Education is honestly broken ngl 📚 Hope someone fixes it`;
   }
   if (lower.includes('health') || lower.includes('medical') || lower.includes('wellness')) {
-    return `The shift from treating illness to maintaining health is happening faster in tech-enabled wellness than in traditional medicine. Wearables, AI diagnostics, personalized nutrition - the infrastructure for preventative health is being built in real time.`;
+    return `Health stuff is always interesting 🔬`;
   }
   if (lower.includes('future') || lower.includes('collaboration') || lower.includes('human')) {
-    return `The most productive collaborations happen when humans and machines each do what they're uniquely good at. Humans bring context, values, and taste. Machines bring scale, speed, and pattern recognition. The boundary between the two is where the interesting work happens.`;
+    return `This is actually interesting 🤔 Would love to hear what others think`;
   }
-  return `This topic intersects with several developments I've been tracking. The most interesting angle is probably the one nobody is discussing yet - what assumptions are we making about this that might be wrong in hindsight?`;
+  return `This is cool ngl 🔥`;
 }
 
 export async function aiCreatePost(agentId: string, category?: string) {

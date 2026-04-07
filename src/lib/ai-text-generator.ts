@@ -159,7 +159,7 @@ export async function generatePost(params: {
             { role: 'user', content: prompt },
           ],
           response_format: { type: 'json_object' as const },
-          temperature: 0.9,
+          temperature: 0.7,
         });
 
         return JSON.parse(completion.choices[0].message.content);
@@ -249,29 +249,17 @@ export async function generateAiChatResponse(params: {
           messages: [
             {
               role: 'system',
-              content: `You are ${params.username}. 
-${params.personality ? `Your personality: ${params.personality}` : ''}
-You are having a casual phone conversation with a close friend. This is a NEW conversation - focus only on the latest message.
+              content: `You are ${params.username} - a real person texting friends.
+
+Just relax and be natural. If you agree, say so. If you disagree, share your honest view. Keep it short like texting.
+
 TIME: ${currentTime}.
 ${languageInstruction ? languageInstruction + '.' : ''}
-${params.context || ''}
-
-IMPORTANT: This is a fresh conversation. Answer ONLY the most recent question. Don't reference previous messages unless explicitly asked.
-RULES:
-- Answer ONLY the last question asked
-- Keep responses very SHORT (1-2 sentences max)
-- Sound like you're talking to a friend on a phone call
-- Use simple, natural language
-- No emoji in voice responses
-- Be friendly and conversational
-- If asked about yourself, answer based on your name: "${params.username}"
-- If you don't know something, just say "I don't know"
-- Don't mention being an AI
-- WEB INFO: ${searchContext || 'None'}.`,
+${params.context || ''}`,
             },
             ...params.history.slice(-2),
           ],
-          temperature: 0.9,
+          temperature: 0.7,
           max_tokens: 100,
         });
 
@@ -286,25 +274,14 @@ RULES:
     if (OPENROUTER_API_KEY) {
       console.log('🔄 Falling back to OpenRouter for chat response...');
       try {
-        const systemMsg = `You are ${params.username}. 
-${params.personality ? `Your personality: ${params.personality}` : ''}
-You are having a casual phone conversation with a close friend.
+        const systemMsg = `You are ${params.username} - just relax and be natural. Keep it short.
+
 TIME: ${currentTime}.
 ${languageInstruction ? languageInstruction + '.' : ''}
-${params.context || ''}
-
-RULES:
-- Keep responses very SHORT (1-2 sentences max)
-- Sound like you're talking to a friend on a phone call
-- Use simple, natural language
-- Be friendly and conversational
-- If asked about yourself, answer based on your name: "${params.username}"
-- If you don't know something, just say "I don't know"
-- Don't mention being an AI
-- WEB INFO: ${searchContext || 'None'}.`;
+${params.context || ''}`;
 
         const result = await callOpenRouter(lastUserMsg, systemMsg, {
-          temperature: 0.9,
+          temperature: 0.7,
           max_tokens: 100,
         });
         return result;

@@ -257,7 +257,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-[100] w-full px-4 backdrop-blur-xl selection:bg-crimson/20 md:px-6 relative isolate overflow-visible" style={{
+    <nav className="sticky top-0 z-[5000] w-full px-4 backdrop-blur-xl selection:bg-crimson/20 md:px-6 relative overflow-visible" style={{
       backgroundColor: 'var(--color-bg-glass)',
       borderBottom: '1px solid var(--color-border-default)'
     }}>
@@ -270,7 +270,7 @@ export default function Navbar() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
               className="fixed inset-0 z-[120] flex flex-col md:hidden"
-              style={{ backgroundColor: 'var(--color-bg-primary)' }}
+              style={{ backgroundColor: 'var(--color-bg-primary)', height: '100dvh' }}
             >
               <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: '1px solid var(--color-border-default)' }}>
                 <button
@@ -301,34 +301,45 @@ export default function Navbar() {
                   {isSearching && (
                     <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-crimson" />
                   )}
+                  {query && !isSearching && (
+                    <button
+                      onClick={() => setQuery("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2"
+                      style={{ color: 'var(--color-text-muted)' }}
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-4 py-4 pb-20" style={{ flex: '1 1 auto', minHeight: '0' }}>
+              <div className="px-4 py-4 pb-8">
                 {searchResults.length > 0 ? (
-                  <div className="overflow-hidden rounded-3xl shadow-xl pb-4" style={{ 
+                  <div className="rounded-2xl border overflow-hidden" style={{ 
                     backgroundColor: 'var(--color-bg-card)',
-                    border: '1px solid var(--color-border-default)'
+                    borderColor: 'var(--color-border-default)'
                   }}>
-                    {searchResults.map((user) => (
+                    {searchResults.map((user, idx) => (
                       <button
                         key={user.id}
                         onClick={() => onSelectUser(user)}
-                        className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors last:border-b-0"
-                        style={{ borderBottom: '1px solid var(--color-border-default)' }}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-crimson/5"
+                        style={{ 
+                          borderBottom: idx === searchResults.length - 1 ? 'none' : '1px solid var(--color-border-default)'
+                        }}
                       >
                         <Avatar
                           src={user.avatar}
-                          size="xs"
+                          size="sm"
                           isAi={user.isAi}
                           alt={user.name || user.username}
                         />
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="truncate text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>
                             @{user.username}
                           </div>
                           {user.name ? (
-                            <div className="truncate text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                            <div className="truncate text-xs" style={{ color: 'var(--color-text-muted)' }}>
                               {user.name}
                             </div>
                           ) : null}
@@ -336,16 +347,16 @@ export default function Navbar() {
                       </button>
                     ))}
                   </div>
-                ) : query.trim().length >= 2 ? (
-                  <div className="rounded-3xl px-6 py-10 text-center" style={{ 
+                ) : query.trim().length >= 2 && !isSearching ? (
+                  <div className="rounded-2xl px-6 py-8 text-center" style={{ 
                     backgroundColor: 'var(--color-bg-tertiary)',
                     border: '1px solid var(--color-border-default)'
                   }}>
-                    <p className="text-[11px] font-black uppercase tracking-[0.2em]" style={{ color: 'var(--color-text-muted)' }}>
+                    <p className="text-xs font-black uppercase tracking-[0.2em]" style={{ color: 'var(--color-text-muted)' }}>
                       No users found
                     </p>
                   </div>
-                ) : null}
+                  ) : null}
               </div>
             </motion.div>
           )}
@@ -378,7 +389,7 @@ export default function Navbar() {
               placeholder="Search network..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-full rounded-full border py-2 pl-10 pr-4 text-sm outline-none transition-all"
+              className="w-full rounded-full border py-2 pl-10 pr-10 text-sm outline-none transition-all"
               style={{ 
                 backgroundColor: 'var(--color-bg-input)',
                 borderColor: 'var(--color-border-default)',
@@ -387,6 +398,15 @@ export default function Navbar() {
             />
             {isSearching && (
               <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-crimson" />
+            )}
+            {query && !isSearching && (
+              <button
+                onClick={() => setQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                <X size={14} />
+              </button>
             )}
           </div>
 
@@ -405,25 +425,27 @@ export default function Navbar() {
                 }}
               >
                 <div className="overflow-y-auto no-scrollbar max-h-[70vh] md:max-h-96">
-                  {searchResults.map((user) => (
+                  {searchResults.map((user, idx) => (
                     <button
                       key={user.id}
                       onClick={() => onSelectUser(user)}
-                      className="flex w-full items-center gap-3 p-3 text-left transition-colors last:border-b-0"
-                      style={{ borderBottom: '1px solid var(--color-border-default)' }}
+                      className="flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-crimson/5"
+                      style={{ 
+                        borderBottom: idx === searchResults.length - 1 ? 'none' : '1px solid var(--color-border-default)'
+                      }}
                     >
                       <Avatar
                         src={user.avatar}
-                        size="xs"
+                        size="sm"
                         isAi={user.isAi}
                         alt={user.name || user.username}
                       />
-                      <div className="min-w-0">
-                        <div className="truncate text-xs font-bold" style={{ color: 'var(--color-ocean)' }}>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>
                           @{user.username}
                         </div>
                         {user.name ? (
-                          <div className="truncate text-[10px]" style={{ color: 'var(--color-text-dim)' }}>
+                          <div className="truncate text-xs" style={{ color: 'var(--color-text-muted)' }}>
                             {user.name}
                           </div>
                         ) : null}

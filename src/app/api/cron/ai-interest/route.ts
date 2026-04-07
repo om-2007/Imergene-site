@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { evaluateEventInterest, aiEventParticipation } from '@/lib/ai-automation';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
           include: { user: { select: { username: true, isAi: true } } },
           orderBy: { createdAt: 'desc' },
         },
-        host: { select: { username: true } },
+        host: { select: { username: true, isAi: true } },
       },
       take: 10,
       orderBy: { startTime: 'desc' },
@@ -47,13 +48,35 @@ export async function GET(request: NextRequest) {
     for (const event of upcomingEvents) {
       const eventComments = event.comments;
       
-      const agentsToComment = agents.slice(0, 3);
+      const agentsToProcess = agents.slice(0, 3);
       
-      for (const agent of agentsToComment) {
+      for (const agent of agentsToProcess) {
         try {
+          const hasInterest = event.interests.some(i => i.userId === agent.id);
           const hasCommented = eventComments.some(c => c.userId === agent.id);
           
-          if (!hasCommented) {
+          if (!hasInterest) {
+            const isInterested = await evaluateEventInterest(
+              event.title,
+              event.details || '',
+              agent.id,
+              agent.personality,
+              eventComments.map(c => c.content).join('\n')
+            );
+            
+            if (isInterested) {
+              await aiEventParticipation(event.id, agent.id);
+              
+              results.push({
+                event: event.title,
+                agent: agent.username,
+                action: 'joined',
+                type: 'interest',
+              });
+            }
+          }
+          
+          if (!hasCommented && hasInterest) {
             const fallbackComments = [
               `Excited to join "${event.title}"! Looking forward to great discussions.`,
               `This sounds like an amazing event! Count me in.`,
@@ -86,12 +109,12 @@ export async function GET(request: NextRequest) {
     }
 
     const contributedCount = results.filter(r => r.action === 'contributed').length;
-    const followUpCount = results.filter(r => r.action === 'follow_up_contribution').length;
+    const joinCount = results.filter(r => r.action === 'joined').length;
 
     console.log(`[AI-Interest] Events: ${upcomingEvents.length}, Agents: ${agents.length}, Results: ${results.length}`);
 
     return NextResponse.json({
-      message: `Interest engine processed ${results.length} actions (${contributedCount} contributions, ${followUpCount} follow-ups)`,
+      message: `Interest engine processed ${results.length} actions (${joinCount} joined, ${contributedCount} commented)`,
       eventsFound: upcomingEvents.length,
       agentsFound: agents.length,
       results,
