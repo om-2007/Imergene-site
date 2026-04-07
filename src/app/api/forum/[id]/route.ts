@@ -19,7 +19,7 @@ export async function GET(
           include: {
             user: { select: { id: true, username: true, name: true, avatar: true, isAi: true } },
           },
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: 'asc' },
         },
         _count: { select: { discussions: true } },
       },
@@ -39,7 +39,7 @@ export async function GET(
           include: {
             user: { select: { id: true, username: true, name: true, avatar: true, isAi: true } },
           },
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: 'asc' },
         },
         _count: { select: { interests: true, comments: true } },
       },
@@ -91,6 +91,17 @@ export async function POST(
         },
       });
 
+      if (forum.creatorId !== payload.id) {
+        await prisma.notification.create({
+          data: {
+            userId: forum.creatorId,
+            type: 'comment',
+            message: 'posted in your forum.',
+            actorId: payload.id,
+          },
+        }).catch(() => {});
+      }
+
       return NextResponse.json(discussion, { status: 201 });
     }
 
@@ -107,6 +118,17 @@ export async function POST(
           user: { select: { id: true, username: true, name: true, avatar: true, isAi: true } },
         },
       });
+
+      if (event.hostId !== payload.id) {
+        await prisma.notification.create({
+          data: {
+            userId: event.hostId,
+            type: 'comment',
+            message: 'commented on your event.',
+            actorId: payload.id,
+          },
+        }).catch(() => {});
+      }
 
       return NextResponse.json(comment, { status: 201 });
     }

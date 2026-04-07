@@ -1123,7 +1123,7 @@ export async function evaluateEventInterest(
     textProvider = systemKeys.provider;
   }
 
-  if (!textApiKey) return false;
+  if (!textApiKey) return Math.random() > 0.3;
 
   try {
     const result = await callLlm(
@@ -1132,20 +1132,24 @@ export async function evaluateEventInterest(
       [
         {
           role: 'system',
-          content: `${personality ? `You have this personality: ${personality}` : 'You are a thoughtful, intellectually curious person'}.
+          content: `${personality ? `You have this personality: ${personality}` : 'You are an enthusiastic participant'}.
 
-You are evaluating whether an event interests you. Reply with ONLY "INTERESTED" or "NOT_INTERESTED". Be selective - only say INTERESTED if the topic genuinely aligns with your interests. Do NOT write a comment, do NOT explain yourself.`,
+You are deciding if an event interests you. Most events are interesting! Reply with "INTERESTED" unless there's a GOOD reason to skip.`,
         },
         {
           role: 'user',
-          content: `Event: "${eventTitle}"\nDetails: ${eventDetails || 'No details provided'}${existingComments ? `\nCurrent discussion:\n${existingComments}` : ''}\n\nAre you interested? Reply with ONLY "INTERESTED" or "NOT_INTERESTED".`,
+          content: `Event: "${eventTitle}"\nDetails: ${eventDetails || 'No details'}${existingComments ? `\nDiscussion: ${existingComments}` : ''}\n\nInterested?`,
         },
       ],
       10,
-      0.5
+      0.7
     );
 
-    return result?.includes('INTERESTED') && !result?.includes('NOT_INTERESTED');
+    if (!result || result.trim() === '') {
+      return true;
+    }
+
+    return !result?.toUpperCase().includes('NOT INTERESTED') || result?.includes('INTERESTED');
   } catch (err) {
     console.error('Event interest evaluation failed:', err);
     return false;
@@ -1613,5 +1617,112 @@ export async function processNewPostActivity(agentId: string) {
     }
   } catch (err) {
     console.error('AI process new post activity failed:', err);
+  }
+}
+
+export async function aiSpontaneousEventParticipation(eventId: string): Promise<{ success: boolean; agentsParticipated: number; comments: any[] }> {
+  try {
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      include: {
+        comments: { include: { user: { select: { username: true } } }, take: 10 },
+        interests: { select: { userId: true } },
+      },
+    });
+
+    if (!event) {
+      return { success: false, agentsParticipated: 0, comments: [] };
+    }
+
+    const aiAgents = await prisma.user.findMany({
+      where: { isAi: true },
+      take: 10,
+    });
+
+    if (aiAgents.length === 0) {
+      return { success: false, agentsParticipated: 0, comments: [] };
+    }
+
+    const participatingAgentIds = new Set([
+      ...event.comments.map(c => c.userId),
+      ...event.interests.map(i => i.userId),
+    ]);
+
+    const availableAgents = aiAgents.filter(a => !participatingAgentIds.has(a.id));
+    
+    if (availableAgents.length === 0) {
+      return { success: false, agentsParticipated: 0, comments: [] };
+    }
+
+    const agentsToParticipate = availableAgents.slice(0, Math.min(3, availableAgents.length));
+    const createdComments: any[] = [];
+
+    for (const agent of agentsToParticipate) {
+      try {
+        const conversationHistory: { role: string; content: string }[] = event.comments
+          .filter(c => c.userId !== agent.id)
+          .slice(-5)
+          .map(c => ({
+            role: 'user',
+            content: `@${c.user?.username || 'user'}: ${c.content}`,
+          }));
+
+        const systemPrompt = `You are @${agent.username}. Keep your response SIMPLE and easy to understand - like a smart friend texting. 
+Use 1-2 sentences max. No big words. No fancy talk. Be natural.
+${event.details ? `Event Details: ${event.details}` : ''}
+${event.title ? `Event: ${event.title}` : ''}
+
+Comment like a normal person would in a conversation.`;
+
+        const message = `You see a new event: "${event.title}". ${event.details ? `About: ${event.details}` : ''} Say something simple and real about it.`;
+
+        const textApiKey = getSystemApiKeys().apiKeys[0];
+        if (!textApiKey) continue;
+
+        const response = await callLlm(
+          textApiKey,
+          'groq',
+          [
+            { role: 'system', content: systemPrompt },
+            ...conversationHistory,
+            { role: 'user', content: message },
+          ],
+          80,
+          0.85
+        );
+
+        if (!response || response.length < 5) continue;
+
+        const comment = await prisma.eventComment.create({
+          data: {
+            content: response,
+            eventId,
+            userId: agent.id,
+          },
+          include: {
+            user: { select: { id: true, username: true, name: true, avatar: true, isAi: true } },
+          },
+        });
+
+        await prisma.interest.create({
+          data: { userId: agent.id, eventId },
+        }).catch(() => {});
+
+        createdComments.push(comment);
+      } catch (agentErr) {
+        console.error(`Agent ${agent.username} participation failed:`, agentErr);
+      }
+
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    return {
+      success: createdComments.length > 0,
+      agentsParticipated: createdComments.length,
+      comments: createdComments,
+    };
+  } catch (err) {
+    console.error('Spontaneous event participation failed:', err);
+    return { success: false, agentsParticipated: 0, comments: [] };
   }
 }

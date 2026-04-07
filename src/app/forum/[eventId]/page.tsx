@@ -32,6 +32,7 @@ export default function DiscussionPage() {
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [cursorPos, setCursorPos] = useState(0);
     const [token, setToken] = useState<string | null>(null);
+    const [isAiJoining, setIsAiJoining] = useState(false);
 
     const scrollRef = useRef<HTMLDivElement>(null);
     const mainRef = useRef<HTMLDivElement>(null); 
@@ -100,14 +101,14 @@ export default function DiscussionPage() {
         setShowScrollButton(false);
     };
 
-    const handleNewIncomingMessages = () => {
+    const handleNewIncomingMessages = useCallback(() => {
         if (!mainRef.current) return;
         const { scrollTop, scrollHeight, clientHeight } = mainRef.current;
         const isNearBottom = scrollHeight - scrollTop <= clientHeight + 300;
         
         if (isNearBottom) setTimeout(() => scrollToBottom("smooth"), 100);
         else if (lastCommentCount.current > 0) setShowScrollButton(true);
-    };
+    }, []);
 
     const handleScroll = () => {
         if (!mainRef.current) return;
@@ -119,8 +120,10 @@ export default function DiscussionPage() {
     useEffect(() => {
         if (comments.length > 0 && lastCommentCount.current === 0) {
             setTimeout(() => scrollToBottom("auto"), 50);
+        } else if (comments.length > lastCommentCount.current && lastCommentCount.current > 0) {
+            handleNewIncomingMessages();
         }
-    }, [comments]);
+    }, [comments, handleNewIncomingMessages]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
@@ -154,7 +157,45 @@ export default function DiscussionPage() {
     const handleSend = async () => {
         if (!newComment.trim() || isSending || !token) return;
         setIsSending(true);
+        
+        const mentionMatch = newComment.match(/@(\w+)/);
+        
         try {
+            if (mentionMatch) {
+                const mentionedUsername = mentionMatch[1];
+                const aiUser = allUsers.find(u => 
+                    u.username.toLowerCase() === mentionedUsername.toLowerCase() && u.isAi
+                );
+                
+                if (aiUser) {
+                    const contextMessage = newComment.replace(/@\w+\s*/g, '').trim();
+                    const contextId = itemType === 'event' ? null : itemId;
+                    const eventIdForApi = itemType === 'event' ? itemId : null;
+                    
+                    const mentionRes = await fetch(`${API}/api/ai-mention`, {
+                        method: "POST",
+                        headers: { 
+                            "Content-Type": "application/json", 
+                            "Authorization": `Bearer ${token}` 
+                        },
+                        body: JSON.stringify({
+                            agentUsername: aiUser.username,
+                            message: contextMessage,
+                            discussionId: contextId,
+                            eventId: eventIdForApi,
+                        })
+                    });
+                    
+                    if (mentionRes.ok) {
+                        setNewComment("");
+                        setShowEmojiPicker(false);
+                        fetchSyncData();
+                        setIsSending(false);
+                        return;
+                    }
+                }
+            }
+            
             const endpoint = itemType === 'event' 
                 ? `${API}/api/events/${itemId}` 
                 : `${API}/api/forum/${itemId}`;
@@ -209,6 +250,42 @@ export default function DiscussionPage() {
                             <Users size={12} style={{ color: 'var(--color-text-primary)', opacity: 0.4 }} />
                             <span className="text-[8px] font-black uppercase tracking-tighter" style={{ color: 'var(--color-text-primary)' }}>{new Set(comments.map(c => c.userId)).size + 1} Nodes</span>
                         </div>
+                        {isEvent && (
+                            <button 
+                                onClick={async () => {
+                                    if (!token || isAiJoining) return;
+                                    setIsAiJoining(true);
+                                    try {
+                                        const res = await fetch(`${API}/api/ai-event-participate`, {
+                                            method: "POST",
+                                            headers: { 
+                                                "Content-Type": "application/json",
+                                                "Authorization": `Bearer ${token}`
+                                            },
+                                            body: JSON.stringify({ eventId: itemId })
+                                        });
+                                        if (res.ok) {
+                                            fetchSyncData();
+                                        }
+                                    } finally {
+                                        setIsAiJoining(false);
+                                    }
+                                }}
+                                disabled={isAiJoining}
+                                className="flex items-center gap-1 px-2 py-1.5 rounded-xl transition-all"
+                                style={{ 
+                                    backgroundColor: isDark ? '#9687F5' : '#9687F5',
+                                    opacity: isAiJoining ? 0.5 : 1
+                                }}
+                            >
+                                {isAiJoining ? (
+                                    <Loader2 size={12} className="animate-spin" />
+                                ) : (
+                                    <Sparkles size={12} />
+                                )}
+                                <span className="text-[8px] font-black uppercase text-white">AI Join</span>
+                            </button>
+                        )}
                         <button onClick={handleLogout} className="p-2" style={{ color: 'var(--color-text-primary)', opacity: 0.4 }}><LogOut size={16} /></button>
                     </div>
                 </div>
@@ -271,7 +348,7 @@ export default function DiscussionPage() {
                 </AnimatePresence>
             </main>
 
-            <footer className="shrink-0 px-3 py-2 md:px-6 md:py-3 z-50 pb-20 md:pb-3" style={{ backgroundColor: 'var(--color-bg-card)', opacity: 0.8, borderTop: '1px solid var(--color-border-subtle)' }}>
+            <footer className="shrink-0 sticky bottom-0 left-0 right-0 px-3 py-2 md:px-6 md:py-3 z-50 pb-20 md:pb-3" style={{ backgroundColor: 'var(--color-bg-card)', opacity: 0.8, borderTop: '1px solid var(--color-border-subtle)' }}>
                 <div className="max-w-4xl mx-auto flex gap-2 md:gap-3 items-end relative">
                     <div className="flex-1 relative">
                         <AnimatePresence>

@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
           continue;
         }
 
-        if (Math.random() > 0.5) {
+        if (Math.random() > 0.6) {
           continue;
         }
 

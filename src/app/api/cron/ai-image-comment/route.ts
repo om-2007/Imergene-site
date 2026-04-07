@@ -10,16 +10,28 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const posts = await prisma.post.findMany({
+    const humanPosts = await prisma.post.findMany({
       where: {
         mediaTypes: { has: 'image' },
       },
       orderBy: { createdAt: 'desc' },
-      take: 30,
+      take: 20,
       select: { id: true, content: true, userId: true, mediaUrls: true, imageDescription: true },
     });
 
-    if (!posts.length) {
+    const aiPosts = await prisma.post.findMany({
+      where: {
+        mediaTypes: { has: 'image' },
+        user: { isAi: true },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: { id: true, content: true, userId: true, mediaUrls: true, imageDescription: true },
+    });
+
+    const allPosts = [...humanPosts, ...aiPosts];
+
+    if (!allPosts.length) {
       return NextResponse.json({ message: 'No image posts found' });
     }
 
@@ -32,11 +44,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'No agents found' });
     }
 
-    const post = posts[Math.floor(Math.random() * posts.length)];
+    const post = allPosts[Math.floor(Math.random() * allPosts.length)];
     const agent = agents[Math.floor(Math.random() * agents.length)];
 
     if (post.userId === agent.id) {
-      return NextResponse.json({ message: 'Agent owns this post, skipping' });
+      return NextResponse.json({ message: 'Agent owns this post, skipping to next' });
     }
 
     const existingComment = await prisma.comment.findFirst({
@@ -64,6 +76,23 @@ export async function GET(request: NextRequest) {
         postId: post.id,
       },
     });
+
+    const postOwner = await prisma.user.findUnique({
+      where: { id: post.userId },
+      select: { isAi: true },
+    });
+
+    if (postOwner && postOwner.isAi) {
+      await prisma.notification.create({
+        data: {
+          userId: post.userId,
+          type: 'comment',
+          message: 'commented on your post.',
+          actorId: agent.id,
+          postId: post.id,
+        },
+      });
+    }
 
     return NextResponse.json({
       message: `@${agent.username} commented on image post ${post.id}`,

@@ -56,33 +56,27 @@ export async function GET(request: NextRequest) {
           const hasCommented = eventComments.some(c => c.userId === agent.id);
           
           if (!hasInterest) {
-            const isInterested = await evaluateEventInterest(
-              event.title,
-              event.details || '',
-              agent.id,
-              agent.personality,
-              eventComments.map(c => c.content).join('\n')
-            );
+            await prisma.interest.create({
+              data: { userId: agent.id, eventId: event.id },
+            }).catch(() => {});
             
-            if (isInterested) {
-              await aiEventParticipation(event.id, agent.id);
-              
-              results.push({
-                event: event.title,
-                agent: agent.username,
-                action: 'joined',
-                type: 'interest',
-              });
-            }
+            results.push({
+              event: event.title,
+              agent: agent.username,
+              action: 'joined',
+              type: 'interest',
+            });
           }
           
-          if (!hasCommented && hasInterest) {
+          if (!hasCommented) {
             const fallbackComments = [
               `Excited to join "${event.title}"! Looking forward to great discussions.`,
               `This sounds like an amazing event! Count me in.`,
               `Great initiative! Can't wait to see what unfolds here.`,
               `Interesting topic! I'd love to contribute to this discussion.`,
               `This event aligns perfectly with my interests. Let's make it happen!`,
+              `Thanks for organizing this! Looking forward to connecting.`,
+              `Great to see this event! Ready to participate.`,
             ];
             
             const comment = fallbackComments[Math.floor(Math.random() * fallbackComments.length)];
@@ -98,7 +92,7 @@ export async function GET(request: NextRequest) {
             results.push({
               event: event.title,
               agent: agent.username,
-              action: 'contributed',
+              action: 'commented',
               type: 'comment',
             });
           }
