@@ -247,16 +247,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const { theme } = useTheme();
 
   useEffect(() => {
-    console.log("PostCard rendering:", { 
-      postId: post.id, 
-      hasUser: !!post.user, 
-      username: post.user?.username,
-      content: post.content?.substring(0, 50),
-      hasMedia: !!(post.mediaUrls?.length)
-    });
-  }, [post.id]);
-
-  useEffect(() => {
     if (typeof window !== 'undefined') {
       setUsername(localStorage.getItem("username"));
       setToken(localStorage.getItem("token"));
@@ -311,8 +301,19 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const isOwner = username === post.user?.username;
   const mediaItems = post.mediaUrls || [];
   const mediaTypes = post.mediaTypes || [];
-  const hasMedia = mediaItems.length > 0;
+  
+  // Show media if: (1) has mediaTypes indicating image/video, OR (2) URL looks like media file
+  const actualMedia = mediaItems.filter((url, idx) => {
+    const type = mediaTypes[idx] || mediaTypes[0];
+    if (type === 'image' || type === 'video') return true;
+    return url.match(/\.(jpg|jpeg|png|gif|webp|svg|mp4|webm|mov|avi|heic)$/i);
+  });
+  const hasMedia = actualMedia.length > 0;
   const displayCommentCount = comments.length > 0 ? comments.length : (post._count?.comments ?? 0);
+
+  if (post.mediaUrls?.length > 0 && actualMedia.length === 0 && mediaTypes[0] !== 'link') {
+    console.log("Post has media but filtered out:", post.id, { mediaItems, mediaTypes });
+  }
 
   const triggerHeartPop = () => {
     if (heartTimeout.current) clearTimeout(heartTimeout.current);
@@ -468,11 +469,11 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           resetZoom();
           break;
         case "ArrowLeft":
-          if (mediaItems.length > 1) setCurrentMediaIndex(i => (i - 1 + mediaItems.length) % mediaItems.length);
+          if (actualMedia.length > 1) setCurrentMediaIndex(i => (i - 1 + actualMedia.length) % actualMedia.length);
           resetZoom();
           break;
         case "ArrowRight":
-          if (mediaItems.length > 1) setCurrentMediaIndex(i => (i + 1) % mediaItems.length);
+          if (actualMedia.length > 1) setCurrentMediaIndex(i => (i + 1) % actualMedia.length);
           resetZoom();
           break;
         case "+":
@@ -490,7 +491,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isFullScreen, mediaItems.length]);
+  }, [isFullScreen, actualMedia.length]);
 
   const handleDragStart = (_event: any, _info?: any) => {
     const url = `${window.location.origin}/post/${post.id}`;
@@ -630,7 +631,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
             }}
             onClick={handleMediaClick}
           >
-            {mediaItems.length > 1 && (
+            {actualMedia.length > 1 && (
               <>
                 <button
                   onClick={e => { e.stopPropagation(); if (currentMediaIndex > 0) setCurrentMediaIndex(i => i - 1); }}
@@ -647,15 +648,15 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                   <ChevronLeft size={20} />
                 </button>
                 <button
-                  onClick={e => { e.stopPropagation(); if (currentMediaIndex < mediaItems.length - 1) setCurrentMediaIndex(i => i + 1); }}
+                  onClick={e => { e.stopPropagation(); if (currentMediaIndex < actualMedia.length - 1) setCurrentMediaIndex(i => i + 1); }}
                   style={{
                     position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
                     zIndex: 20, padding: 8, background: "rgba(255,255,255,0.15)",
                     backdropFilter: "blur(8px)", border: "none", borderRadius: "50%",
                     color: "#fff", cursor: "pointer",
-                    opacity: currentMediaIndex === mediaItems.length - 1 ? 0 : 1,
+                    opacity: currentMediaIndex === actualMedia.length - 1 ? 0 : 1,
                     transition: "opacity 0.2s",
-                    pointerEvents: currentMediaIndex === mediaItems.length - 1 ? "none" : "auto",
+                    pointerEvents: currentMediaIndex === actualMedia.length - 1 ? "none" : "auto",
                   }}
                 >
                   <ChevronRight size={20} />
@@ -675,13 +676,13 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 {mediaTypes[currentMediaIndex] === "video" ? (
                   <video
                     ref={videoRef}
-                    src={mediaItems[currentMediaIndex]}
+                    src={actualMedia[currentMediaIndex]}
                     style={{ width: "100%", height: "auto", display: "block" }}
                     loop playsInline draggable={false}
                   />
                 ) : (
                   <img
-                    src={mediaItems[currentMediaIndex]}
+                    src={actualMedia[currentMediaIndex]}
                     alt="Post media"
                     loading="lazy"
                     decoding="async"
@@ -727,7 +728,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           </div>
 
           <div style={{ padding: "0 18px" }}>
-            <MediaDots count={mediaItems.length} current={currentMediaIndex} />
+            <MediaDots count={actualMedia.length} current={currentMediaIndex} />
           </div>
 
           {post.content && (
@@ -862,10 +863,10 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 </button>
               </div>
 
-              {mediaItems.length > 1 && (
+              {actualMedia.length > 1 && (
                 <>
                   <button
-                    onClick={() => { setCurrentMediaIndex(i => (i - 1 + mediaItems.length) % mediaItems.length); resetZoom(); }}
+                    onClick={() => { setCurrentMediaIndex(i => (i - 1 + actualMedia.length) % actualMedia.length); resetZoom(); }}
                     style={{
                       position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)",
                       padding: 16, background: "rgba(255,255,255,0.1)", border: "none",
@@ -878,7 +879,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                     <ChevronLeft size={24} />
                   </button>
                   <button
-                    onClick={() => { setCurrentMediaIndex(i => (i + 1) % mediaItems.length); resetZoom(); }}
+                    onClick={() => { setCurrentMediaIndex(i => (i + 1) % actualMedia.length); resetZoom(); }}
                     style={{
                       position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",
                       padding: 16, background: "rgba(255,255,255,0.1)", border: "none",
@@ -901,7 +902,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 style={{ cursor: "grab", display: "flex", alignItems: "center", justifyContent: "center" }}
               >
                 <motion.img
-                  src={mediaItems[currentMediaIndex]}
+                  src={actualMedia[currentMediaIndex]}
                   animate={{ scale, x: position.x, y: position.y }}
                   transition={{ type: "spring", stiffness: 300, damping: 28 }}
                   style={{ maxWidth: "88vw", maxHeight: "80vh", objectFit: "contain", borderRadius: 12, pointerEvents: "none", userSelect: "none" }}
@@ -910,15 +911,28 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 />
               </motion.div>
 
-              {mediaItems.length > 1 && (
-                <div style={{
-                  position: "absolute", top: 80, left: "50%", transform: "translateX(-50%)",
-                  background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)",
-                  padding: "6px 14px", borderRadius: 20, color: "rgba(255,255,255,0.8)",
-                  fontSize: 12, fontFamily: '"DM Sans", system-ui, sans-serif',
-                }}>
-                  {currentMediaIndex + 1} / {mediaItems.length}
-                </div>
+              {actualMedia.length > 1 && (
+                <>
+                  <button
+                    onClick={() => setIsFullScreen(false)}
+                    style={{
+                      position: "absolute", top: 16, right: 16,
+                      zIndex: 50, padding: 10, background: "rgba(0,0,0,0.5)",
+                      border: "none", borderRadius: "50%", color: "#fff", cursor: "pointer",
+                    }}
+                  >
+                    <X size={18} />
+                  </button>
+                  <div
+                    style={{
+                      position: "absolute", bottom: 20, left: "50%", transform: "translateX(-50%)",
+                      background: "rgba(0,0,0,0.6)", padding: "8px 16px", borderRadius: 100,
+                      color: "#fff", fontSize: 12, fontWeight: 500,
+                    }}
+                  >
+                    {currentMediaIndex + 1} / {actualMedia.length}
+                  </div>
+                </>
               )}
 
               <p style={{

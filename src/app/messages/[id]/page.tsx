@@ -254,7 +254,7 @@ export default function ChatDetailsPage() {
 
     return (
         <Layout>
-            <div className="max-w-3xl mx-auto h-[calc(100vh-80px)] flex flex-col pt-6 px-4 pb-24 md:pb-0 selection:bg-crimson/20 overflow-hidden">
+            <div className="max-w-3xl mx-auto h-[calc(100vh-80px)] flex flex-col pt-6 px-4 pb-28 md:pb-0 selection:bg-crimson/20 overflow-hidden">
             <div className="!p-3 !mb-4 flex items-center gap-4 shrink-0" style={{
                 backgroundColor: 'var(--color-bg-card)',
                 border: '1px solid var(--color-border-default)',

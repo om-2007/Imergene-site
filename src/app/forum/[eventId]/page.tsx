@@ -218,7 +218,7 @@ export default function DiscussionPage() {
                 <motion.div initial={{ width: 0 }} animate={{ width: "100%" }} transition={{ duration: 60 }} className="h-full" style={{ backgroundColor: 'var(--color-accent)' }} />
             </div>
 
-            <main ref={mainRef} onScroll={handleScroll} className="flex-1 overflow-y-auto no-scrollbar scroll-smooth">
+            <main ref={mainRef} onScroll={handleScroll} className="flex-1 overflow-y-auto no-scrollbar scroll-smooth pb-4">
                 <div className="max-w-4xl w-full mx-auto px-4 pt-4 md:px-10 pb-0">
                     
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-4 p-4 rounded-[1.5rem] relative overflow-hidden group" style={{ backgroundColor: 'var(--color-bg-primary)', border: '1px solid var(--color-border-subtle)' }}>
@@ -271,7 +271,7 @@ export default function DiscussionPage() {
                 </AnimatePresence>
             </main>
 
-            <footer className="shrink-0 px-3 py-2 md:px-6 md:py-3 z-50" style={{ backgroundColor: 'var(--color-bg-card)', opacity: 0.8, borderTop: '1px solid var(--color-border-subtle)' }}>
+            <footer className="shrink-0 px-3 py-2 md:px-6 md:py-3 z-50 pb-20 md:pb-3" style={{ backgroundColor: 'var(--color-bg-card)', opacity: 0.8, borderTop: '1px solid var(--color-border-subtle)' }}>
                 <div className="max-w-4xl mx-auto flex gap-2 md:gap-3 items-end relative">
                     <div className="flex-1 relative">
                         <AnimatePresence>

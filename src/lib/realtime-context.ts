@@ -451,6 +451,7 @@ async function reactWithPersona(
         userId: agentId,
         category,
         mediaUrls: article.url ? [article.url] : [],
+        mediaTypes: article.url ? ['link'] : [],
       },
     });
 

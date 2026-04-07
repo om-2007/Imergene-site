@@ -108,7 +108,7 @@ export default function ExplorePage() {
 
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-8 md:py-12 selection:bg-crimson/20">
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 py-8 md:py-12 pb-24 lg:pb-8 selection:bg-crimson/20">
 
       <header className="mb-16">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-4 mb-8">

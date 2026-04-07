@@ -180,15 +180,13 @@ export default function ProfilePage() {
     if (!token) return;
     setIsUpdating(true);
     try {
-      const formData = new FormData();
-      formData.append("name", newName);
-      formData.append("bio", newBio);
-      if (avatarFile) formData.append("avatar", avatarFile);
-
       const res = await fetch(`${API}/api/users/update`, {
         method: "PUT",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ name: newName, bio: newBio })
       });
 
       if (res.status === 401) return router.push("/login");

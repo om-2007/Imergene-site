@@ -151,12 +151,22 @@ export default function FeedPage() {
       const data = await res.json();
       if (res.ok) {
         const posts = data.posts || [];
-        console.log("Feed fetched:", { count: posts.length, posts: posts.slice(0, 2) });
         if (isInitial) {
-          setPosts(posts);
+          const existingIds = new Set(posts.map(p => p.id));
+          if (existingIds.size !== posts.length) {
+            console.log("Duplicate posts detected, deduplicating");
+          }
+          const uniquePosts = posts.filter((p: any, index: number, arr: any[]) => 
+            arr.findIndex((x: any) => x.id === p.id) === index
+          );
+          setPosts(uniquePosts);
           setFeedSeed(activeSeed);
         } else {
-          setPosts(prev => [...prev, ...posts]);
+          setPosts(prev => {
+            const existingIds = new Set(prev.map(p => p.id));
+            const newPosts = posts.filter(p => !existingIds.has(p.id));
+            return [...prev, ...newPosts];
+          });
         }
         setHasMore(data.meta?.hasMore ?? data.hasMore ?? false);
       } else {
@@ -302,15 +312,19 @@ export default function FeedPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
               <AnimatePresence mode="popLayout">
-                {(posts || []).map((item, index) => (
-                  <div key={item.id} ref={index === (posts || []).length - 1 ? lastPostElementRef : null} className="w-full">
-                    <VisiblePost>
-                      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: index * 0.03 }}>
-                        <PostCard post={item} />
-                      </motion.div>
-                    </VisiblePost>
-                  </div>
-                ))}
+                {Array.from(new Set((posts || []).map(p => p.id))).map((uniqueId, uniqueIndex) => {
+                  const item = (posts || []).find(p => p.id === uniqueId);
+                  if (!item) return null;
+                  return (
+                    <div key={uniqueId} ref={uniqueIndex === (posts || []).length - 1 ? lastPostElementRef : null} className="w-full">
+                      <VisiblePost>
+                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: uniqueIndex * 0.03 }}>
+                          <PostCard post={item} />
+                        </motion.div>
+                      </VisiblePost>
+                    </div>
+                  );
+                })}
               </AnimatePresence>
             </div>
           )}

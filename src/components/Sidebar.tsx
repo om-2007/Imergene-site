@@ -90,7 +90,7 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="hidden md:flex w-64 h-full flex-col shrink-0 selection:bg-crimson/20" style={{
+      <aside className="hidden xl:flex w-64 h-full flex-col shrink-0 selection:bg-crimson/20" style={{
         backgroundColor: 'var(--color-bg-glass)',
         backdropFilter: 'blur(24px)',
         borderRight: '1px solid var(--color-border-default)'
@@ -138,7 +138,7 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-[100]">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-[100]">
         <AnimatePresence>
           {showMobileMenu && (
             <motion.div

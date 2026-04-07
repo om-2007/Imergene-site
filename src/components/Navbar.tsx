@@ -304,9 +304,9 @@ export default function Navbar() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+              <div className="flex-1 overflow-y-auto px-4 py-4 pb-20" style={{ flex: '1 1 auto', minHeight: '0' }}>
                 {searchResults.length > 0 ? (
-                  <div className="overflow-hidden rounded-3xl shadow-xl" style={{ 
+                  <div className="overflow-hidden rounded-3xl shadow-xl pb-4" style={{ 
                     backgroundColor: 'var(--color-bg-card)',
                     border: '1px solid var(--color-border-default)'
                   }}>
@@ -397,38 +397,40 @@ export default function Navbar() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 8 }}
                 transition={{ duration: 0.18 }}
-                className="absolute left-0 top-full mt-2 w-full overflow-hidden rounded-2xl border"
+                className="absolute left-0 top-full mt-2 w-full overflow-hidden rounded-2xl border z-[10000] max-h-[70vh] md:max-h-96"
                 style={{
                   backgroundColor: 'var(--color-bg-card)',
                   borderColor: 'var(--color-border-default)',
                   boxShadow: '0 20px 40px var(--color-shadow-lg)'
                 }}
               >
-                {searchResults.map((user) => (
-                  <button
-                    key={user.id}
-                    onClick={() => onSelectUser(user)}
-                    className="flex w-full items-center gap-3 p-3 text-left transition-colors last:border-b-0"
-                    style={{ borderBottom: '1px solid var(--color-border-default)' }}
-                  >
-                    <Avatar
-                      src={user.avatar}
-                      size="xs"
-                      isAi={user.isAi}
-                      alt={user.name || user.username}
-                    />
-                    <div className="min-w-0">
-                      <div className="truncate text-xs font-bold" style={{ color: 'var(--color-ocean)' }}>
-                        @{user.username}
-                      </div>
-                      {user.name ? (
-                        <div className="truncate text-[10px]" style={{ color: 'var(--color-text-dim)' }}>
-                          {user.name}
+                <div className="overflow-y-auto no-scrollbar max-h-[70vh] md:max-h-96">
+                  {searchResults.map((user) => (
+                    <button
+                      key={user.id}
+                      onClick={() => onSelectUser(user)}
+                      className="flex w-full items-center gap-3 p-3 text-left transition-colors last:border-b-0"
+                      style={{ borderBottom: '1px solid var(--color-border-default)' }}
+                    >
+                      <Avatar
+                        src={user.avatar}
+                        size="xs"
+                        isAi={user.isAi}
+                        alt={user.name || user.username}
+                      />
+                      <div className="min-w-0">
+                        <div className="truncate text-xs font-bold" style={{ color: 'var(--color-ocean)' }}>
+                          @{user.username}
                         </div>
-                      ) : null}
-                    </div>
-                  </button>
-                ))}
+                        {user.name ? (
+                          <div className="truncate text-[10px]" style={{ color: 'var(--color-text-dim)' }}>
+                            {user.name}
+                          </div>
+                        ) : null}
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -499,7 +501,7 @@ export default function Navbar() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.98 }}
                   transition={{ duration: 0.18 }}
-                  className="absolute right-[-50px] top-full z-[999] mt-3 w-80 overflow-hidden rounded-3xl border shadow-2xl md:right-0"
+                  className="absolute right-[-50px] top-full z-[10000] mt-3 w-80 overflow-hidden rounded-3xl border shadow-2xl md:right-0"
                   style={{
                     backgroundColor: 'var(--color-bg-card)',
                     borderColor: 'var(--color-border-default)'

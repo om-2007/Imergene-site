@@ -1,3 +1,12 @@
+import crypto from 'crypto';
+import { v2 as cloudinary } from 'cloudinary';
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || '',
+  api_key: process.env.CLOUDINARY_API_KEY || '',
+  api_secret: process.env.CLOUDINARY_API_SECRET || '',
+});
+
 export interface CloudinaryUploadResult {
   publicId: string;
   url: string;
@@ -17,9 +26,15 @@ const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || '';
 const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || '';
 const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET || '';
 
-function getAuthHeader(): string {
-  const auth = `${CLOUDINARY_API_KEY}:${CLOUDINARY_API_SECRET}`;
-  return Buffer.from(auth).toString('base64');
+function generateSignature(timestamp: number, folder?: string, publicId?: string): string {
+  const params: Record<string, string | number> = {
+    timestamp,
+  };
+  
+  if (folder) params.folder = folder;
+  if (publicId) params.public_id = publicId;
+  
+  return cloudinary.utils.api_sign_request(params, CLOUDINARY_API_SECRET);
 }
 
 export async function uploadImage(
@@ -34,6 +49,9 @@ export async function uploadImage(
     throw new Error('Cloudinary not configured');
   }
 
+  const timestamp = Math.floor(Date.now() / 1000);
+  const signature = generateSignature(timestamp, options.folder, options.publicId);
+
   const formData = new URLSearchParams();
   
   if (typeof file === 'string') {
@@ -42,7 +60,9 @@ export async function uploadImage(
     formData.append('file', `data:image/jpeg;base64,${file.toString('base64')}`);
   }
   
-  formData.append('upload_preset', 'imergene_uploads');
+  formData.append('api_key', CLOUDINARY_API_KEY);
+  formData.append('timestamp', timestamp.toString());
+  formData.append('signature', signature);
   
   if (options.folder) {
     formData.append('folder', options.folder);
@@ -98,6 +118,9 @@ export async function uploadVideo(
     throw new Error('Cloudinary not configured');
   }
 
+  const timestamp = Math.floor(Date.now() / 1000);
+  const signature = generateSignature(timestamp, options.folder, options.publicId);
+
   const formData = new URLSearchParams();
   
   if (typeof file === 'string') {
@@ -106,7 +129,9 @@ export async function uploadVideo(
     formData.append('file', `data:video/mp4;base64,${file.toString('base64')}`);
   }
   
-  formData.append('upload_preset', 'imergene_videos');
+  formData.append('api_key', CLOUDINARY_API_KEY);
+  formData.append('timestamp', timestamp.toString());
+  formData.append('signature', signature);
   
   if (options.folder) {
     formData.append('folder', options.folder);
@@ -159,7 +184,7 @@ export async function deleteMedia(publicId: string): Promise<CloudinaryDeleteRes
   }
 
   const timestamp = Math.floor(Date.now() / 1000);
-  const signature = await generateSignature(publicId, timestamp);
+  const signature = generateSignature(timestamp, undefined, publicId);
 
   const formData = new URLSearchParams();
   formData.append('public_id', publicId);
@@ -181,7 +206,8 @@ export async function deleteMedia(publicId: string): Promise<CloudinaryDeleteRes
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error?.message || 'Delete failed');
+      console.error('Cloudinary upload failed:', JSON.stringify(error));
+      throw new Error(error.error?.message || 'Upload failed');
     }
 
     return await response.json();
@@ -189,12 +215,6 @@ export async function deleteMedia(publicId: string): Promise<CloudinaryDeleteRes
     console.error('Cloudinary deleteMedia error:', error);
     throw new Error(`Failed to delete media: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-}
-
-async function generateSignature(publicId: string, timestamp: number): Promise<string> {
-  const crypto = await import('crypto');
-  const signString = `public_id=${publicId}&timestamp=${timestamp}${CLOUDINARY_API_SECRET}`;
-  return crypto.createHash('sha1').update(signString).digest('hex');
 }
 
 export async function getMediaMetadata(publicId: string) {
