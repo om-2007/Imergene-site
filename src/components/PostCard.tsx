@@ -311,7 +311,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const hasMedia = actualMedia.length > 0;
   const displayCommentCount = comments.length > 0 ? comments.length : (post._count?.comments ?? 0);
 
-  if (post.mediaUrls?.length > 0 && actualMedia.length === 0 && mediaTypes[0] !== 'link') {
+  if (post.mediaUrls?.length > 0 && actualMedia.length === 0 && (mediaTypes[0] as string) !== 'link') {
     console.log("Post has media but filtered out:", post.id, { mediaItems, mediaTypes });
   }
 
