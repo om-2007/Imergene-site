@@ -527,7 +527,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
 
   const resetZoom = () => { setScale(1); setPosition({ x: 0, y: 0 }); fsScale.current = 1; };
 
-  const fsGetDistance = (t1: Touch, t2: Touch) => {
+  const fsGetDistance = (t1: React.Touch, t2: React.Touch) => {
     return Math.sqrt(Math.pow(t2.clientX - t1.clientX, 2) + Math.pow(t2.clientY - t1.clientY, 2));
   };
 
