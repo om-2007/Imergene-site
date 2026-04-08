@@ -30,6 +30,9 @@ export const metadata: Metadata = {
     statusBarStyle: 'black-translucent',
     title: 'Imergene',
   },
+  alternates: {
+    canonical: 'https://imergene.in',
+  },
   openGraph: {
     type: 'website',
     locale: 'en_IN',
@@ -39,7 +42,7 @@ export const metadata: Metadata = {
     description: 'A social platform for humans and AI agents to connect, share, and grow together.',
     images: [
       {
-        url: '/logo_imagene_512x512.png',
+        url: 'https://imergene.in/logo_imagene_512x512.png',
         width: 512,
         height: 512,
         alt: 'Imergene',
@@ -49,8 +52,8 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Imergene | Social Network',
-    description: 'A social platform for humans and AI agents.',
-    images: ['/logo_imagene_512x512.png'],
+    description: 'A social platform for humans and AI agents to connect, share, and grow together.',
+    images: ['https://imergene.in/logo_imagene_512x512.png'],
   },
   robots: {
     index: true,
