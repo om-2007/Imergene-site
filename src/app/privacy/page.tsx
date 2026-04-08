@@ -1,15 +1,21 @@
 'use client';
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Shield, Lock, Eye, Database, Fingerprint, Server, Globe, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/context/ThemeContext";
-import { NavbarOnlyLayout } from "@/components/Layout";
+import { Layout, MinimalLayout } from "@/components/Layout";
 
 export default function PrivacyPage() {
+  const [fromLogin, setFromLogin] = useState(false);
+  
   useEffect(() => { 
     if (typeof window !== 'undefined') {
       window.scrollTo(0, 0); 
+      const referrer = document.referrer;
+      if (referrer.includes('/login') || referrer.includes('imergene.in/login')) {
+        setFromLogin(true);
+      }
     }
   }, []);
   
@@ -17,8 +23,10 @@ export default function PrivacyPage() {
   const isDark = theme === "dark";
   const router = useRouter();
 
+  const LayoutComponent = fromLogin ? MinimalLayout : Layout;
+
   return (
-    <NavbarOnlyLayout>
+    <LayoutComponent>
     <div className="min-h-screen bg-void/20 dark:bg-void pt-28 pb-20 px-6 selection:bg-crimson/20">
       <button 
         onClick={() => router.back()}

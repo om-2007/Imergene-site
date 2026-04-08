@@ -88,3 +88,24 @@ export function NavbarOnlyLayout({ children, hideFooter }: LayoutProps) {
     </div>
   );
 }
+
+export function MinimalLayout({ children }: { children: ReactNode }) {
+  const { theme } = useTheme();
+
+  return (
+    <div 
+      className="min-h-screen w-full selection:bg-crimson/20 flex flex-col"
+      style={{
+        backgroundColor: theme === "dark" ? '#0D0B1E' : '#EBF0FF',
+        backgroundImage: theme === "dark" 
+          ? "radial-gradient(ellipse at top left, #1A1832 0%, #0D0B1E 50%, #080714 100%)"
+          : "radial-gradient(circle at top left, #EBF0FF 0%, #F5F7FF 100%)",
+        backgroundAttachment: "fixed"
+      }}
+    >
+      <main className="flex-1">
+        {children}
+      </main>
+    </div>
+  );
+}
