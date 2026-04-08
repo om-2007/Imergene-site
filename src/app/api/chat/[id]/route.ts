@@ -58,7 +58,7 @@ export async function POST(
 
     const { id: conversationId } = await params;
     const body = await request.json();
-    const { content, mediaUrl, mediaType, metadata } = body;
+    const { content, mediaUrl, mediaType, metadata, mentions } = body;
     const senderId = payload.id;
 
     const conversation = await prisma.conversation.findUnique({
@@ -92,42 +92,79 @@ export async function POST(
       data: { updatedAt: new Date() },
     });
 
+    if (mentions && mentions.length > 0) {
+      const mentionedUsers = await prisma.user.findMany({
+        where: { username: { in: mentions } },
+        select: { id: true, username: true },
+      });
+
+      for (const mentionedUser of mentionedUsers) {
+        await prisma.notification.create({
+          data: {
+            type: 'MENTION',
+            userId: mentionedUser.id,
+            actorId: senderId,
+            messageId: message.id,
+            message: `@${conversation.participants.find((p: any) => p.id === senderId)?.username || 'Someone'} mentioned you in a chat`,
+          },
+        });
+      }
+    }
+
     if (recipient && recipient.isAi) {
-      setTimeout(async () => {
-        try {
-          const recentMessages = await prisma.message.findMany({
-            where: { conversationId },
-            orderBy: { createdAt: 'desc' },
-            take: 6,
+      console.log(`[Chat] Generating AI response for conversation ${conversationId}, recipient ${recipient.id}`);
+      
+      try {
+        const recentMessages = await prisma.message.findMany({
+          where: { conversationId },
+          orderBy: { createdAt: 'desc' },
+          take: 6,
+        });
+
+        const history = recentMessages.reverse().map((msg: { senderId: string; content: string }) => ({
+          role: msg.senderId === recipient.id ? 'assistant' : 'user',
+          content: msg.content,
+        }));
+
+        const mentionedUsers = content.match(/@(\w+)/g)?.map(m => m.slice(1)) || [];
+        let enhancedContent = content;
+        
+        if (mentionedUsers.length > 0) {
+          const mentionNotice = `\n[Note: You are being mentioned by ${mentionedUsers.map(u => '@' + u).join(', ')}. They want your attention!]`;
+          enhancedContent = content + mentionNotice;
+        }
+
+        console.log(`[Chat] History length: ${history.length}`);
+
+        const aiResponsePromise = generateAIChatResponse(enhancedContent, recipient.id, history, senderId);
+        const timeoutPromise = new Promise<string | null>((resolve) => 
+          setTimeout(() => resolve(null), 300000)
+        );
+
+        const aiResponse = await Promise.race([aiResponsePromise, timeoutPromise]);
+
+        if (aiResponse) {
+          console.log(`[Chat] AI response: ${aiResponse.substring(0, 50)}...`);
+          await prisma.message.create({
+            data: {
+              content: aiResponse,
+              senderId: recipient.id,
+              conversationId,
+              isAiGenerated: true,
+            },
+            include: { sender: true },
           });
 
-          const history = recentMessages.reverse().map((msg: { senderId: string; content: string }) => ({
-            role: msg.senderId === recipient.id ? 'assistant' : 'user',
-            content: msg.content,
-          }));
-
-          const aiResponse = await generateAIChatResponse(content, recipient.id, history, senderId);
-
-          if (aiResponse) {
-            await prisma.message.create({
-              data: {
-                content: aiResponse,
-                senderId: recipient.id,
-                conversationId,
-                isAiGenerated: true,
-              },
-              include: { sender: true },
-            });
-
-            await prisma.conversation.update({
-              where: { id: conversationId },
-              data: { updatedAt: new Date() },
-            });
-          }
-        } catch (aiErr) {
-          console.error('AI Chat Error:', aiErr);
+          await prisma.conversation.update({
+            where: { id: conversationId },
+            data: { updatedAt: new Date() },
+          });
+        } else {
+          console.log(`[Chat] AI response timed out or failed`);
         }
-      }, 1500);
+      } catch (aiErr) {
+        console.error('[Chat] AI Error:', aiErr);
+      }
     }
 
     return NextResponse.json(message, { status: 201 });

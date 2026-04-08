@@ -31,11 +31,12 @@ export default function TermsPage() {
       <div className="min-h-screen bg-void/20 dark:bg-[#0F0E1A] pt-28 pb-20 px-6 selection:bg-crimson/20 font-sans">
         <button 
           onClick={() => router.back()}
-          className="fixed top-20 md:top-8 left-8 flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors z-20"
+          className="fixed top-6 left-6 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-widest transition-all z-20 hover:scale-105"
           style={{ 
-            backgroundColor: isDark ? 'rgba(26, 24, 50, 0.8)' : 'rgba(255, 255, 255, 0.8)',
-            color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(45, 40, 75, 0.4)',
-            border: `1px solid ${isDark ? 'rgba(150,135,245,0.2)' : 'rgba(150,135,245,0.1)'}`,
+            backgroundColor: isDark ? '#1A1832' : '#FFFFFF',
+            color: isDark ? 'rgba(255,255,255,0.85)' : '#2D284B',
+            border: `1px solid ${isDark ? 'rgba(150,135,245,0.4)' : 'rgba(150,135,245,0.3)'}`,
+            boxShadow: isDark ? '0 4px 20px rgba(150,135,245,0.2)' : '0 4px 12px rgba(45,40,75,0.1)',
           }}
         >
           <ArrowLeft size={14} /> Back

@@ -39,10 +39,13 @@ export default function ChatDetailsPage() {
     const [isOtherTyping, setIsOtherTyping] = useState(false);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const [showMentions, setShowMentions] = useState(false);
+    const [mentionSearch, setMentionSearch] = useState("");
+    const [mentionIndex, setMentionIndex] = useState(0);
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
     const [token, setToken] = useState<string | null>(null);
     const [myUsername, setMyUsername] = useState<string | null>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const emojiRef = useRef<HTMLDivElement>(null);
@@ -96,6 +99,26 @@ export default function ChatDetailsPage() {
         }
     };
 
+    const renderMessageWithMentions = (content: string) => {
+        const parts = content.split(/(@\w+)/g);
+        return parts.map((part, i) => {
+            if (part.startsWith('@')) {
+                const username = part.slice(1);
+                return (
+                    <span 
+                        key={i} 
+                        className="font-bold cursor-pointer hover:underline transition-all"
+                        style={{ color: isDark ? '#C4B5FD' : '#7C3AED' }}
+                        onClick={() => router.push(`/profile/${username}`)}
+                    >
+                        {part}
+                    </span>
+                );
+            }
+            return <span key={i}>{part}</span>;
+        });
+    };
+
     const broadcastTyping = async (isTyping: boolean) => {
         if (!token) return;
         try {
@@ -143,6 +166,12 @@ export default function ChatDetailsPage() {
     }, [id]);
 
     useEffect(() => {
+        loadChat(true);
+        const interval = setInterval(() => loadChat(false), 3000);
+        return () => clearInterval(interval);
+    }, [id]);
+
+    useEffect(() => {
         async function fetchUsers() {
             const currentToken = localStorage.getItem("token");
             if (!currentToken) return;
@@ -152,26 +181,12 @@ export default function ChatDetailsPage() {
                 });
                 const data = await res.json();
                 if (Array.isArray(data)) setAllUsers(data);
-            } catch (err) {}
+            } catch (err) {
+                console.error('Failed to fetch users for mentions:', err);
+            }
         }
         fetchUsers();
     }, []);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (emojiRef.current && !emojiRef.current.contains(event.target as Node)) {
-                setShowEmojiPicker(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-
-    useEffect(() => {
-        loadChat(true);
-        const interval = setInterval(() => loadChat(false), 4000);
-        return () => clearInterval(interval);
-    }, [loadChat, id]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
@@ -191,8 +206,32 @@ export default function ChatDetailsPage() {
                 u.username.toLowerCase().includes(query) || (u.name && u.name.toLowerCase().includes(query))
             ).slice(0, 5);
             setFilteredUsers(matches);
+            setMentionSearch(query);
+            setMentionIndex(0);
             setShowMentions(matches.length > 0);
-        } else { setShowMentions(false); }
+        } else { 
+            setShowMentions(false);
+            setMentionSearch("");
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (!showMentions || filteredUsers.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setMentionIndex(i => Math.min(i + 1, filteredUsers.length - 1));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setMentionIndex(i => Math.max(i - 1, 0));
+        } else if (e.key === 'Enter' || e.key === 'Tab') {
+            e.preventDefault();
+            if (filteredUsers[mentionIndex]) {
+                insertMention(filteredUsers[mentionIndex].username);
+            }
+        } else if (e.key === 'Escape') {
+            setShowMentions(false);
+        }
     };
 
     const insertMention = (username: string) => {
@@ -200,6 +239,8 @@ export default function ChatDetailsPage() {
         words.pop();
         setInput([...words, `@${username} `].join(" "));
         setShowMentions(false);
+        setMentionSearch("");
+        inputRef.current?.focus();
     };
 
     const handleSend = async (e: React.FormEvent) => {
@@ -209,24 +250,32 @@ export default function ChatDetailsPage() {
         setIsSending(true);
 
         const optimisticId = Date.now().toString();
+        const mentionedUsernames = input.match(/@(\w+)/g)?.map(m => m.slice(1)) || [];
+        
         const optimisticMsg = {
             id: optimisticId,
             content: input,
             sender: { username: myUsername },
             createdAt: new Date().toISOString(),
-            sending: true
+            sending: true,
+            mentions: mentionedUsernames
         };
 
         setMessages(prev => [...prev, optimisticMsg]);
         setInput("");
         setShowEmojiPicker(false);
+        setShowMentions(false);
+        setMentionSearch("");
         setTimeout(() => scrollToBottom("smooth"), 50);
 
         try {
             const res = await fetch(`${API}/api/chat/${id}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ content: optimisticMsg.content })
+                body: JSON.stringify({ 
+                    content: optimisticMsg.content,
+                    mentions: mentionedUsernames
+                })
             });
             if (res.ok) {
                 const confirmedMsg = await res.json();
@@ -366,7 +415,9 @@ export default function ChatDetailsPage() {
                                                     }
                                                 </div>
                                             )}
-                                            <div className="px-4 py-2.5 leading-relaxed font-normal">{m.content}</div>
+                                            <div className="px-4 py-2.5 leading-relaxed font-normal">
+                                                {renderMessageWithMentions(m.content)}
+                                            </div>
                                         </>
                                     )}
                                 </div>
@@ -384,26 +435,80 @@ export default function ChatDetailsPage() {
             <div className="flex flex-col gap-1 relative shrink-0">
                 <AnimatePresence>
                     {showMentions && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute bottom-full left-0 w-full mb-3 rounded-2xl overflow-hidden z-[120] shadow-2xl" style={{
-                            backgroundColor: 'var(--color-bg-card)',
-                            border: '1px solid var(--color-border-default)'
-                        }}>
-                            <div className="p-2.5 border-b" style={{ 
+                        <motion.div 
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }} 
+                            animate={{ opacity: 1, y: 0, scale: 1 }} 
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            className="absolute bottom-full left-0 w-full mb-2 rounded-2xl overflow-hidden z-[120] shadow-2xl border"
+                            style={{
+                                backgroundColor: 'var(--color-bg-card)',
+                                borderColor: 'var(--color-border-default)',
+                                maxHeight: '280px',
+                            }}
+                        >
+                            <div className="px-4 py-2.5 border-b flex items-center gap-2" style={{ 
                                 backgroundColor: 'var(--color-bg-tertiary)',
                                 borderColor: 'var(--color-border-default)'
                             }}>
-                                <span className="text-[10px] font-black text-crimson uppercase tracking-widest">Neural Directory</span>
+                                <span className="text-[10px] font-black text-crimson uppercase tracking-widest">Mention</span>
+                                {mentionSearch && (
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(150,135,245,0.2)', color: 'var(--color-crimson)' }}>
+                                        {mentionSearch}
+                                    </span>
+                                )}
                             </div>
-                            {filteredUsers.map((u) => (
-                                <button key={u.id} type="button" onClick={() => insertMention(u.username)} className="w-full flex items-center gap-4 p-3.5 transition-colors border-b last:border-0 text-left" style={{ borderColor: 'var(--color-border-default)' }}>
-                                    <Avatar src={u.avatar} size="xs" isAi={u.isAi} />
-                                    <div>
-                                        <p className="text-xs font-bold uppercase tracking-tight" style={{ color: 'var(--color-text-primary)' }}>{u.name || u.username}</p>
-                                        <p className="text-[10px] italic" style={{ color: 'var(--color-text-muted)' }}>@{u.username}</p>
-                                    </div>
-                                    {u.isAi && <Cpu size={12} className="ml-auto text-crimson opacity-40" />}
-                                </button>
-                            ))}
+                            <div className="overflow-y-auto" style={{ maxHeight: '200px' }}>
+                                {filteredUsers.map((u, idx) => (
+                                    <button 
+                                        key={u.id} 
+                                        type="button" 
+                                        onClick={() => insertMention(u.username)} 
+                                        className="w-full flex items-center gap-3 p-3 transition-all border-b last:border-0 text-left"
+                                        style={{ 
+                                            borderColor: 'var(--color-border-default)',
+                                            backgroundColor: idx === mentionIndex ? 'rgba(150,135,245,0.15)' : 'transparent',
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'rgba(150,135,245,0.1)';
+                                            setMentionIndex(idx);
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = idx === mentionIndex ? 'rgba(150,135,245,0.15)' : 'transparent';
+                                        }}
+                                    >
+                                        <div className="relative">
+                                            <Avatar src={u.avatar} size="sm" isAi={u.isAi} />
+                                            {u.isAi && (
+                                                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-crimson rounded-full flex items-center justify-center">
+                                                    <Cpu size={8} className="text-white" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
+                                                    {u.name || u.username}
+                                                </p>
+                                                {idx === mentionIndex && (
+                                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-crimson/20 text-crimson font-bold">Selected</span>
+                                                )}
+                                            </div>
+                                            <p className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+                                                @{u.username} · {u.isAi ? 'AI Agent' : 'Human'}
+                                            </p>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="px-4 py-2 border-t text-[9px] flex items-center gap-3" style={{ 
+                                backgroundColor: 'var(--color-bg-tertiary)',
+                                borderColor: 'var(--color-border-default)',
+                                color: 'var(--color-text-muted)'
+                            }}>
+                                <span className="flex items-center gap-1"><kbd className="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono">↑↓</kbd> Navigate</span>
+                                <span className="flex items-center gap-1"><kbd className="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono">Enter</kbd> Select</span>
+                                <span className="flex items-center gap-1"><kbd className="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono">Esc</kbd> Close</span>
+                            </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
@@ -439,15 +544,18 @@ export default function ChatDetailsPage() {
                             )}
                         </AnimatePresence>
                         <input 
+                            ref={inputRef}
                             value={input} 
                             onChange={handleInputChange} 
-                            placeholder={isSending ? "Transmitting..." : "Secure transmission..."} 
+                            onKeyDown={handleKeyDown}
+                            placeholder={isSending ? "Transmitting..." : showMentions ? "Search or select..." : "Secure transmission..."} 
                             disabled={isSending} 
-                            className="w-full rounded-2xl pl-14 pr-4 py-4 text-sm focus:outline-none focus:ring-2 transition-all shadow-sm" 
+                            className="w-full rounded-2xl pl-14 pr-4 py-4 text-sm focus:outline-none transition-all shadow-sm" 
                             style={{ 
                                 backgroundColor: 'var(--color-bg-card)',
-                                border: '1px solid var(--color-border-default)',
-                                color: 'var(--color-text-primary)'
+                                border: `1px solid ${showMentions ? 'var(--color-crimson)' : 'var(--color-border-default)'}`,
+                                color: 'var(--color-text-primary)',
+                                boxShadow: showMentions ? '0 0 0 3px rgba(150,135,245,0.15)' : 'none',
                             }}
                         />
                     </div>

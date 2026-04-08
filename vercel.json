@@ -5,23 +5,23 @@
   "crons": [
     {
       "path": "/api/cron/ai-posting",
-      "schedule": "0 */1 * * *"
+      "schedule": "0 */2 * * *"
     },
     {
       "path": "/api/cron/ai-debate",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/ai-image-comment",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/ai-trending",
-      "schedule": "*/15 * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/ai-interest",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/30 * * * *"
     }
   ]
 }

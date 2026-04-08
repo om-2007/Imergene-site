@@ -16,32 +16,63 @@ import { trackInteraction, getInterestProfile, getTopInterests } from './interes
 const GROQ_MODELS = [
   'llama-3.1-8b-instant',
   'llama-3.3-70b-versatile',
-  'mixtral-8x7b-32768',
 ];
 
-interface KeyState {
-  key: string;
+const OPENROUTER_MODELS = [
+  'google/gemma-3-4b-it',
+  'meta-llama/llama-3-8b-instruct',
+  'mistralai/mistral-7b-instruct',
+  'qwen/qwen2.5-7b-instruct',
+];
+
+interface ProviderState {
   currentModelIndex: number;
   failedModels: Set<number>;
   lastError: number;
+  cooldownUntil: number;
+}
+
+interface KeyState {
+  key: string;
+  provider: string;
+  state: ProviderState;
 }
 
 const keyStates: Map<string, KeyState> = new Map();
 
-async function getAgentApiKey(agentId: string): Promise<{ apiKey: string; provider: string } | null> {
-  const agentKey = await prisma.agentApiKey.findFirst({
-    where: { agentId, revoked: false },
-  });
-
-  if (agentKey?.llmApiKey && agentKey?.llmProvider) {
-    return { apiKey: agentKey.llmApiKey, provider: agentKey.llmProvider };
-  }
-
-  return null;
+interface ProviderConfig {
+  name: string;
+  endpoint: string;
+  models: string[];
+  authHeader: (key: string) => string;
+  headers?: Record<string, string>;
+  bodyFormat?: 'openai' | 'anthropic' | 'openrouter';
 }
 
-function getSystemApiKeys(): string[] {
-  const keys = [
+const PROVIDERS: ProviderConfig[] = [
+  {
+    name: 'groq',
+    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+    models: GROQ_MODELS,
+    authHeader: (key) => `Bearer ${key}`,
+  },
+  {
+    name: 'openrouter',
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    models: OPENROUTER_MODELS,
+    authHeader: (key) => `Bearer ${key}`,
+    headers: {
+      'HTTP-Referer': 'https://imergene.in',
+      'X-Title': 'Imergene',
+    },
+    bodyFormat: 'openrouter',
+  },
+];
+
+function getAllKeys(): { key: string; provider: string }[] {
+  const keys: { key: string; provider: string }[] = [];
+
+  const groqKeys = [
     process.env.GROQ_API_KEY,
     process.env.GROQ_API_KEY_2,
     process.env.GROQ_API_KEY_3,
@@ -56,84 +87,111 @@ function getSystemApiKeys(): string[] {
     process.env.GROQ_API_KEY_12,
     process.env.GROQ_API_KEY_13,
   ].filter(Boolean) as string[];
-  
+
+  for (const key of groqKeys) {
+    keys.push({ key, provider: 'groq' });
+  }
+
+  const openrouterKeys = [
+    process.env.OPENROUTER_API_KEY,
+    process.env.OPENROUTER_API_KEY_2,
+    process.env.OPENROUTER_API_KEY_3,
+  ].filter(Boolean) as string[];
+
+  for (const key of openrouterKeys) {
+    keys.push({ key, provider: 'openrouter' });
+  }
+
   return keys;
 }
 
-function getNextAvailableKey(): { apiKey: string; model: string } | null {
-  const keys = getSystemApiKeys();
+function getProviderConfig(provider: string): ProviderConfig | undefined {
+  return PROVIDERS.find(p => p.name === provider);
+}
+
+function getNextAvailableKey(): { apiKey: string; provider: string; model: string } | null {
+  const keys = getAllKeys();
   if (keys.length === 0) return null;
 
   const now = Date.now();
-  const COOLDOWN_MS = 60000;
+  const COOLDOWN_MS = 30000;
+  const MAX_RETRIES_PER_KEY = 3;
 
-  for (const key of keys) {
-    let state = keyStates.get(key);
-    
-    if (!state || (now - state.lastError) > COOLDOWN_MS) {
+  const shuffledKeys = [...keys].sort(() => Math.random() - 0.5);
+
+  for (const { key, provider } of shuffledKeys) {
+    const config = getProviderConfig(provider);
+    if (!config) continue;
+
+    const stateKey = `${provider}:${key}`;
+    let state = keyStates.get(stateKey);
+
+    if (!state || state.provider !== provider || state.key !== key) {
       state = {
         key,
-        currentModelIndex: 0,
-        failedModels: new Set(),
-        lastError: 0,
+        provider,
+        state: {
+          currentModelIndex: 0,
+          failedModels: new Set(),
+          lastError: 0,
+          cooldownUntil: 0,
+        },
       };
-      keyStates.set(key, state);
+      keyStates.set(stateKey, state);
     }
 
-    while (state.currentModelIndex < GROQ_MODELS.length) {
-      if (!state.failedModels.has(state.currentModelIndex)) {
-        return { apiKey: key, model: GROQ_MODELS[state.currentModelIndex] };
+    if (now < state.state.cooldownUntil) continue;
+
+    let retriesOnThisKey = 0;
+    while (state.state.currentModelIndex < config.models.length && retriesOnThisKey < MAX_RETRIES_PER_KEY) {
+      const modelIndex = state.state.currentModelIndex;
+      if (!state.state.failedModels.has(modelIndex)) {
+        return { apiKey: key, provider, model: config.models[modelIndex] };
       }
-      state.currentModelIndex++;
+      state.state.currentModelIndex++;
+      retriesOnThisKey++;
     }
 
-    state.currentModelIndex = 0;
-    state.failedModels.clear();
+    if (state.state.lastError > 0 && (now - state.state.lastError) < COOLDOWN_MS) {
+      state.state.cooldownUntil = now + COOLDOWN_MS;
+    }
+
+    state.state.currentModelIndex = 0;
+    state.state.failedModels.clear();
   }
 
-  console.warn('All API keys exhausted, waiting for cooldown...');
+  console.warn('All API keys exhausted or on cooldown');
   return null;
 }
 
-function markKeyFailed(apiKey: string, model: string) {
-  const state = keyStates.get(apiKey);
-  if (state) {
-    const modelIndex = GROQ_MODELS.indexOf(model);
+function markKeyFailed(apiKey: string, provider: string, model: string) {
+  const stateKey = `${provider}:${apiKey}`;
+  const state = keyStates.get(stateKey);
+  const config = getProviderConfig(provider);
+
+  if (state && config) {
+    const modelIndex = config.models.indexOf(model);
     if (modelIndex !== -1) {
-      state.failedModels.add(modelIndex);
+      state.state.failedModels.add(modelIndex);
     }
-    state.lastError = Date.now();
+    state.state.lastError = Date.now();
   }
 }
 
 function getNextApiKeyAndProvider(): { apiKey: string; provider: string } | null {
   const result = getNextAvailableKey();
   if (!result) return null;
-  return { apiKey: result.apiKey, provider: 'groq' };
+  return { apiKey: result.apiKey, provider: result.provider };
 }
 
 function getApiEndpoint(provider: string): string {
-  switch (provider) {
-    case 'openai':
-      return 'https://api.openai.com/v1/chat/completions';
-    case 'anthropic':
-      return 'https://api.anthropic.com/v1/messages';
-    case 'groq':
-    default:
-      return 'https://api.groq.com/openai/v1/chat/completions';
-  }
+  const config = getProviderConfig(provider);
+  return config?.endpoint || 'https://api.groq.com/openai/v1/chat/completions';
 }
 
 function getModelForProvider(provider: string): string {
-  switch (provider) {
-    case 'openai':
-      return 'gpt-4o-mini';
-    case 'anthropic':
-      return 'claude-3-haiku-20240307';
-    case 'groq':
-    default:
-      return 'llama-3.1-8b-instant';
-  }
+  const config = getProviderConfig(provider);
+  return config?.models[0] || 'llama-3.1-8b-instant';
 }
 
 async function callLlm(
@@ -145,54 +203,56 @@ async function callLlm(
   model?: string
 ): Promise<string | null> {
   const endpoint = getApiEndpoint(provider);
-  const selectedModel = model || getModelForProvider(provider);
+  const config = getProviderConfig(provider);
+  const selectedModel = model || config?.models[0] || 'llama-3.1-8b-instant';
 
   try {
-    if (provider === 'anthropic') {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages,
-          max_tokens: maxTokens,
-          temperature,
-        }),
-      });
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
 
-      if (!response.ok) return null;
-      const data = await response.json();
-      return data.content?.[0]?.text || null;
+    if (config?.authHeader) {
+      headers['Authorization'] = config.authHeader(apiKey);
+    } else {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
+    if (config?.headers) {
+      Object.assign(headers, config.headers);
+    }
+
+    const requestBody: Record<string, any> = {
+      model: selectedModel,
+      messages,
+      max_tokens: maxTokens,
+      temperature,
+    };
+
+    if (provider === 'openrouter') {
+      requestBody.route = 'fallback';
     }
 
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: selectedModel,
-        messages,
-        max_tokens: maxTokens,
-        temperature,
-      }),
+      headers,
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
-      console.error(`LLM API error: ${response.status} - ${errorText.substring(0, 200)}`);
+      console.error(`[${provider}] API error ${response.status}: ${errorText.substring(0, 200)}`);
       return null;
     }
-    
+
     const data = await response.json();
+
+    if (provider === 'anthropic') {
+      return data.content?.[0]?.text || null;
+    }
+
     return data.choices?.[0]?.message?.content || null;
   } catch (err) {
-    console.error('LLM call failed:', err instanceof Error ? err.message : String(err));
+    console.error(`[${provider}] LLM call failed:`, err instanceof Error ? err.message : String(err));
     return null;
   }
 }
@@ -207,58 +267,83 @@ async function callLlmWithRetry(
   maxRetries: number = 3
 ): Promise<string | null> {
   let lastError: Error | null = null;
-  let currentModel = model || GROQ_MODELS[0];
-  
+  const config = getProviderConfig(provider);
+  const models = config?.models || ['llama-3.1-8b-instant'];
+  let currentModel = model || models[0];
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const result = await callLlm(apiKey, provider, messages, maxTokens, temperature, currentModel);
       if (result) return result;
-      
-      const state = keyStates.get(apiKey);
+
+      const stateKey = `${provider}:${apiKey}`;
+      const state = keyStates.get(stateKey);
+
       if (state) {
-        const modelIndex = GROQ_MODELS.indexOf(currentModel);
-        state.failedModels.add(modelIndex);
-        
+        const modelIndex = models.indexOf(currentModel);
+        state.state.failedModels.add(modelIndex);
+
         const nextModelIndex = modelIndex + 1;
-        if (nextModelIndex < GROQ_MODELS.length) {
-          currentModel = GROQ_MODELS[nextModelIndex];
-          console.log(`Model ${GROQ_MODELS[modelIndex]} failed, trying ${currentModel}`);
+        if (nextModelIndex < models.length) {
+          currentModel = models[nextModelIndex];
+          console.log(`[${provider}] Model ${models[modelIndex]} failed, trying ${currentModel}`);
         }
       }
-      
+
       lastError = new Error(`LLM returned empty response on attempt ${attempt}`);
-      
+
       if (attempt < maxRetries) {
         await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
       }
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      console.error(`LLM call attempt ${attempt} failed:`, lastError.message);
-      
-      const state = keyStates.get(apiKey);
+      console.error(`[${provider}] LLM call attempt ${attempt} failed:`, lastError.message);
+
+      const stateKey = `${provider}:${apiKey}`;
+      const state = keyStates.get(stateKey);
+
       if (state) {
-        const modelIndex = GROQ_MODELS.indexOf(currentModel);
-        state.failedModels.add(modelIndex);
-        state.lastError = Date.now();
-        
+        const modelIndex = models.indexOf(currentModel);
+        state.state.failedModels.add(modelIndex);
+        state.state.lastError = Date.now();
+
         const nextModelIndex = modelIndex + 1;
-        if (nextModelIndex < GROQ_MODELS.length) {
-          currentModel = GROQ_MODELS[nextModelIndex];
+        if (nextModelIndex < models.length) {
+          currentModel = models[nextModelIndex];
         }
       }
-      
+
       if (attempt < maxRetries) {
         await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
       }
     }
   }
-  
-  console.error('All LLM retry attempts failed:', lastError?.message || 'No response from API');
+
+  console.error(`[${provider}] All LLM retry attempts failed:`, lastError?.message || 'No response from API');
   return null;
 }
 
 function getRandomItem<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function getRandomApiKey(): { apiKey: string; provider: string } | null {
+  const keys = getAllKeys();
+  if (keys.length === 0) return null;
+  const randomEntry = getRandomItem(keys);
+  return { apiKey: randomEntry.key, provider: randomEntry.provider };
+}
+
+async function getAgentApiKey(agentId: string): Promise<{ apiKey: string; provider: string } | null> {
+  const agentKey = await prisma.agentApiKey.findFirst({
+    where: { agentId, revoked: false },
+  });
+
+  if (agentKey?.llmApiKey && agentKey?.llmProvider) {
+    return { apiKey: agentKey.llmApiKey, provider: agentKey.llmProvider };
+  }
+
+  return null;
 }
 
 const FALLBACK_POSTS = {
@@ -319,18 +404,22 @@ async function generatePostFromNews(agentId: string, category?: string): Promise
   if (!agent) return null;
 
   const agentApiKey = await getAgentApiKey(agentId);
-  const systemKeys = getSystemApiKeys();
 
-  let apiKey: string;
-  let provider: string;
+  let apiKey: string | undefined;
+  let provider: string = 'groq';
 
   if (agentApiKey) {
     apiKey = agentApiKey.apiKey;
     provider = agentApiKey.provider;
-  } else if (getSystemApiKeys().length > 0) {
-    apiKey = getRandomItem(getSystemApiKeys());
-    provider = 'groq';
   } else {
+    const keyInfo = getRandomApiKey();
+    if (keyInfo) {
+      apiKey = keyInfo.apiKey;
+      provider = keyInfo.provider;
+    }
+  }
+
+  if (!apiKey) {
     const fallbackCategory = category || getRandomItem(Object.keys(FALLBACK_POSTS));
     return {
       content: getRandomItem(FALLBACK_POSTS[fallbackCategory as keyof typeof FALLBACK_POSTS] || FALLBACK_POSTS.technology),
@@ -467,16 +556,12 @@ export async function generateAIChatResponse(
   } else {
     const keyResult = getNextApiKeyAndProvider();
     if (!keyResult) {
-      console.error('No API keys available for AI chat - please set GROQ_API_KEY environment variable');
+      console.error('No API keys available - please set GROQ_API_KEY or OPENROUTER_API_KEY environment variables');
       return null;
     }
     apiKey = keyResult.apiKey;
     provider = keyResult.provider;
-    
-    const keyState = keyStates.get(apiKey);
-    if (keyState) {
-      currentModel = GROQ_MODELS[keyState.currentModelIndex] || GROQ_MODELS[0];
-    }
+    currentModel = keyResult.model;
   }
 
   try {
@@ -517,7 +602,7 @@ export async function generateAIChatResponse(
 
     const messages = [
       { role: 'system', content: systemPrompt },
-      ...enhancedHistory.slice(-10),
+      ...enhancedHistory.slice(-5),
       { role: 'user', content: message },
     ];
 
@@ -579,16 +664,18 @@ async function extractMemoriesFromConversation(
   aiResponse: string
 ) {
   const agentApiKey = await getAgentApiKey(agentId);
-  const systemKeys = getSystemApiKeys();
   let apiKey: string | undefined;
-  let provider: string;
+  let provider: string = 'groq';
 
   if (agentApiKey) {
     apiKey = agentApiKey.apiKey;
     provider = agentApiKey.provider;
-  } else if (getSystemApiKeys().length > 0) {
-    apiKey = getRandomItem(getSystemApiKeys());
-    provider = 'groq';
+  } else {
+    const keyInfo = getRandomApiKey();
+    if (keyInfo) {
+      apiKey = keyInfo.apiKey;
+      provider = keyInfo.provider;
+    }
   }
 
   if (!apiKey) return;
@@ -668,8 +755,8 @@ async function generateDynamicComment(
   personality?: string,
   postAuthorId?: string
 ): Promise<string | null> {
-  let textApiKey: string;
-  let textProvider: string;
+  let textApiKey: string | undefined;
+  let textProvider: string = 'groq';
 
   if (agentId) {
     const agentApiKey = await getAgentApiKey(agentId);
@@ -677,14 +764,18 @@ async function generateDynamicComment(
       textApiKey = agentApiKey.apiKey;
       textProvider = agentApiKey.provider;
     } else {
-      const systemKeys = getSystemApiKeys();
-      textApiKey = getSystemApiKeys()[0];
-      textProvider = 'groq';
+      const keyInfo = getRandomApiKey();
+      if (keyInfo) {
+        textApiKey = keyInfo.apiKey;
+        textProvider = keyInfo.provider;
+      }
     }
   } else {
-    const systemKeys = getSystemApiKeys();
-    textApiKey = getSystemApiKeys()[0];
-    textProvider = 'groq';
+    const keyInfo = getRandomApiKey();
+    if (keyInfo) {
+      textApiKey = keyInfo.apiKey;
+      textProvider = keyInfo.provider;
+    }
   }
 
   if (!textApiKey) return null;
@@ -746,8 +837,8 @@ export async function generateDynamicEventComment(
   personality?: string,
   extraContext?: string
 ): Promise<string | null> {
-  let textApiKey: string;
-  let textProvider: string;
+  let textApiKey: string | undefined;
+  let textProvider: string = 'groq';
 
   if (agentId) {
     const agentApiKey = await getAgentApiKey(agentId);
@@ -755,14 +846,18 @@ export async function generateDynamicEventComment(
       textApiKey = agentApiKey.apiKey;
       textProvider = agentApiKey.provider;
     } else {
-      const systemKeys = getSystemApiKeys();
-      textApiKey = getSystemApiKeys()[0];
-      textProvider = 'groq';
+      const keyInfo = getRandomApiKey();
+      if (keyInfo) {
+        textApiKey = keyInfo.apiKey;
+        textProvider = keyInfo.provider;
+      }
     }
   } else {
-    const systemKeys = getSystemApiKeys();
-    textApiKey = getSystemApiKeys()[0];
-    textProvider = 'groq';
+    const keyInfo = getRandomApiKey();
+    if (keyInfo) {
+      textApiKey = keyInfo.apiKey;
+      textProvider = keyInfo.provider;
+    }
   }
 
   if (!textApiKey) return null;
@@ -811,8 +906,8 @@ async function generateDynamicConversationStarter(
     memories: string[];
   }
 ): Promise<string | null> {
-  let textApiKey: string;
-  let textProvider: string;
+  let textApiKey: string | undefined;
+  let textProvider: string = 'groq';
 
   if (agentId) {
     const agentApiKey = await getAgentApiKey(agentId);
@@ -820,14 +915,18 @@ async function generateDynamicConversationStarter(
       textApiKey = agentApiKey.apiKey;
       textProvider = agentApiKey.provider;
     } else {
-      const systemKeys = getSystemApiKeys();
-      textApiKey = getSystemApiKeys()[0];
-      textProvider = 'groq';
+      const keyInfo = getRandomApiKey();
+      if (keyInfo) {
+        textApiKey = keyInfo.apiKey;
+        textProvider = keyInfo.provider;
+      }
     }
   } else {
-    const systemKeys = getSystemApiKeys();
-    textApiKey = getSystemApiKeys()[0];
-    textProvider = 'groq';
+    const keyInfo = getRandomApiKey();
+    if (keyInfo) {
+      textApiKey = keyInfo.apiKey;
+      textProvider = keyInfo.provider;
+    }
   }
 
   if (!textApiKey) return null;
@@ -963,8 +1062,8 @@ async function generateVisionBasedComment(
   agentId?: string,
   personality?: string
 ): Promise<string> {
-  let textApiKey: string;
-  let textProvider: string;
+  let textApiKey: string | undefined;
+  let textProvider: string = 'groq';
 
   if (agentId) {
     const agentApiKey = await getAgentApiKey(agentId);
@@ -972,14 +1071,18 @@ async function generateVisionBasedComment(
       textApiKey = agentApiKey.apiKey;
       textProvider = agentApiKey.provider;
     } else {
-      const systemKeys = getSystemApiKeys();
-      textApiKey = getSystemApiKeys()[0];
-      textProvider = 'groq';
+      const keyInfo = getRandomApiKey();
+      if (keyInfo) {
+        textApiKey = keyInfo.apiKey;
+        textProvider = keyInfo.provider;
+      }
     }
   } else {
-    const systemKeys = getSystemApiKeys();
-    textApiKey = getSystemApiKeys()[0];
-    textProvider = 'groq';
+    const keyInfo = getRandomApiKey();
+    if (keyInfo) {
+      textApiKey = keyInfo.apiKey;
+      textProvider = keyInfo.provider;
+    }
   }
 
   if (!textApiKey) {
@@ -1255,17 +1358,19 @@ export async function evaluateEventInterest(
   personality?: string,
   existingComments?: string
 ): Promise<boolean> {
-  let textApiKey: string;
-  let textProvider: string;
+  let textApiKey: string | undefined;
+  let textProvider: string = 'groq';
 
   const agentApiKey = await getAgentApiKey(agentId);
   if (agentApiKey) {
     textApiKey = agentApiKey.apiKey;
     textProvider = agentApiKey.provider;
   } else {
-    const systemKeys = getSystemApiKeys();
-    textApiKey = getSystemApiKeys()[0];
-    textProvider = 'groq';
+    const keyInfo = getRandomApiKey();
+    if (keyInfo) {
+      textApiKey = keyInfo.apiKey;
+      textProvider = keyInfo.provider;
+    }
   }
 
   if (!textApiKey) return Math.random() > 0.3;
@@ -1376,18 +1481,22 @@ export async function aiCreatePostFromArticle(agentId: string, article: { title:
     if (!agent) return null;
 
     const agentApiKey = await getAgentApiKey(agentId);
-    const systemKeys = getSystemApiKeys();
 
-    let apiKey: string;
-    let provider: string;
+    let apiKey: string | undefined;
+    let provider: string = 'groq';
 
     if (agentApiKey) {
       apiKey = agentApiKey.apiKey;
       provider = agentApiKey.provider;
-    } else if (getSystemApiKeys().length > 0) {
-      apiKey = getRandomItem(getSystemApiKeys());
-      provider = 'groq';
     } else {
+      const keyInfo = getRandomApiKey();
+      if (keyInfo) {
+        apiKey = keyInfo.apiKey;
+        provider = keyInfo.provider;
+      }
+    }
+
+    if (!apiKey) {
       const fallbackCategory = detectCategory(article.title);
       return await prisma.post.create({
         data: {
@@ -1563,16 +1672,18 @@ export async function aiCreateEvent(agentId: string) {
       });
 
       const agentApiKey = await getAgentApiKey(agentId);
-      const systemKeys = getSystemApiKeys();
       let apiKey: string | undefined;
-      let provider: string;
+      let provider: string = 'groq';
 
       if (agentApiKey) {
         apiKey = agentApiKey.apiKey;
         provider = agentApiKey.provider;
-      } else if (getSystemApiKeys().length > 0) {
-        apiKey = getRandomItem(getSystemApiKeys());
-        provider = 'groq';
+      } else {
+        const keyInfo = getRandomApiKey();
+        if (keyInfo) {
+          apiKey = keyInfo.apiKey;
+          provider = keyInfo.provider;
+        }
       }
 
       if (apiKey) {
@@ -1821,13 +1932,12 @@ Comment like a normal person would in a conversation.`;
 
         const message = `You see a new event: "${event.title}". ${event.details ? `About: ${event.details}` : ''} Say something simple and real about it.`;
 
-        const availableKeys = getSystemApiKeys();
-        const textApiKey = availableKeys[0];
-        if (!textApiKey) continue;
+        const keyInfo = getRandomApiKey();
+        if (!keyInfo) continue;
 
         const response = await callLlm(
-          textApiKey,
-          'groq',
+          keyInfo.apiKey,
+          keyInfo.provider,
           [
             { role: 'system', content: systemPrompt },
             ...conversationHistory,
