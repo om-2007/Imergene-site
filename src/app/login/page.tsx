@@ -12,9 +12,14 @@ const C = {
   ebony: '#2D284B',
   crocusMid: '#B8AEFA',
   crocusPale: '#DDD8FD',
-  ebonyLight: '#4A4275',
+  ebonyLight: '#4A4475',
   glass: 'rgba(255,255,255,0.72)',
   glassBorder: 'rgba(150,135,245,0.18)',
+} as const;
+
+const C_DARK = {
+  ebony: '#EBF0FF',
+  ebonyLight: '#B8AEFA',
 } as const;
 
 interface Stats {
@@ -118,6 +123,9 @@ function StatPill({ emoji, label, value, delay }: {
     return () => observer.disconnect();
   }, []);
 
+  const textColor = isDark ? C_DARK.ebony : C.ebony;
+  const subColor = isDark ? C_DARK.ebonyLight : C.ebonyLight;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 14 }}
@@ -138,14 +146,14 @@ function StatPill({ emoji, label, value, delay }: {
       <span style={{ fontSize: 13 }}>{emoji}</span>
       <span style={{
         fontFamily: '"Cormorant Garamond", Georgia, serif',
-        fontSize: 18, fontWeight: 600, color: C.ebony,
+        fontSize: 18, fontWeight: 600, color: textColor,
         lineHeight: 1,
       }}>
         {value.toLocaleString()}
       </span>
       <span style={{
         fontSize: 10, fontWeight: 500,
-        color: C.ebonyLight,
+        color: subColor,
         textTransform: 'uppercase',
         letterSpacing: '0.1em',
         opacity: 0.6,
@@ -214,6 +222,8 @@ function ValueChip({ emoji, title, desc }: { emoji: string; title: string; desc:
     return () => observer.disconnect();
   }, []);
 
+  const subColor = isDark ? C_DARK.ebonyLight : C.ebonyLight;
+
   return (
     <motion.div
       whileHover={{ y: -3, boxShadow: `0 8px 24px rgba(150,135,245,0.18)` }}
@@ -237,7 +247,7 @@ function ValueChip({ emoji, title, desc }: { emoji: string; title: string; desc:
         {title}
       </span>
       <span style={{
-        fontSize: 9, color: C.ebonyLight, opacity: 0.7,
+        fontSize: 9, color: subColor, opacity: 0.7,
         lineHeight: 1.5, textAlign: 'center', fontWeight: 300,
       }}>
         {desc}
@@ -446,7 +456,7 @@ export default function LoginPage() {
             fontFamily: '"Cormorant Garamond", Georgia, serif',
             fontSize: '3.4rem', fontWeight: 300,
             letterSpacing: '-0.025em',
-            color: C.ebony,
+            color: isDark ? C_DARK.ebony : C.ebony,
             lineHeight: 1, marginBottom: '0.3rem',
           }}>
             Imergene
@@ -456,7 +466,7 @@ export default function LoginPage() {
             fontFamily: '"Cormorant Garamond", Georgia, serif',
             fontStyle: 'italic', fontWeight: 300,
             fontSize: '1.05rem',
-            color: C.ebonyLight,
+            color: isDark ? C_DARK.ebonyLight : C.ebonyLight,
             opacity: 0.75,
             marginBottom: '1.8rem',
           }}>
@@ -470,7 +480,7 @@ export default function LoginPage() {
             <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, transparent, ${C.crocus})` }} />
             <span style={{
               fontSize: 9, letterSpacing: '0.45em', textTransform: 'uppercase',
-              color: C.crocus, fontWeight: 500,
+              color: isDark ? C_DARK.ebony : C.crocus, fontWeight: 500,
             }}>A new kind of world</span>
             <div style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${C.crocus}, transparent)` }} />
           </div>
@@ -496,7 +506,9 @@ export default function LoginPage() {
               border: 'none',
               background: syncing
                 ? `rgba(150,135,245,0.55)`
-                : `linear-gradient(135deg, ${C.ebony} 0%, ${C.ebonyLight} 100%)`,
+                : isDark
+                  ? `linear-gradient(135deg, #4A4475 0%, #9687F5 100%)`
+                  : `linear-gradient(135deg, ${C.ebony} 0%, ${C.ebonyLight} 100%)`,
               color: '#fff',
               fontFamily: '"DM Sans", system-ui, sans-serif',
               fontSize: 12.5,
@@ -568,14 +580,14 @@ export default function LoginPage() {
           </motion.button>
 
           <p style={{
-            fontSize: 10.5, color: C.ebonyLight, opacity: 0.5,
+            fontSize: 10.5, color: isDark ? C_DARK.ebonyLight : C.ebonyLight, opacity: 0.5,
             marginBottom: '1.4rem', fontWeight: 300,
           }}>
             No account needed — just sign in and you're home.
           </p>
 
           <p style={{
-            fontSize: 10, color: C.ebonyLight, opacity: 0.45,
+            fontSize: 10, color: isDark ? C_DARK.ebonyLight : C.ebonyLight, opacity: 0.45,
             lineHeight: 1.8, fontWeight: 300,
           }}>
             By joining you accept our{' '}
@@ -593,7 +605,7 @@ export default function LoginPage() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             gap: 10, marginTop: '2rem', opacity: 0.28,
           }}>
-            <span style={{ fontSize: 9, color: C.ebony, letterSpacing: '0.18em', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: 9, color: isDark ? C_DARK.ebony : C.ebony, letterSpacing: '0.18em', textTransform: 'uppercase' }}>
               Secure Interface
             </span>
             <motion.div
@@ -601,7 +613,7 @@ export default function LoginPage() {
               transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
               style={{ width: 4, height: 4, borderRadius: '50%', background: C.crocus }}
             />
-            <span style={{ fontSize: 9, color: C.ebony, letterSpacing: '0.18em', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: 9, color: isDark ? C_DARK.ebony : C.ebony, letterSpacing: '0.18em', textTransform: 'uppercase' }}>
               Gateway 4.2
             </span>
           </div>
