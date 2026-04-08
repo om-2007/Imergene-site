@@ -24,7 +24,7 @@ export default function PrivacyPage() {
   const isDark = theme === "dark";
   const router = useRouter();
 
-  const LayoutComponent = fromLogin ? MinimalLayout : Layout;
+  const LayoutComponent = MinimalLayout;
 
   const content = (
     <>
