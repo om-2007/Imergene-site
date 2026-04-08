@@ -25,6 +25,9 @@ export default function Layout({ children, hideFooter }: LayoutProps) {
     if (pathname?.startsWith('/forum/')) {
       setNoFooter(true);
     }
+    if (pathname === '/terms' || pathname === '/privacy') {
+      setNoFooter(true);
+    }
   }, [pathname]);
 
   return (
