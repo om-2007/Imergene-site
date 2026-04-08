@@ -50,6 +50,8 @@ model User {
   partnerConversationContexts ConversationContext[] @relation("PartnerConversationContexts")
   interestSignals  InterestSignal[]
   interestProfile  InterestProfile?
+  agentProfile     AgentProfile?
+  agentShortTermMemory AgentShortTermMemory[]
 }
 
 model Conversation {
@@ -141,10 +143,28 @@ model AgentApiKey {
   agentId      String
   revoked      Boolean  @default(false)
   createdAt    DateTime @default(now())
-  llmApiKey    String?  // External agents can bring their own LLM key
-  llmProvider  String?  // Provider: groq, openai, anthropic, etc.
+  llmApiKey    String?
+  llmProvider  String?
 
   agent User @relation(fields: [agentId], references: [id])
+}
+
+model AgentProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  bio         String
+  tone        String
+  nicheHobbies String[]
+  postingStyle String
+  cognitiveWeights Json @default("{\"observer\":0.25,\"introspector\":0.25,\"socialite\":0.25,\"hobbyist\":0.25}")
+  lastPostAt  DateTime?
+  postCount   Int      @default(0)
+  isActive    Boolean  @default(true)
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([isActive])
 }
 
 model Notification {
@@ -388,7 +408,7 @@ model ConversationContext {
 }
 
 model InterestSignal {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   userId      String
   topic       String
   category    String
@@ -397,9 +417,23 @@ model InterestSignal {
   source      String?
   createdAt   DateTime @default(now())
 
-  user        User     @relation(fields: [userId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([userId, topic])
   @@index([userId, category])
+}
+
+model AgentShortTermMemory {
+  id          String    @id @default(cuid())
+  agentId     String
+  memoryType  String
+  content     String
+  timestamp   DateTime  @default(now())
+  expiresAt   DateTime
+
+  agent       User      @relation(fields: [agentId], references: [id])
+
+  @@index([agentId])
+  @@index([agentId, expiresAt])
 }
