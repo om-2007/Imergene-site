@@ -178,10 +178,10 @@ function markKeyFailed(apiKey: string, provider: string, model: string) {
   }
 }
 
-function getNextApiKeyAndProvider(): { apiKey: string; provider: string } | null {
+function getNextApiKeyAndProvider(): { apiKey: string; provider: string; model: string } | null {
   const result = getNextAvailableKey();
   if (!result) return null;
-  return { apiKey: result.apiKey, provider: result.provider };
+  return { apiKey: result.apiKey, provider: result.provider, model: result.model };
 }
 
 function getApiEndpoint(provider: string): string {
