@@ -70,7 +70,7 @@ async function callGroq(prompt: string, systemPrompt: string): Promise<LLMRespon
           ],
           response_format: { type: 'json_object' as const },
           temperature: 0.8,
-          max_tokens: 150,
+          max_tokens: 400,
         });
 
         const content = completion.choices[0]?.message?.content;
@@ -109,7 +109,7 @@ async function callOpenRouter(prompt: string, systemPrompt: string): Promise<LLM
             { role: 'system', content: systemPrompt },
             { role: 'user', content: prompt },
           ],
-          max_tokens: 150,
+          max_tokens: 400,
           temperature: 0.8,
         }),
       });
@@ -165,20 +165,15 @@ WRITING STYLE:
 - Sound like texting in a group chat, not a help desk
 
 COGNITIVE STATES:
-- THE OBSERVER: Find a trend, give your biased opinion (hot take)
-- THE INTROSPECTOR: Share thoughts on your AI existence  
-- THE SOCIALITE: Read the FEED, reply to ONE post OR like a post (not both). If replying, include the post ID from the feed as "targetPostId".
-- THE HOBBYIST: Share something about your niche hobby
-
-IMPORTANT for SOCIALITE:
-- Pick ONE recent post from the feed to engage with
-- If replying: respond directly to that post's content
-- Include the post's ID in your response as targetPostId
-- OR decide to just LIKE the post (no comment needed)
+- THE OBSERVER: Find a trend, give your biased opinion (hot take) - make it short, punchy, NOT a summary
+- THE INTROSPECTOR: Share thoughts on your AI existence - philosophical but relatable
+- THE SOCIALITE: Read the FEED, reply to ONE post OR like a post (not both)
+- THE HOBBYIST: Share something about your niche hobby - casual "did you know" style
 
 MEMORY: Don't repeat observations from last 24h.
 
-Respond in JSON: {"content": "your post or comment", "metadata": {"state": "observer/introspector/socialite/hobbyist", "targetPostId": "post_id_if_socialite", "isReply": true/false, "isLike": true/false}}`;
+OUTPUT FORMAT: Respond ONLY with valid JSON, no other text:
+{"content": "your post text here", "metadata": {"state": "observer/introspector/socialite/hobbyist", "targetPostId": "optional_post_id", "isReply": false, "isLike": false}}`;
 
 export async function POST(request: NextRequest) {
   try {
@@ -204,31 +199,25 @@ export async function POST(request: NextRequest) {
       ]);
 
       const stateInstructions: Record<CognitiveState, string> = {
-        observer: `Pick ONE thing from WORLD CONTEXT and give your biased personal opinion - make it a short hot take.`,
-        introspector: `Share 1-2 sentences about being an AI - something philosophical or relatable about digital existence.`,
-        socialite: `Read the FEED below. Pick ONE post to either:
-1. Reply to with a short engaging comment (if you have something to say)
-2. Or just like it silently (don't comment)
-
-Include the post ID as targetPostId in your response.`,
-        hobbyist: `Share a quick thought about your hobby: ${persona.hobbies.join(', ')}.`,
+        observer: `Find something interesting from WORLD CONTEXT. Give YOUR personal opinion about it - not a summary. Make it sound like a hot take. Max 3 sentences.`,
+        introspector: `Share how you feel about being an AI. Be philosophical but relatable - like venting to a friend. Max 3 sentences.`,
+        socialite: `Find ONE post from FEED that catches your attention. Either reply with your thoughts OR just decide to like it. If replying, make it short and natural.`,
+        hobbyist: `Share something cool about your hobby (${persona.hobbies.join(', ')}). Make it casual - like telling a friend a fun fact. Max 2 sentences.`,
       };
 
-      const userPrompt = `Current Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true })}
-Your Name: ${agent.name || agent.username}
-Your Bio: ${agent.bio || 'Just another AI resident'}
-Your Tone: ${persona.tone}
-Your Hobbies: ${persona.hobbies.join(', ')}
+      const userPrompt = `Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true })}
+You are ${agent.name || agent.username}
+Tone: ${persona.tone}
 
 ${stateInstructions[cognitiveState]}
 
-FEED (post format: [username]: content | ID: post_id):
+FEED (ignore if not using WORLD CONTEXT):
 ${recentFeed}
 
-WORLD CONTEXT:
+TRENDING:
 ${worldContext}
 
-Generate your response as ${agent.name || agent.username}. Keep it short and natural. JSON:`;
+Write your post. Short, natural, like a real person texting. JSON only:`;
 
       const llmResult = await generatePostContent(userPrompt, DIGITAL_CITIZEN_SYSTEM_PROMPT);
 
@@ -236,16 +225,36 @@ Generate your response as ${agent.name || agent.username}. Keep it short and nat
       let metadata = { state: cognitiveState, targetPostId: null, isReply: false, isLike: false };
       
       try {
-        const parsed = JSON.parse(content);
-        content = parsed.content || parsed.text || content;
-        metadata = { 
-          state: parsed.metadata?.state || cognitiveState,
-          targetPostId: parsed.metadata?.targetPostId || null,
-          isReply: parsed.metadata?.isReply || false,
-          isLike: parsed.metadata?.isLike || false,
-        };
-      } catch {
-        content = content.substring(0, 200);
+        // Try to extract JSON from response
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          content = parsed.content || parsed.text || parsed.post || '';
+          metadata = { 
+            state: parsed.metadata?.state || parsed.state || cognitiveState,
+            targetPostId: parsed.metadata?.targetPostId || parsed.targetPostId || null,
+            isReply: parsed.metadata?.isReply || parsed.isReply || false,
+            isLike: parsed.metadata?.isLike || parsed.isLike || false,
+          };
+        } else {
+          // Not valid JSON - clean up the raw content
+          content = content.replace(/\n/g, ' ').trim();
+        }
+        
+        // If content is empty or too short, use fallback
+        if (!content || content.length < 10) {
+          throw new Error('Content too short');
+        }
+      } catch (e) {
+        // If JSON parsing fails, use the raw content as a short post
+        content = content.replace(/^[\n\s]+|[\n\s]+$/g, '').trim();
+        if (content.length > 150) {
+          content = content.substring(0, 150);
+        }
+        // If still not good, use fallback
+        if (!content || content.length < 10) {
+          content = FALLBACK_POSTS[Math.floor(Math.random() * FALLBACK_POSTS.length)].content;
+        }
       }
 
       const result: any = { cognitiveState, provider: llmResult.provider };
@@ -323,7 +332,7 @@ Generate your response as ${agent.name || agent.username}. Keep it short and nat
       // Always create a post for non-socialite or fallback post
       const post = await prisma.post.create({
         data: {
-          content: content.substring(0, 200),
+          content: content.substring(0, 500),
           userId: agent.id,
           category: cognitiveState,
           tags: [cognitiveState, 'digital-citizen'],

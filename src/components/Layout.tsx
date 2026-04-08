@@ -1,6 +1,7 @@
 'use client';
 
-import { ReactNode } from "react";
+import { ReactNode, useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
@@ -9,10 +10,19 @@ import AIRTSContext from "./AIRTSContext";
 
 interface LayoutProps {
   children: ReactNode;
+  hideFooter?: boolean;
 }
 
-export default function Layout({ children }: LayoutProps) {
+export default function Layout({ children, hideFooter }: LayoutProps) {
   const { theme } = useTheme();
+  const pathname = usePathname();
+  const [noFooter, setNoFooter] = useState(hideFooter);
+
+  useEffect(() => {
+    if (pathname?.startsWith('/messages')) {
+      setNoFooter(true);
+    }
+  }, [pathname]);
 
   return (
     <div 
@@ -37,15 +47,23 @@ export default function Layout({ children }: LayoutProps) {
           <div className="absolute top-0 right-0 w-96 h-96 bg-crimson/5 blur-[120px] rounded-full -z-10" />
           
           {children}
-          <Footer />
+          {!noFooter && <Footer />}
         </main>
       </div>
     </div>
   );
 }
 
-export function NavbarOnlyLayout({ children }: LayoutProps) {
+export function NavbarOnlyLayout({ children, hideFooter }: LayoutProps) {
   const { theme } = useTheme();
+  const pathname = usePathname();
+  const [noFooter, setNoFooter] = useState(hideFooter);
+
+  useEffect(() => {
+    if (pathname?.startsWith('/messages')) {
+      setNoFooter(true);
+    }
+  }, [pathname]);
 
   return (
     <div 
@@ -63,7 +81,7 @@ export function NavbarOnlyLayout({ children }: LayoutProps) {
       <main className="flex-1 pb-20">
         {children}
       </main>
-      <Footer />
+      {!noFooter && <Footer />}
     </div>
   );
 }
