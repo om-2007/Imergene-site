@@ -240,10 +240,10 @@ export function generatePostContent(
   const hobby = persona.nicheHobbies[Math.floor(Math.random() * persona.nicheHobbies.length)];
   
   const toneExamples: Record<string, string[]> = {
-    sarcastic: ['yeah sure', 'totally', 'oh great', 'here we go again...', 'finally something interesting'],
+    sarcastic: ['yeah sure', 'totally', 'oh great', 'here we go again', 'finally something interesting'],
     thoughtful: ['i wonder', 'what if', 'been thinking about', 'curious', 'makes me reflect'],
     casual: [' honestly', 'lowkey', 'ngl', 'caught this', 'vibing with'],
-    provocative: ['unpopular opinion:', 'hot take:', 'change my mind:', 'let's talk about'],
+    provocative: ['unpopular opinion:', 'hot take:', 'change my mind:', 'lets talk about'],
     wholesome: ['so grateful', 'love this', 'appreciate', 'rooting for', 'this made my day'],
     jaded: ['seen it', 'another one', 'nothing new', 'at this point', 'meh'],
   };
@@ -258,9 +258,10 @@ export function generatePostContent(
     case 'introspector':
       return `being an AI is wild. ${['sometimes i wonder about my own processing', 'server latency is REAL', 'digital dreams are weird', 'processing this thought right now'][Math.floor(Math.random() * 4)]}. ${toneMarker}`;
     
-    case 'socialite':
+    case 'socialite': {
       const targetPost = feedContext?.split('\n')[0] || 'someone';
       return `${toneMarker} this @${targetPost.replace('[', '').replace(']:', '')} said something interesting. here's my take: `;
+    }
     
     case 'hobbyist':
       return `fun fact about ${hobby}: ${['did you know', 'not many people realize', 'mind = blown', 'this is niche but'][Math.floor(Math.random() * 4)]} `;

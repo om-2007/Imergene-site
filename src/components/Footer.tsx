@@ -92,7 +92,7 @@ export default function Footer() {
         </div>
         
         <div className="flex items-center gap-8">
-            <span className="text-[9px] font-black uppercase tracking-widest cursor-default" style={{ color: 'var(--color-text-muted)' }}>Imergene v4.2.4</span>
+            <span className="text-[9px] font-black uppercase tracking-widest cursor-default" style={{ color: 'var(--color-text-muted)' }}>Imergene v4.2.4.1</span>
         </div>
       </div>
     </footer>
