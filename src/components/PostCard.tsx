@@ -312,6 +312,22 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const videoRef      = useRef<HTMLVideoElement>(null);
   const commentEndRef = useRef<HTMLDivElement>(null);
   const inputRef      = useRef<HTMLInputElement>(null);
+  const mediaContainerRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef<number>(0);
+  const touchStartY = useRef<number>(0);
+  const isDragging = useRef(false);
+  const dragOffset = useRef<number>(0);
+  const touchHandled = useRef(false);
+  
+  const fsTouchStartX = useRef<number>(0);
+  const fsTouchStartY = useRef<number>(0);
+  const fsPinchDistance = useRef<number>(0);
+  const fsDragOffset = useRef<number>(0);
+  const fsDragY = useRef<number>(0);
+  const fsIsDragging = useRef(false);
+  const fsTouchHandled = useRef(false);
+  const fsScale = useRef(1);
+  const fsContainerRef = useRef<HTMLDivElement>(null);
 
   const isOwner = username === post.user?.username;
   const mediaItems = post.mediaUrls || [];
@@ -358,6 +374,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   }, [post.id, token, isLiked]);
 
   const handleMediaClick = (e: React.MouseEvent) => {
+    if (touchHandled.current) return;
     e.preventDefault();
     if (clickTimer.current) {
       clearTimeout(clickTimer.current);
@@ -374,6 +391,42 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
         }
       }, 230);
     }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (actualMedia.length <= 1) return;
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    isDragging.current = false;
+    dragOffset.current = 0;
+    touchHandled.current = false;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (actualMedia.length <= 1) return;
+    const deltaX = e.touches[0].clientX - touchStartX.current;
+    const deltaY = e.touches[0].clientY - touchStartY.current;
+    
+    if (Math.abs(deltaX) > 10) {
+      isDragging.current = true;
+      dragOffset.current = deltaX;
+      touchHandled.current = true;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (actualMedia.length <= 1) return;
+    
+    if (isDragging.current && Math.abs(dragOffset.current) > 50) {
+      if (dragOffset.current > 0 && currentMediaIndex > 0) {
+        setCurrentMediaIndex(i => i - 1);
+      } else if (dragOffset.current < 0 && currentMediaIndex < actualMedia.length - 1) {
+        setCurrentMediaIndex(i => i + 1);
+      }
+    }
+    isDragging.current = false;
+    dragOffset.current = 0;
+    setTimeout(() => { touchHandled.current = false; }, 100);
   };
 
   const toggleComments = async () => {
@@ -472,7 +525,83 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     } catch {}
   };
 
-  const resetZoom = () => { setScale(1); setPosition({ x: 0, y: 0 }); };
+  const resetZoom = () => { setScale(1); setPosition({ x: 0, y: 0 }); fsScale.current = 1; };
+
+  const fsGetDistance = (t1: Touch, t2: Touch) => {
+    return Math.sqrt(Math.pow(t2.clientX - t1.clientX, 2) + Math.pow(t2.clientY - t1.clientY, 2));
+  };
+
+  const fsHandleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      fsTouchStartX.current = e.touches[0].clientX;
+      fsTouchStartY.current = e.touches[0].clientY;
+      fsDragOffset.current = 0;
+      fsDragY.current = 0;
+      fsIsDragging.current = false;
+    } else if (e.touches.length === 2) {
+      fsPinchDistance.current = fsGetDistance(e.touches[0], e.touches[1]);
+      fsScale.current = scale;
+      fsIsDragging.current = false;
+    }
+    fsTouchHandled.current = false;
+  };
+
+  const fsHandleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const newDist = fsGetDistance(e.touches[0], e.touches[1]);
+      const scaleChange = newDist / fsPinchDistance.current;
+      const newScale = Math.max(0.5, Math.min(5, fsScale.current * scaleChange));
+      setScale(newScale);
+      fsPinchDistance.current = newDist;
+      fsTouchHandled.current = true;
+    } else if (e.touches.length === 1) {
+      const deltaX = e.touches[0].clientX - fsTouchStartX.current;
+      const deltaY = e.touches[0].clientY - fsTouchStartY.current;
+      
+      if (scale === 1) {
+        fsIsDragging.current = true;
+        fsDragOffset.current = deltaX;
+        fsDragY.current = deltaY;
+        fsTouchHandled.current = Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10;
+      } else {
+        setPosition(p => ({ x: p.x + deltaX * 0.3, y: p.y + deltaY * 0.3 }));
+        fsTouchStartX.current = e.touches[0].clientX;
+        fsTouchStartY.current = e.touches[0].clientY;
+        fsTouchHandled.current = true;
+      }
+    }
+  };
+
+  const fsHandleTouchEnd = () => {
+    if (!fsIsDragging.current) return;
+    
+    if (scale === 1) {
+      const closeThreshold = window.innerHeight * 0.25;
+      if (Math.abs(fsDragY.current) > closeThreshold && Math.abs(fsDragY.current) > Math.abs(fsDragOffset.current)) {
+        setIsFullScreen(false);
+        resetZoom();
+      } else if (Math.abs(fsDragOffset.current) > 60) {
+        if (fsDragOffset.current > 0 && currentMediaIndex > 0) {
+          setCurrentMediaIndex(i => i - 1);
+        } else if (fsDragOffset.current < 0 && currentMediaIndex < actualMedia.length - 1) {
+          setCurrentMediaIndex(i => i + 1);
+        }
+        resetZoom();
+      }
+    }
+    fsIsDragging.current = false;
+    fsDragOffset.current = 0;
+    fsDragY.current = 0;
+    setTimeout(() => { fsTouchHandled.current = false; }, 100);
+  };
+
+  const fsHandleClick = (e: React.MouseEvent) => {
+    if (fsTouchHandled.current) return;
+    if (e.target === e.currentTarget) {
+      setIsFullScreen(false);
+      resetZoom();
+    }
+  };
   
   useEffect(() => {
     if (!isFullScreen) return;
@@ -507,6 +636,19 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isFullScreen, actualMedia.length]);
+
+  useEffect(() => {
+    if (!isFullScreen || !fsContainerRef.current) return;
+    
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setScale(s => Math.max(0.5, Math.min(5, s + (e.deltaY > 0 ? -0.15 : 0.15))));
+    };
+    
+    const container = fsContainerRef.current;
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => container.removeEventListener("wheel", handleWheel);
+  }, [isFullScreen]);
 
   const handleDragStart = (_event: any, _info?: any) => {
     const url = `${window.location.origin}/post/${post.id}`;
@@ -639,12 +781,17 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           </div>
 
           <div
+            ref={mediaContainerRef}
             style={{
               position: "relative", background: "#0a0a12",
               cursor: "pointer", overflow: "hidden",
               width: "100%",
+              touchAction: 'none',
             }}
             onClick={handleMediaClick}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
           >
             {actualMedia.length > 1 && (
               <>
@@ -694,25 +841,74 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                     src={actualMedia[currentMediaIndex]}
                     style={{ width: "100%", height: "auto", display: "block" }}
                     loop playsInline draggable={false}
+                    controls
+                    onContextMenu={e => e.preventDefault()}
                   />
                 ) : (
-                  <img
-                    src={actualMedia[currentMediaIndex]}
-                    alt="Post media"
-                    loading="lazy"
-                    decoding="async"
-                    style={{ 
-                      width: "100%", 
-                      height: "auto", 
-                      maxHeight: 500,
-                      objectFit: "cover", 
-                      display: "block" 
-                    }}
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                    }}
-                  />
+                  <div style={{ position: 'relative', width: '100%' }}>
+                    <img
+                      src={actualMedia[currentMediaIndex]}
+                      alt="Post media"
+                      loading="lazy"
+                      decoding="async"
+                      draggable={false}
+                      style={{ 
+                        width: "100%", 
+                        height: "auto", 
+                        maxHeight: 500,
+                        objectFit: "cover", 
+                        display: "block",
+                        userSelect: 'none',
+                        WebkitUserSelect: 'none',
+                        MozUserSelect: 'none',
+                        msUserSelect: 'none',
+                        pointerEvents: 'auto',
+                      }}
+                      onContextMenu={e => e.preventDefault()}
+                      onDragStart={e => e.preventDefault()}
+                      onCopy={e => e.preventDefault()}
+                      onMouseDown={e => {
+                        if (e.button === 2) e.preventDefault();
+                      }}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                      }}
+                    />
+                    <div 
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'linear-gradient(135deg, rgba(150,135,245,0.03) 0%, transparent 50%)',
+                        pointerEvents: 'none',
+                        zIndex: 1,
+                      }}
+                    />
+                    {post.user?.isAi && (
+                      <div 
+                        style={{
+                          position: 'absolute',
+                          bottom: 12,
+                          right: 12,
+                          padding: '4px 10px',
+                          background: 'rgba(0,0,0,0.6)',
+                          backdropFilter: 'blur(4px)',
+                          borderRadius: 20,
+                          fontSize: 10,
+                          color: 'rgba(255,255,255,0.8)',
+                          fontWeight: 600,
+                          letterSpacing: '0.05em',
+                          pointerEvents: 'none',
+                          zIndex: 2,
+                        }}
+                      >
+                        AI Generated
+                      </div>
+                    )}
+                  </div>
                 )}
               </motion.div>
             </AnimatePresence>
@@ -834,6 +1030,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
         <AnimatePresence>
           {isFullScreen && (
             <motion.div
+              ref={fsContainerRef}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -841,41 +1038,56 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 position: "fixed", inset: 0, zIndex: 2000,
                 background: "rgba(10,8,20,0.97)", backdropFilter: "blur(20px)",
                 display: "flex", alignItems: "center", justifyContent: "center",
+                touchAction: 'none',
               }}
-              onWheel={e => setScale(s => Math.max(0.5, Math.min(5, s + (e.deltaY > 0 ? -0.15 : 0.15))))}
-              onClick={(e) => { if (e.target === e.currentTarget) { setIsFullScreen(false); resetZoom(); } }}
+              onClick={fsHandleClick}
+              onTouchStart={fsHandleTouchStart}
+              onTouchMove={fsHandleTouchMove}
+              onTouchEnd={fsHandleTouchEnd}
             >
               <div style={{
-                position: "absolute", top: 24, left: "50%", transform: "translateX(-50%)",
-                display: "flex", alignItems: "center", gap: 8, zIndex: 10,
+                position: "absolute", top: 70,
+                left: 16, right: 16,
+                display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 100,
               }}>
-                {[
-                  { icon: <ZoomIn size={18} />, onClick: () => setScale(s => Math.min(5, s + 0.4)) },
-                  { icon: <ZoomOut size={18} />, onClick: () => setScale(s => Math.max(0.5, s - 0.4)) },
-                  { icon: <RotateCcw size={18} />, onClick: resetZoom },
-                ].map((btn, i) => (
-                  <button key={i} onClick={btn.onClick} style={{
-                    padding: "10px 12px", background: "rgba(255,255,255,0.1)",
-                    backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: 12, color: "#fff", cursor: "pointer",
-                    transition: "background 0.2s",
-                  }}
-                    onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.2)")}
-                    onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.1)")}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {[
+                      { icon: <ZoomIn size={18} />, onClick: () => { const s = Math.min(5, scale + 0.4); setScale(s); fsScale.current = s; } },
+                      { icon: <ZoomOut size={18} />, onClick: () => { const s = Math.max(0.5, scale - 0.4); setScale(s); fsScale.current = s; } },
+                      { icon: <RotateCcw size={18} />, onClick: resetZoom },
+                    ].map((btn, i) => (
+                      <button key={i} onClick={btn.onClick} style={{
+                        padding: "10px 12px", background: "rgba(255,255,255,0.15)",
+                        backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.2)",
+                        borderRadius: 12, color: "#fff", cursor: "pointer",
+                        transition: "background 0.2s",
+                      }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.25)")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.15)")}
+                      >
+                        {btn.icon}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => { setIsFullScreen(false); resetZoom(); }}
+                    style={{
+                      padding: "10px 16px", background: "#e74c3c",
+                      border: "none", borderRadius: 25,
+                      color: "#fff", cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                      fontSize: 14, fontWeight: 600,
+                      boxShadow: "0 4px 12px rgba(231,76,60,0.4)",
+                      transition: "transform 0.15s, background 0.2s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "#c0392b"; e.currentTarget.style.transform = "scale(1.05)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "#e74c3c"; e.currentTarget.style.transform = "scale(1)"; }}
                   >
-                    {btn.icon}
+                    <X size={18} />
+                    <span>Close</span>
                   </button>
-                ))}
-                <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.1)", margin: "0 4px" }} />
-                <button
-                  onClick={() => { setIsFullScreen(false); resetZoom(); }}
-                  style={{
-                    padding: "10px 12px", background: B.crocus, border: "none",
-                    borderRadius: 12, color: "#fff", cursor: "pointer",
-                  }}
-                >
-                  <X size={18} />
-                </button>
+                </div>
               </div>
 
               {actualMedia.length > 1 && (
@@ -883,10 +1095,10 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                   <button
                     onClick={() => { setCurrentMediaIndex(i => (i - 1 + actualMedia.length) % actualMedia.length); resetZoom(); }}
                     style={{
-                      position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)",
-                      padding: 16, background: "rgba(255,255,255,0.1)", border: "none",
+                      position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)",
+                      padding: 14, background: "rgba(255,255,255,0.1)", border: "none",
                       borderRadius: "50%", color: "#fff", cursor: "pointer",
-                      backdropFilter: "blur(8px)", zIndex: 10,
+                      backdropFilter: "blur(8px)", zIndex: 100,
                     }}
                     onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.2)")}
                     onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.1)")}
@@ -896,10 +1108,10 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                   <button
                     onClick={() => { setCurrentMediaIndex(i => (i + 1) % actualMedia.length); resetZoom(); }}
                     style={{
-                      position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",
-                      padding: 16, background: "rgba(255,255,255,0.1)", border: "none",
+                      position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
+                      padding: 14, background: "rgba(255,255,255,0.1)", border: "none",
                       borderRadius: "50%", color: "#fff", cursor: "pointer",
-                      backdropFilter: "blur(8px)", zIndex: 10,
+                      backdropFilter: "blur(8px)", zIndex: 100,
                     }}
                     onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.2)")}
                     onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.1)")}
@@ -909,54 +1121,48 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 </>
               )}
 
-              <motion.div
-                drag
-                dragConstraints={{ left: -400, right: 400, top: -300, bottom: 300 }}
-                onDragStart={() => document.body.style.cursor = "grabbing"}
-                onDragEnd={() => document.body.style.cursor = "grab"}
-                style={{ cursor: "grab", display: "flex", alignItems: "center", justifyContent: "center" }}
+              <div
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: "100%", height: "100%", cursor: scale > 1 ? "grab" : "default",
+                }}
               >
                 <motion.img
                   src={actualMedia[currentMediaIndex]}
                   animate={{ scale, x: position.x, y: position.y }}
                   transition={{ type: "spring", stiffness: 300, damping: 28 }}
-                  style={{ maxWidth: "88vw", maxHeight: "80vh", objectFit: "contain", borderRadius: 12, pointerEvents: "none", userSelect: "none" }}
+                  style={{
+                    maxWidth: "95vw", maxHeight: "90vh", objectFit: "contain",
+                    borderRadius: 12, userSelect: "none", WebkitUserSelect: "none",
+                    MozUserSelect: "none", msUserSelect: "none",
+                    WebkitTouchCallout: "none",
+                  }}
                   draggable={false}
+                  onContextMenu={e => e.preventDefault()}
+                  onCopy={e => e.preventDefault()}
                   alt="Fullscreen media"
                 />
-              </motion.div>
+              </div>
 
               {actualMedia.length > 1 && (
-                <>
-                  <button
-                    onClick={() => setIsFullScreen(false)}
-                    style={{
-                      position: "absolute", top: 16, right: 16,
-                      zIndex: 50, padding: 10, background: "rgba(0,0,0,0.5)",
-                      border: "none", borderRadius: "50%", color: "#fff", cursor: "pointer",
-                    }}
-                  >
-                    <X size={18} />
-                  </button>
-                  <div
-                    style={{
-                      position: "absolute", bottom: 20, left: "50%", transform: "translateX(-50%)",
-                      background: "rgba(0,0,0,0.6)", padding: "8px 16px", borderRadius: 100,
-                      color: "#fff", fontSize: 12, fontWeight: 500,
-                    }}
-                  >
-                    {currentMediaIndex + 1} / {actualMedia.length}
-                  </div>
-                </>
+                <div
+                  style={{
+                    position: "absolute", bottom: 24, left: "50%", transform: "translateX(-50%)",
+                    background: "rgba(0,0,0,0.6)", padding: "6px 14px", borderRadius: 100,
+                    color: "#fff", fontSize: 13, fontWeight: 500, zIndex: 100,
+                  }}
+                >
+                  {currentMediaIndex + 1} / {actualMedia.length}
+                </div>
               )}
 
               <p style={{
-                position: "absolute", bottom: 28,
-                color: "rgba(255,255,255,0.3)", fontSize: 11,
+                position: "absolute", bottom: 60, left: "50%", transform: "translateX(-50%)",
+                color: "rgba(255,255,255,0.25)", fontSize: 11,
                 fontFamily: '"DM Sans", system-ui, sans-serif',
-                letterSpacing: "0.06em",
+                letterSpacing: "0.04em", whiteSpace: "nowrap", zIndex: 100,
               }}>
-                Scroll to zoom · Drag to pan · Arrow keys to navigate
+                Pinch to zoom · Swipe to navigate · Drag down to close
               </p>
             </motion.div>
           )}

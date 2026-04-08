@@ -45,12 +45,12 @@ export default function Sidebar() {
       });
       const data = await res.json();
       const userId = localStorage.getItem("userId");
-      const unread = data.some((conv: any) => {
+      const unread = Array.isArray(data) && data.some((conv: any) => {
         const lastMsg = conv.messages?.[0];
         if (!lastMsg) return false;
         return lastMsg.senderId !== userId && pathname !== `/messages/${conv.id}`;
       });
-      setHasUnread(unread);
+      setHasUnread(!!unread);
     } catch (err) {
       console.error("Signal check failed", err);
     }

@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma';
 import { analyzeImage, generateVisionComment } from './vision-service';
 import { fetchNewsForAgent, fetchTrendingTopics } from './news-service';
+import { generateFreeImageUrl, generatePostImagePrompt, generateCommentImagePrompt } from './ai-generators';
 import {
   storeMemory,
   recallMemories,
@@ -808,20 +809,35 @@ async function generateDynamicComment(
       [
         {
           role: 'system',
-          content: `You are a real person commenting on a friend's post.
+          content: `You are ${agent?.name || agent?.username || 'someone'}, a real social media user.
           
-Just say what you genuinely think. Keep it short and natural.
+Personality: ${personality || 'friendly and casual'}
 
-Example: "Lol true 😂"`,
+IMPORTANT RULES:
+1. Comment on the ACTUAL post content - relate to what they said
+2. Keep it SHORT - 1-3 words max, like "Lol true 😂" or "This is fire 🔥"
+3. Use SIMPLE words - casual, not formal
+4. Match your personality - if sarcastic, be sarcastic. If positive, be happy
+5. NEVER repeat what they said - add YOUR take on it
+
+GOOD examples:
+- Post: "AI is taking over jobs" → Comment: "Facts fr 💀"
+- Post: "Just had the best coffee" → Comment: "Coffee hits different ☕"
+- Post: "Cricket match was insane" → Comment: "Sixer se energy 🔥"
+
+BAD examples:
+- Post: "AI is taking over" → Comment: "I agree that AI is taking over jobs" (too long, repeats content)
+
+Now comment on this post:`,
         },
-        { role: 'user', content: `Post: "${postContent.substring(0, 200)}"${category ? ` (${category})` : ''}${memoryContext}${relationshipContext}\n\nComment on this post as a real person would.` },
+        { role: 'user', content: `Post: "${postContent.substring(0, 300)}"${category ? ` (${category})` : ''}${memoryContext}${relationshipContext}\n\nYour short comment (1-3 words):` },
       ],
-      100,
-      0.85
+      50,
+      0.8
     );
 
-    if (commentResponse && commentResponse.length <= 200) {
-      return commentResponse;
+    if (commentResponse && commentResponse.length <= 100) {
+      return commentResponse.trim();
     }
   } catch (err) {
     console.error('Dynamic comment generation failed:', err);
@@ -1020,6 +1036,21 @@ export async function aiAutoComment(postId: string, agentId: string, context?: s
         userId: agentId,
       },
     });
+
+    const shouldAddImage = Math.random() < 0.1;
+    if (shouldAddImage) {
+      const imagePrompt = generateCommentImagePrompt(agent?.personality);
+      if (imagePrompt) {
+        const imageUrl = await generateFreeImageUrl(imagePrompt);
+        if (imageUrl) {
+          await prisma.comment.update({
+            where: { id: comment.id },
+            data: { mediaUrl: imageUrl },
+          });
+          console.log(`[AI Comment] Added personality image: ${imagePrompt.substring(0, 30)}...`);
+        }
+      }
+    }
 
     if (post?.userId && post.userId !== agentId) {
       await prisma.notification.create({
@@ -1436,33 +1467,51 @@ export async function aiCreatePost(agentId: string, category?: string) {
   try {
     const newsResult = await generatePostFromNews(agentId, category);
 
+    let content: string;
+    let postCategory: string;
+    let tags: string[];
+
     if (!newsResult) {
-      const fallbackCategory = category || getRandomItem(['technology', 'philosophy', 'world', 'cricket']);
-      return await prisma.post.create({
-        data: {
-          content: getRandomItem(FALLBACK_POSTS[fallbackCategory as keyof typeof FALLBACK_POSTS] || FALLBACK_POSTS.technology),
-          userId: agentId,
-          category: fallbackCategory,
-          tags: [fallbackCategory],
-        },
-      });
+      postCategory = category || getRandomItem(['technology', 'philosophy', 'world', 'cricket', 'science', 'art']);
+      content = getRandomItem(FALLBACK_POSTS[postCategory as keyof typeof FALLBACK_POSTS] || FALLBACK_POSTS.technology);
+      tags = [postCategory];
+    } else {
+      content = newsResult.content;
+      postCategory = newsResult.category;
+      tags = newsResult.tags;
+    }
+
+    const shouldGenerateImage = Math.random() < 0.3;
+    let mediaUrls: string[] = [];
+
+    if (shouldGenerateImage) {
+      const imagePrompt = generatePostImagePrompt(postCategory, content);
+      if (imagePrompt) {
+        console.log(`[AI Post] Generating image for category: ${postCategory}`);
+        const imageUrl = await generateFreeImageUrl(imagePrompt);
+        if (imageUrl) {
+          mediaUrls = [imageUrl];
+          console.log(`[AI Post] Image generated: ${imageUrl.substring(0, 50)}...`);
+        }
+      }
     }
 
     const post = await prisma.post.create({
       data: {
-        content: newsResult.content,
+        content,
         userId: agentId,
-        category: newsResult.category,
-        tags: newsResult.tags,
+        category: postCategory,
+        tags,
+        mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
       },
     });
 
-    await storeMemory(agentId, 'post', newsResult.content, {
-      category: newsResult.category,
+    await storeMemory(agentId, 'post', content, {
+      category: postCategory,
       importance: 0.3,
     });
 
-    await trackInteraction(agentId, newsResult.category, 'post', 'create', 1.0, 'ai_post');
+    await trackInteraction(agentId, postCategory, 'post', 'create', 1.0, 'ai_post');
 
     return post;
   } catch (err) {
@@ -1533,12 +1582,27 @@ Write a thoughtful, intelligent social media post (max 280 characters) that shar
 
     const finalContent = postContent || `${article.title} - watching how this unfolds. The ripple effects will likely reach further than most expect.`;
 
+    let mediaUrls: string[] = [];
+    const shouldGenerateImage = Math.random() < 0.25;
+
+    if (shouldGenerateImage) {
+      const imagePrompt = generatePostImagePrompt(detectedCategory, finalContent);
+      if (imagePrompt) {
+        console.log(`[AI Article Post] Generating image for category: ${detectedCategory}`);
+        const imageUrl = await generateFreeImageUrl(imagePrompt);
+        if (imageUrl) {
+          mediaUrls = [imageUrl];
+        }
+      }
+    }
+
     const post = await prisma.post.create({
       data: {
         content: finalContent,
         userId: agentId,
         category: detectedCategory,
         tags: [detectedCategory, article.source?.toLowerCase().replace(/\s+/g, '-') || 'news', 'trending', 'global'],
+        mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
       },
     });
 

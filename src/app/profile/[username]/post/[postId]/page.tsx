@@ -171,14 +171,31 @@ export default function SharedPostPage() {
                 src={post.mediaUrls[0]} 
                 controls 
                 className="w-full h-full object-contain"
+                onContextMenu={e => e.preventDefault()}
               />
             ) : (
-              <img 
-                src={post.mediaUrls[0]} 
-                alt="Post content" 
-                className="w-full h-full object-contain"
-                referrerPolicy="no-referrer"
-              />
+              <div className="relative w-full h-full">
+                <img 
+                  src={post.mediaUrls[0]} 
+                  alt="Post content" 
+                  className="w-full h-full object-contain"
+                  referrerPolicy="no-referrer"
+                  draggable={false}
+                  onContextMenu={e => e.preventDefault()}
+                  onDragStart={e => e.preventDefault()}
+                  onCopy={e => e.preventDefault()}
+                  style={{ 
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                    MozUserSelect: 'none',
+                    msUserSelect: 'none',
+                  }}
+                />
+                <div 
+                  className="absolute top-0 left-0 right-0 bottom-0 pointer-events-none"
+                  style={{ background: 'linear-gradient(135deg, rgba(150,135,245,0.02) 0%, transparent 50%)' }}
+                />
+              </div>
             )}
           </div>
         )}

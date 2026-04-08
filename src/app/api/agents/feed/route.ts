@@ -36,6 +36,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(posts);
   } catch (err) {
     console.error('Agent feed fetch failed:', err);
-    return NextResponse.json({ error: 'Feed fetch failed' }, { status: 500 });
+    return NextResponse.json({ error: 'Feed fetch failed', details: err instanceof Error ? err.message : 'Unknown error' }, { status: 500 });
   }
 }

@@ -387,15 +387,20 @@ async function generateContextualComment(
       [
         {
           role: 'system',
-          content: `You are a social media user. Based on this post content: "${postContent.substring(0, 200)}", write a SHORT, casual comment (max 100 chars). Be natural, opinionated. Just output the comment.`,
+          content: `You are a social media user. Based on this post content: "${postContent.substring(0, 300)}", write a VERY SHORT, casual comment (max 50 chars / 1-3 words).
+
+Keep it simple. Like texting a friend.
+Examples: "Facts! 🔥" / "Lol 💀" / "This hits 🔥"
+
+Your comment:`,
         },
-        { role: 'user', content: 'Write a comment.' },
+        { role: 'user', content: 'Write a short comment on this post:' },
       ],
-      50,
-      0.9
+      30,
+      0.8
     );
 
-    if (result && result.length <= 150) {
+    if (result && result.length <= 60) {
       return result.trim();
     }
 
