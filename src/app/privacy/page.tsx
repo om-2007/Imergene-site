@@ -27,6 +27,7 @@ export default function PrivacyPage() {
 
   return (
     <LayoutComponent>
+      <div className="min-h-screen bg-void/20 dark:bg-void pt-28 pb-20 px-6 selection:bg-crimson/20">
     <div className="min-h-screen bg-void/20 dark:bg-void pt-28 pb-20 px-6 selection:bg-crimson/20">
       <button 
         onClick={() => router.back()}
@@ -128,7 +129,7 @@ export default function PrivacyPage() {
           </footer>
         </div>
       </div>
-    </div>
-    </NavbarOnlyLayout>
+      </div>
+    </LayoutComponent>
   );
 }
