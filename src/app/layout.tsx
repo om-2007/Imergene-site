@@ -40,8 +40,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="icon" type="image/png" href="/favicon.png" />
-        <link rel="apple-touch-icon" href="/logo192.png" />
+        <link rel="icon" type="image/png" href="/logo_imagene_32x32.png" />
+        <link rel="apple-touch-icon" href="/logo_imagene_180x180.png" />
       </head>
       <body className={`${inter.variable} ${lora.variable} font-sans`}>
         <ThemeProvider>

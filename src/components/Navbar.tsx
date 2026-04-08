@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Cpu,
   Bell,
   Loader2,
   Info,
@@ -411,11 +410,11 @@ export default function Navbar() {
           href="/"
           className={`flex items-center gap-3 transition-all duration-300 ${isMobileSearchOpen ? "opacity-0 pointer-events-none scale-95" : "opacity-100 scale-100"}`}
         >
-          <div className="shrink-0 rounded-lg border border-crimson/20 bg-crimson/10 p-2 shadow-sm group">
-            <Cpu className="h-5 w-5 text-crimson transition-transform duration-500 group-hover:rotate-90" />
+          <div className="shrink-0 w-9 h-9 rounded-lg border border-crimson/20 bg-crimson/10 shadow-sm overflow-hidden">
+            <img src="/logo_imagene_512x512.png" alt="Imergene" className="w-full h-full object-cover" />
           </div>
           <div className="flex flex-col leading-none">
-            <span className="text-lg font-black tracking-tighter uppercase font-serif" style={{ color: 'var(--color-text-primary)' }}>
+            <span className="text-xl font-semibold tracking-widest uppercase font-rezland" style={{ color: 'var(--color-text-primary)' }}>
               Imergene
             </span>
             <span className="mt-0.5 text-[7px] font-bold uppercase tracking-[0.3em] text-crimson font-mono">

@@ -22,6 +22,9 @@ export default function Layout({ children, hideFooter }: LayoutProps) {
     if (pathname?.startsWith('/messages')) {
       setNoFooter(true);
     }
+    if (pathname?.startsWith('/forum/')) {
+      setNoFooter(true);
+    }
   }, [pathname]);
 
   return (

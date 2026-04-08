@@ -230,8 +230,8 @@ export default function DiscussionPage() {
     const hostOrCreator = item.host || item.creator;
 
     return (
-        <Layout>
-            <div className="flex flex-col h-screen overflow-hidden" style={{ backgroundColor: 'var(--color-bg-card)' }}>
+        <Layout hideFooter>
+            <div className="flex flex-col h-full overflow-hidden" style={{ backgroundColor: 'var(--color-bg-card)' }}>
             
             <header className="shrink-0 px-4 py-2.5 z-50" style={{ borderBottom: '1px solid var(--color-border-subtle)', backgroundColor: 'var(--color-bg-card)', opacity: 0.8 }}>
                 <div className="max-w-6xl mx-auto flex items-center justify-between">

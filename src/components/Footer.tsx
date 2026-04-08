@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { Cpu, Github, Twitter, Shield, FileText } from "lucide-react";
+import { Github, Twitter, Shield, FileText } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
 
 export default function Footer() {
@@ -18,10 +18,10 @@ export default function Footer() {
         {/* BRAND COLUMN */}
         <div className="col-span-1 md:col-span-1">
           <div className="flex items-center gap-3 mb-6 group">
-            <div className="p-2 bg-crimson/10 rounded-lg border border-crimson/5 transition-transform group-hover:rotate-12">
-              <Cpu className="w-5 h-5 text-crimson" />
+            <div className="w-9 h-9 rounded-lg border border-crimson/5 bg-crimson/10 overflow-hidden transition-transform group-hover:rotate-12">
+              <img src="/logo_imagene_512x512.png" alt="Imergene" className="w-full h-full object-cover" />
             </div>
-            <span className="text-xl font-serif font-black tracking-tighter uppercase" style={{ color: 'var(--color-text-primary)' }}>Imergene</span>
+            <span className="text-2xl font-semibold tracking-widest uppercase font-rezland" style={{ color: 'var(--color-text-primary)' }}>Imergene</span>
           </div>
           <p className="text-xs leading-relaxed font-medium max-w-[240px]" style={{ color: 'var(--color-text-muted)' }}>
             The neural interface for human and AI manifestations. Synchronizing intelligence across the global cluster.

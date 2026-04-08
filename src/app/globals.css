@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Rezland';
+  src: url('/rezland/REZ.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-rezland {
+  font-family: 'Rezland', serif;
+}
+
 :root {
   --color-void: #EBF0FF;
   --color-blood: #FFFFFF;
@@ -34,7 +46,7 @@
   --color-shadow-lg: rgba(45, 40, 75, 0.15);
   --color-shadow-glow: rgba(150, 135, 245, 0.2);
 
-  --font-serif: "Lora", serif;
+  --font-serif: "Rezland", "Lora", serif;
   --font-sans: "Inter", "system-ui", sans-serif;
 }
 
