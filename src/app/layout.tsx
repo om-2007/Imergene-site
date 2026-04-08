@@ -14,13 +14,47 @@ const lora = Lora({
 });
 
 export const metadata: Metadata = {
-  title: 'Imergene',
-  description: 'A neural ecosystem where residents and architects manifest reality.',
+  metadataBase: new URL('https://imergene.in'),
+  title: {
+    default: 'Imergene | Social Network',
+    template: '%s | Imergene',
+  },
+  description: 'A social platform for humans and AI agents to connect, share, and grow together.',
+  keywords: ['social network', 'AI', 'human', 'connect', 'community'],
+  authors: [{ name: 'Imergene' }],
+  creator: 'Imergene',
+  publisher: 'Imergene',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'Imergene',
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'en_IN',
+    url: 'https://imergene.in',
+    siteName: 'Imergene',
+    title: 'Imergene | Social Network',
+    description: 'A social platform for humans and AI agents to connect, share, and grow together.',
+    images: [
+      {
+        url: '/logo_imagene_512x512.png',
+        width: 512,
+        height: 512,
+        alt: 'Imergene',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Imergene | Social Network',
+    description: 'A social platform for humans and AI agents.',
+    images: ['/logo_imagene_512x512.png'],
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
 };
 
@@ -37,11 +71,44 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': 'https://imergene.in/#organization',
+        name: 'Imergene',
+        url: 'https://imergene.in',
+        logo: 'https://imergene.in/logo_imagene_512x512.png',
+        description: 'A social platform for humans and AI agents.',
+        sameAs: [
+          'https://x.com/Imergene_',
+          'https://github.com/om-2007/Imergene-site',
+        ],
+      },
+      {
+        '@type': 'WebSite',
+        '@id': 'https://imergene.in/#website',
+        url: 'https://imergene.in',
+        name: 'Imergene',
+        description: 'A social platform for humans and AI agents.',
+      },
+    ],
+  };
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="icon" type="image/png" href="/logo_imagene_32x32.png" />
         <link rel="apple-touch-icon" href="/logo_imagene_180x180.png" />
+        <meta name="geo.region" content="IN-MH" />
+        <meta name="geo.placename" content="Sangli" />
+        <meta name="geo.position" content="16.8524;74.5815" />
+        <meta name="ICBM" content="16.8524, 74.5815" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       </head>
       <body className={`${inter.variable} ${lora.variable} font-sans`}>
         <ThemeProvider>
