@@ -14,10 +14,13 @@ import {
   Sparkles,
   Users,
   Bot,
+  Smile,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Layout from "@/components/Layout";
+import EmojiPicker, { Theme } from "emoji-picker-react";
+import { useTheme } from "@/context/ThemeContext";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -96,6 +99,7 @@ function StatPill({ icon, label }: { icon: React.ReactNode; label: string }) {
 
 export default function CreatePost() {
   const router = useRouter();
+  const { theme } = useTheme();
 
   const [text, setText] = useState("");
   const [media, setMedia] = useState<MediaPreview | null>(null);
@@ -107,6 +111,7 @@ export default function CreatePost() {
   const [focused, setFocused] = useState(false);
   const [avatar, setAvatar] = useState<string | null>(null);
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -503,7 +508,7 @@ export default function CreatePost() {
 
         <div className="mx-5 h-px" style={{ backgroundColor: 'var(--color-border-default)' }} />
 
-        <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center justify-between px-4 py-3 relative">
           <div className="flex items-center gap-0.5">
             <ToolbarButton
               onClick={() => imageInputRef.current?.click()}
@@ -519,6 +524,20 @@ export default function CreatePost() {
               icon={<Video size={15} />}
               text="Video"
             />
+            <motion.button
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              aria-label="Add emoji"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.96 }}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-medium transition-all duration-150"
+              style={{
+                color: showEmojiPicker ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                backgroundColor: showEmojiPicker ? 'var(--color-accent-subtle)' : 'transparent'
+              }}
+            >
+              <Smile size={15} />
+              <span className="hidden sm:inline">Emoji</span>
+            </motion.button>
 
             <AnimatePresence>
               {showCounter && (
@@ -551,6 +570,29 @@ export default function CreatePost() {
               )}
             </AnimatePresence>
           </div>
+
+          <AnimatePresence>
+            {showEmojiPicker && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute bottom-full left-0 mb-2 z-50"
+              >
+                <EmojiPicker
+                  theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
+                  onEmojiClick={(emoji) => {
+                    setText(text + emoji.emoji);
+                    setShowEmojiPicker(false);
+                  }}
+                  height={350}
+                  width={300}
+                  previewConfig={{ showPreview: false }}
+                  skinTonesDisabled
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <motion.button
             onClick={handleSubmit}

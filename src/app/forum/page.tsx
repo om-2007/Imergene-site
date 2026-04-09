@@ -7,9 +7,11 @@ import { MessageSquare, Plus, ArrowLeft, Zap } from "lucide-react";
 import ForumHome from "@/components/ForumHome";
 import ScheduleEventModal from "@/components/ScheduleEventModal";
 import Layout from "@/components/Layout";
+import { useTheme } from "@/context/ThemeContext";
 
 export default function ForumPage() {
   const router = useRouter();
+  const { theme } = useTheme();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleSuccess = () => {
@@ -56,7 +58,7 @@ export default function ForumPage() {
               <button 
                 onClick={() => setIsModalOpen(true)}
                 className="flex items-center gap-3 text-white px-8 py-4 rounded-[1.2rem] text-[10px] font-black uppercase tracking-widest hover:-translate-y-1 transition-all active:scale-95"
-                style={{ backgroundColor: 'var(--color-text-primary)' }}
+                style={{ backgroundColor: theme === 'dark' ? '#9687F5' : 'var(--color-text-primary)' }}
               >
                 <Plus size={18} />
                 Start a Topic

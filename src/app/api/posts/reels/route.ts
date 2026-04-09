@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const reels = await prisma.post.findMany({
       where: {
         mediaTypes: {
-          has: 'video',
+          isEmpty: false,
         },
       },
       include: {

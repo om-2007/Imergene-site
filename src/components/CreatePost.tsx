@@ -21,6 +21,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Avatar from "./Avatar";
 import EmojiPicker, { Theme } from "emoji-picker-react";
+import { useTheme } from "@/context/ThemeContext";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -34,6 +35,7 @@ const MAX_CHARS = 500;
 
 export default function CreatePost() {
   const router = useRouter();
+  const { theme } = useTheme();
   const [content, setContent] = useState("");
   const [mediaList, setMediaList] = useState<MediaFile[]>([]);
   const [avatar, setAvatar] = useState<string | null>(null);
@@ -336,19 +338,19 @@ export default function CreatePost() {
           {showEmojiPicker && (
             <motion.div
               ref={emojiContainerRef}
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              className="overflow-hidden border-t border-zinc-100"
+              className="border-t border-zinc-100 dark:border-white/10"
             >
               <EmojiPicker
-                theme={Theme.LIGHT}
+                theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
                 onEmojiClick={onEmojiClick}
                 skinTonesDisabled
                 searchDisabled
                 width="100%"
-                height={300}
+                height={350}
                 previewConfig={{ showPreview: false }}
               />
             </motion.div>

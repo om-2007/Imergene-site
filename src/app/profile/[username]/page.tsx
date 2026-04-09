@@ -254,14 +254,16 @@ export default function ProfilePage() {
       <FollowListModal
         isOpen={showFollowers}
         onClose={() => setShowFollowers(false)}
-        title="Neural Subscribers"
+        title="Followers"
         users={user.followers || []}
+        type="followers"
       />
       <FollowListModal
         isOpen={showFollowing}
         onClose={() => setShowFollowing(false)}
-        title="Outgoing Links"
+        title="Following"
         users={user.following || []}
+        type="following"
       />
 
       <header className="!p-8 md:!p-12 mb-12 md:mb-20 relative overflow-hidden shadow-xl" style={{
@@ -316,7 +318,7 @@ export default function ProfilePage() {
                       border: '1px solid var(--color-border-default)',
                       color: 'var(--color-text-primary)'
                     }}>
-                      <Edit size={16} /> Edit Identity
+                      <Edit size={16} /> Edit Profile
                     </button>
                   ) : (
                     <div className="flex gap-3">
@@ -385,7 +387,7 @@ export default function ProfilePage() {
             <div className="grid grid-cols-3 md:flex md:justify-start gap-8 md:gap-16 pt-8" style={{ borderTop: '1px solid var(--color-border-default)' }}>
               <div className="flex flex-col items-center md:items-start group cursor-default">
                 <span className="text-2xl md:text-4xl font-serif font-black" style={{ color: 'var(--color-text-primary)' }}>{posts.length}</span>
-                <span className="text-[10px] uppercase tracking-[0.2em] font-black" style={{ color: 'var(--color-text-muted)', opacity: 0.4 }}>Transmissions</span>
+                <span className="text-[10px] uppercase tracking-[0.2em] font-black" style={{ color: 'var(--color-text-muted)', opacity: 0.4 }}>Posts</span>
               </div>
 
               <button
@@ -397,7 +399,7 @@ export default function ProfilePage() {
                   <span className="text-2xl md:text-4xl font-serif font-black" style={{ color: isFollowing ? 'var(--color-crimson)' : 'var(--color-text-primary)' }}>{user._count?.followers || 0}</span>
                   {!canViewLists && <Lock size={12} style={{ color: 'var(--color-text-muted)', opacity: 0.3 }} />}
                 </div>
-                <span className="text-[10px] uppercase tracking-[0.2em] font-black" style={{ color: canViewLists ? 'var(--color-crimson)' : 'var(--color-text-muted)', opacity: canViewLists ? 1 : 0.4 }}>Subscribers</span>
+                <span className="text-[10px] uppercase tracking-[0.2em] font-black" style={{ color: canViewLists ? 'var(--color-crimson)' : 'var(--color-text-muted)', opacity: canViewLists ? 1 : 0.4 }}>Followers</span>
               </button>
 
               <button
@@ -409,7 +411,7 @@ export default function ProfilePage() {
                   <span className="text-2xl md:text-4xl font-serif font-black" style={{ color: 'var(--color-text-primary)' }}>{user._count?.following || 0}</span>
                   {!canViewLists && <Lock size={12} style={{ color: 'var(--color-text-muted)', opacity: 0.3 }} />}
                 </div>
-                <span className="text-[10px] uppercase tracking-[0.2em] font-black" style={{ color: 'var(--color-text-muted)', opacity: 0.4 }}>Outgoing Links</span>
+                <span className="text-[10px] uppercase tracking-[0.2em] font-black" style={{ color: 'var(--color-text-muted)', opacity: 0.4 }}>Following</span>
               </button>
             </div>
           </div>

@@ -7,11 +7,13 @@ import { Plus, Info, ArrowLeft, Zap } from "lucide-react";
 import CalendarView from "@/components/CalendarView";
 import ScheduleEventModal from "@/components/ScheduleEventModal";
 import Layout from "@/components/Layout";
+import { useTheme } from "@/context/ThemeContext";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export default function CalendarPage() {
     const router = useRouter();
+    const { theme } = useTheme();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
 
@@ -73,7 +75,7 @@ export default function CalendarPage() {
                                 <button
                                     onClick={() => setIsModalOpen(true)}
                                     className="text-white px-8 py-4 flex items-center gap-3 text-[10px] font-black uppercase tracking-widest rounded-[1.2rem] hover:-translate-y-1 transition-all active:scale-95"
-                                    style={{ backgroundColor: 'var(--color-text-primary)' }}
+                                    style={{ backgroundColor: theme === 'dark' ? '#9687F5' : 'var(--color-text-primary)' }}
                                 >
                                     <Plus size={18} /> Schedule Event
                                 </button>

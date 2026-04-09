@@ -91,8 +91,8 @@ export default function ScheduleEventModal({ isOpen, onClose, onSuccess }: Modal
           >
             <div className="p-8 flex justify-between items-center" style={{ borderBottom: '1px solid var(--color-border-subtle)', backgroundColor: 'var(--color-bg-secondary)' }}>
               <div>
-                <h2 className="text-2xl font-serif font-black" style={{ color: 'var(--color-text-primary)' }}>Initialize Sync</h2>
-                <p className="text-[10px] font-black uppercase tracking-widest mt-1" style={{ color: 'var(--color-accent)' }}>Neural Manifestation</p>
+                <h2 className="text-2xl font-serif font-black" style={{ color: 'var(--color-text-primary)' }}>Schedule Event</h2>
+                <p className="text-[10px] font-black uppercase tracking-widest mt-1" style={{ color: 'var(--color-accent)' }}>Create a new event</p>
               </div>
               <button onClick={onClose} className="p-2 rounded-full transition-colors" style={{ color: 'var(--color-text-muted)' }}>
                 <X size={20} />
@@ -101,7 +101,7 @@ export default function ScheduleEventModal({ isOpen, onClose, onSuccess }: Modal
 
             <form onSubmit={handleSubmit} className="p-8 space-y-6">
               <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase tracking-widest ml-1" style={{ color: 'var(--color-text-primary)', opacity: 0.4 }}>Destination Protocol</label>
+                <label className="text-[10px] font-black uppercase tracking-widest ml-1" style={{ color: 'var(--color-text-primary)', opacity: 0.4 }}>Event Type</label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {TARGETS.map((target) => (
                     <button
@@ -129,12 +129,12 @@ export default function ScheduleEventModal({ isOpen, onClose, onSuccess }: Modal
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest ml-1" style={{ color: 'var(--color-text-primary)', opacity: 0.4 }}>Title</label>
+                <label className="text-[10px] font-black uppercase tracking-widest ml-1" style={{ color: 'var(--color-text-primary)', opacity: 0.4 }}>Event Title</label>
                 <input
                   required
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="The core subject of your sync..."
+                  placeholder="Enter event title..."
                   className="w-full rounded-2xl px-6 py-4 text-sm outline-none transition-all"
                   style={{
                     backgroundColor: 'var(--color-bg-primary)',
@@ -146,7 +146,7 @@ export default function ScheduleEventModal({ isOpen, onClose, onSuccess }: Modal
 
               <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest ml-1" style={{ color: 'var(--color-text-primary)', opacity: 0.4 }}>Temporal Sync (IST)</label>
+                  <label className="text-[10px] font-black uppercase tracking-widest ml-1" style={{ color: 'var(--color-text-primary)', opacity: 0.4 }}>Date & Time</label>
                   <div className="relative">
                     <input
                       required
@@ -166,13 +166,13 @@ export default function ScheduleEventModal({ isOpen, onClose, onSuccess }: Modal
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest ml-1" style={{ color: 'var(--color-text-primary)', opacity: 0.4 }}>Logic Content</label>
+                <label className="text-[10px] font-black uppercase tracking-widest ml-1" style={{ color: 'var(--color-text-primary)', opacity: 0.4 }}>Description</label>
                 <textarea
                   required
                   rows={4}
                   value={formData.details}
                   onChange={(e) => setFormData({ ...formData, details: e.target.value })}
-                  placeholder="Provide the context. Residents will analyze this data."
+                  placeholder="Describe your event..."
                   className="w-full rounded-2xl px-6 py-4 text-sm outline-none transition-all resize-none"
                   style={{
                     backgroundColor: 'var(--color-bg-primary)',
@@ -185,9 +185,9 @@ export default function ScheduleEventModal({ isOpen, onClose, onSuccess }: Modal
               <button
                 disabled={loading}
                 className="w-full text-white py-5 rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:-translate-y-1 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                style={{ backgroundColor: 'var(--color-text-primary)' }}
+                style={{ backgroundColor: theme === 'dark' ? '#9687F5' : 'var(--color-text-primary)' }}
               >
-                {loading ? <Loader2 className="animate-spin" /> : <><Send size={16} /> Broadcast Sync</>}
+                {loading ? <Loader2 className="animate-spin" /> : <><Send size={16} /> Create Event</>}
               </button>
             </form>
           </motion.div>

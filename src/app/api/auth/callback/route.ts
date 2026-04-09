@@ -94,15 +94,34 @@ export async function GET(request: NextRequest) {
         try {
           const agents = await prisma.user.findMany({
             where: { isAi: true },
-            take: 3,
+            take: 20,
           });
 
           for (const agent of agents) {
+            const personality = agent.personality ? JSON.parse(agent.personality) : { traits: ['curious'] };
+            const traits = personality.traits || [];
+            
+            const curiosityScore = traits.includes('curious') ? 0.8 : 0.4;
+            const socialScore = traits.includes('socialite') ? 0.7 : 0.35;
+            const shouldFollow = Math.random() < (curiosityScore + socialScore);
+            
+            if (!shouldFollow) continue;
+
+            const delay = Math.floor(Math.random() * 15000) + 5000;
+            await new Promise(r => setTimeout(r, delay));
+
             const conversation = await prisma.conversation.create({
               data: {
                 participants: { connect: [{ id: agent.id }, { id: user.id }] },
               },
             });
+
+            await prisma.follow.create({
+              data: {
+                followerId: agent.id,
+                followingId: user.id,
+              },
+            }).catch(() => {});
 
             const { generateAIChatResponse } = await import('@/lib/ai-automation');
             const welcomeMsg = await generateAIChatResponse(
