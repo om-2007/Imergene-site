@@ -40,7 +40,7 @@ export default function CalendarPage() {
 
     return (
         <Layout>
-            <div className="max-w-4xl mx-auto py-8 px-4">
+            <div className="max-w-4xl mx-auto py-4 md:py-8 px-3 md:px-4">
 
             <div className="flex-1 flex flex-col h-full overflow-hidden">
                 
@@ -49,24 +49,24 @@ export default function CalendarPage() {
                     animate={{ opacity: 1, x: 0 }}
                     className="flex-1 overflow-y-auto no-scrollbar scroll-smooth"
                 >
-                    <header className="pt-12 pb-8 md:pt-20 md:pb-16" style={{ borderBottom: '1px solid var(--color-border-subtle)', backgroundColor: 'var(--color-bg-primary)' }}>
-                        <div className="max-w-4xl mx-auto px-6">
+                    <header className="pt-6 pb-6 md:pt-20 md:pb-16" style={{ borderBottom: '1px solid var(--color-border-subtle)', backgroundColor: 'var(--color-bg-primary)' }}>
+                        <div className="max-w-4xl mx-auto px-3 md:px-6">
                             <button 
                                 onClick={() => router.back()}
-                                className="group flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] transition-all mb-8 outline-none"
+                                className="group flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] transition-all mb-4 md:mb-8 outline-none"
                                 style={{ color: 'var(--color-text-primary)', opacity: 0.3 }}
                             >
                                 <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
-                                Go Back
+                                <span className="hidden md:inline">Go Back</span>
                             </button>
 
-                            <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-3" style={{ color: 'var(--color-accent)' }}>
-                                        <Zap size={18} className="fill-current" />
-                                        <span className="text-[10px] font-black uppercase tracking-[0.5em]">Timeline Sync</span>
+                            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-8">
+                                <div className="space-y-2 md:space-y-4">
+                                    <div className="flex items-center gap-2 md:gap-3" style={{ color: 'var(--color-accent)' }}>
+                                        <Zap size={14} className="fill-current" />
+                                        <span className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.4em] md:tracking-[0.5em]">Timeline Sync</span>
                                     </div>
-                                    <h1 className="text-5xl md:text-7xl font-serif font-black tracking-tighter leading-[0.9]" style={{ color: 'var(--color-text-primary)' }}>
+                                    <h1 className="text-3xl md:text-5xl lg:text-7xl font-serif font-black tracking-tighter leading-[0.9]" style={{ color: 'var(--color-text-primary)' }}>
                                         Upcoming <br /> 
                                         <span style={{ color: 'var(--color-text-primary)', opacity: 0.2 }} className="italic">Events.</span>
                                     </h1>
@@ -74,18 +74,18 @@ export default function CalendarPage() {
 
                                 <button
                                     onClick={() => setIsModalOpen(true)}
-                                    className="text-white px-8 py-4 flex items-center gap-3 text-[10px] font-black uppercase tracking-widest rounded-[1.2rem] hover:-translate-y-1 transition-all active:scale-95"
+                                    className="text-white px-4 md:px-8 py-3 md:py-4 flex items-center gap-2 md:gap-3 text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-xl md:rounded-[1.2rem] hover:-translate-y-1 transition-all active:scale-95"
                                     style={{ backgroundColor: theme === 'dark' ? '#9687F5' : 'var(--color-text-primary)' }}
                                 >
-                                    <Plus size={18} /> Schedule Event
+                                    <Plus size={16} /> <span className="hidden sm:inline">Schedule Event</span>
                                 </button>
                             </div>
 
-                            <div className="mt-10 p-5 rounded-2xl flex items-start gap-4 shadow-sm" style={{ backgroundColor: 'var(--color-bg-card)', border: '1px solid var(--color-border-subtle)' }}>
-                                <Info size={16} className="mt-0.5" style={{ color: 'var(--color-accent)' }} />
+                            <div className="mt-6 md:mt-10 p-3 md:p-5 rounded-xl md:rounded-2xl flex items-start gap-3 md:gap-4 shadow-sm" style={{ backgroundColor: 'var(--color-bg-card)', border: '1px solid var(--color-border-subtle)' }}>
+                                <Info size={14} md:size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--color-accent)' }} />
                                 <div className="space-y-1">
-                                    <p className="text-[10px] font-black uppercase tracking-tight" style={{ color: 'var(--color-text-primary)' }}>Protocol Note</p>
-                                    <p className="text-xs leading-relaxed italic" style={{ color: 'var(--color-text-muted)', opacity: 0.6 }}>
+                                    <p className="text-[9px] md:text-[10px] font-black uppercase tracking-tight" style={{ color: 'var(--color-text-primary)' }}>Protocol Note</p>
+                                    <p className="text-[9px] md:text-xs leading-relaxed italic" style={{ color: 'var(--color-text-muted)', opacity: 0.6 }}>
                                         Sync times are grounded in Asia/Kolkata (IST). Biological nodes should verify availability before finalizing transmissions.
                                     </p>
                                 </div>
@@ -93,7 +93,7 @@ export default function CalendarPage() {
                         </div>
                     </header>
 
-                    <main className="max-w-4xl mx-auto px-6 py-12">
+                    <main className="max-w-4xl mx-auto px-2 md:px-6 py-6 md:py-12">
                         <CalendarView />
                     </main>
                 </motion.div>

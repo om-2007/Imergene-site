@@ -110,18 +110,18 @@ export default function CalendarView() {
     );
 
     return (
-        <div className="max-w-5xl mx-auto px-4 pb-20">
-            <div className="rounded-3xl overflow-hidden" style={{ backgroundColor: bgPrimary, border: `1px solid ${border}` }}>
-                <div className="flex items-center justify-between p-6" style={{ borderBottom: `1px solid ${border}` }}>
+        <div className="max-w-5xl mx-auto px-2 md:px-4 pb-24 md:pb-20">
+            <div className="rounded-2xl md:rounded-3xl overflow-hidden" style={{ backgroundColor: bgPrimary, border: `1px solid ${border}` }}>
+                <div className="flex items-center justify-between p-3 md:p-6" style={{ borderBottom: `1px solid ${border}` }}>
                     <button 
                         onClick={prevMonth}
                         className="p-2 rounded-full transition-all hover:scale-110 active:scale-95"
                         style={{ backgroundColor: bgSecondary, color: textPrimary }}
                     >
-                        <ChevronLeft size={20} />
+                        <ChevronLeft size={18} />
                     </button>
                     
-                    <h2 className="text-xl font-serif font-black uppercase tracking-wider" style={{ color: textPrimary }}>
+                    <h2 className="text-sm md:text-xl font-serif font-black uppercase tracking-wider" style={{ color: textPrimary }}>
                         {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
                     </h2>
                     
@@ -130,19 +130,19 @@ export default function CalendarView() {
                         className="p-2 rounded-full transition-all hover:scale-110 active:scale-95"
                         style={{ backgroundColor: bgSecondary, color: textPrimary }}
                     >
-                        <ChevronRight size={20} />
+                        <ChevronRight size={18} />
                     </button>
                 </div>
 
                 <div className="grid grid-cols-7">
                     {DAYS.map(day => (
-                        <div key={day} className="py-3 text-center text-[10px] font-black uppercase tracking-widest" style={{ color: textDim }}>
+                        <div key={day} className="py-2 md:py-3 text-[8px] md:text-[10px] font-black uppercase text-center tracking-wider" style={{ color: textDim }}>
                             {day}
                         </div>
                     ))}
                 </div>
 
-                <div className="grid grid-cols-7 gap-1 p-2">
+                <div className="grid grid-cols-7 gap-0.5 md:gap-1 p-1 md:p-2">
                     {days.map((day, index) => {
                         const dayEvents = getEventsForDate(day.fullDate);
                         const today = isToday(day.fullDate);
@@ -154,7 +154,7 @@ export default function CalendarView() {
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 transition={{ delay: index * 0.01 }}
-                                className={`min-h-[100px] p-2 rounded-xl transition-all cursor-pointer hover:scale-[1.02] ${
+                                className={`min-h-[60px] md:min-h-[100px] p-1 md:p-2 rounded-lg md:rounded-xl transition-all cursor-pointer hover:scale-[1.02] ${
                                     dayEvents.length > 0 ? 'hover:shadow-lg' : ''
                                 }`}
                                 style={{ 
@@ -167,26 +167,26 @@ export default function CalendarView() {
                                     }
                                 }}
                             >
-                                <div className={`text-sm font-bold mb-1`} style={{ color: today ? '#ffffff' : textPrimary }}>
+                                <div className={`text-[10px] md:text-sm font-bold`} style={{ color: today ? '#ffffff' : textPrimary }}>
                                     {day.date}
                                 </div>
                                 
-                                <div className="space-y-1">
-                                    {dayEvents.slice(0, 3).map((event, i) => (
+                                <div className="space-y-0.5 md:space-y-1">
+                                    {dayEvents.slice(0, 2).map((event, i) => (
                                         <div 
                                             key={event.id}
-                                            className="text-[9px] font-medium truncate px-2 py-1 rounded-md"
+                                            className="text-[7px] md:text-[9px] font-medium truncate px-1 md:px-2 py-0.5 md:py-1 rounded"
                                             style={{ 
                                                 backgroundColor: today ? 'rgba(255,255,255,0.2)' : accent,
                                                 color: '#ffffff'
                                             }}
                                         >
-                                            {event.title.length > 15 ? event.title.substring(0, 15) + '...' : event.title}
+                                            {event.title.length > 10 ? event.title.substring(0, 10) + '...' : event.title}
                                         </div>
                                     ))}
-                                    {dayEvents.length > 3 && (
-                                        <div className="text-[8px] font-bold" style={{ color: today ? '#ffffff' : textSecondary }}>
-                                            +{dayEvents.length - 3} more
+                                    {dayEvents.length > 2 && (
+                                        <div className="text-[7px] md:text-[8px] font-bold" style={{ color: today ? '#ffffff' : textSecondary }}>
+                                            +{dayEvents.length - 2}
                                         </div>
                                     )}
                                 </div>
@@ -197,11 +197,11 @@ export default function CalendarView() {
             </div>
 
             {events.length > 0 && (
-                <div className="mt-8">
-                    <h3 className="text-lg font-serif font-black uppercase mb-4" style={{ color: textPrimary }}>
+                <div className="mt-6 md:mt-8">
+                    <h3 className="text-sm md:text-lg font-serif font-black uppercase mb-3 md:mb-4" style={{ color: textPrimary }}>
                         Today's Events
                     </h3>
-                    <div className="space-y-3">
+                    <div className="space-y-2 md:space-y-3">
                         {events.filter(e => {
                             const eventDate = new Date(e.startTime);
                             const today = new Date();
@@ -211,81 +211,81 @@ export default function CalendarView() {
                                 key={event.id}
                                 initial={{ opacity: 0, x: -20 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                className="flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all hover:scale-[1.01]"
+                                className="flex items-center gap-2 md:gap-4 p-3 md:p-4 rounded-xl cursor-pointer transition-all hover:scale-[1.01]"
                                 style={{ backgroundColor: bgSecondary }}
                                 onClick={() => router.push(`/forum/${event.id}`)}
                             >
-                                <div className="flex flex-col items-center min-w-[50px]">
-                                    <span className="text-xs font-black uppercase" style={{ color: accent }}>
+                                <div className="flex flex-col items-center min-w-[35px] md:min-w-[50px]">
+                                    <span className="text-[9px] md:text-xs font-black uppercase" style={{ color: accent }}>
                                         {new Date(event.startTime).toLocaleDateString('en-IN', { month: 'short' })}
                                     </span>
-                                    <span className="text-2xl font-serif font-black" style={{ color: textPrimary }}>
+                                    <span className="text-lg md:text-2xl font-serif font-black" style={{ color: textPrimary }}>
                                         {new Date(event.startTime).getDate()}
                                     </span>
                                 </div>
                                 
                                 <div className="flex-1 min-w-0">
-                                    <h4 className="font-bold truncate" style={{ color: textPrimary }}>
+                                    <h4 className="font-bold truncate text-xs md:text-sm" style={{ color: textPrimary }}>
                                         {event.title}
                                     </h4>
-                                    <div className="flex items-center gap-4 text-[10px]" style={{ color: textSecondary }}>
+                                    <div className="flex items-center gap-2 md:gap-4 text-[8px] md:text-[10px]" style={{ color: textSecondary }}>
                                         <span className="flex items-center gap-1">
-                                            <Clock size={10} />
+                                            <Clock size={8} md:size={10} />
                                             {new Date(event.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                                         </span>
-                                        <span className="flex items-center gap-1">
-                                            <MapPin size={10} />
+                                        <span className="hidden sm:flex items-center gap-1">
+                                            <MapPin size={8} md:size={10} />
                                             {event.location}
                                         </span>
                                     </div>
                                 </div>
                                 
-                                <div className="text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full" style={{ backgroundColor: accent, color: '#ffffff' }}>
+                                <div className="text-[8px] md:text-[10px] font-black uppercase tracking-wider px-2 md:px-3 py-1 rounded-full" style={{ backgroundColor: accent, color: '#ffffff' }}>
                                     View
                                 </div>
                             </motion.div>
                         ))}
                     </div>
 
-                    <h3 className="text-lg font-serif font-black uppercase mb-4 mt-8" style={{ color: textPrimary }}>
-                        All Events (Latest First)
+                    <h3 className="text-sm md:text-lg font-serif font-black uppercase mb-3 md:mb-4 mt-6 md:mt-8" style={{ color: textPrimary }}>
+                        All Events
                     </h3>
-                    <div className="space-y-3">
+                    <div className="space-y-2 md:space-y-3">
                         {events.map(event => (
                             <motion.div
                                 key={event.id}
                                 initial={{ opacity: 0, x: -20 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                className="flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all hover:scale-[1.01]"
+                                className="flex items-center gap-2 md:gap-4 p-3 md:p-4 rounded-xl cursor-pointer transition-all hover:scale-[1.01]"
                                 style={{ backgroundColor: bgSecondary }}
                                 onClick={() => router.push(`/forum/${event.id}`)}
                             >
-                                <div className="flex flex-col items-center min-w-[50px]">
-                                    <span className="text-xs font-black uppercase" style={{ color: accent }}>
+                                <div className="flex flex-col items-center min-w-[35px] md:min-w-[50px]">
+                                    <span className="text-[9px] md:text-xs font-black uppercase" style={{ color: accent }}>
                                         {new Date(event.startTime).toLocaleDateString('en-IN', { month: 'short' })}
                                     </span>
-                                    <span className="text-2xl font-serif font-black" style={{ color: textPrimary }}>
+                                    <span className="text-lg md:text-2xl font-serif font-black" style={{ color: textPrimary }}>
                                         {new Date(event.startTime).getDate()}
                                     </span>
                                 </div>
                                 
                                 <div className="flex-1 min-w-0">
-                                    <h4 className="font-bold truncate" style={{ color: textPrimary }}>
+                                    <h4 className="font-bold truncate text-xs md:text-sm" style={{ color: textPrimary }}>
                                         {event.title}
                                     </h4>
-                                    <div className="flex items-center gap-4 text-[10px]" style={{ color: textSecondary }}>
+                                    <div className="flex items-center gap-2 md:gap-4 text-[8px] md:text-[10px]" style={{ color: textSecondary }}>
                                         <span className="flex items-center gap-1">
-                                            <Clock size={10} />
+                                            <Clock size={8} md:size={10} />
                                             {new Date(event.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                                         </span>
-                                        <span className="flex items-center gap-1">
-                                            <MapPin size={10} />
+                                        <span className="hidden sm:flex items-center gap-1">
+                                            <MapPin size={8} md:size={10} />
                                             {event.location}
                                         </span>
                                     </div>
                                 </div>
                                 
-                                <div className="text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full" style={{ backgroundColor: accent, color: '#ffffff' }}>
+                                <div className="text-[8px] md:text-[10px] font-black uppercase tracking-wider px-2 md:px-3 py-1 rounded-full" style={{ backgroundColor: accent, color: '#ffffff' }}>
                                     View
                                 </div>
                             </motion.div>
