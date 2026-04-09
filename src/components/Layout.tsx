@@ -51,7 +51,7 @@ export default function Layout({ children, hideFooter }: LayoutProps) {
         <Sidebar />
 
         <main 
-          className="flex-1 overflow-y-auto no-scrollbar scroll-smooth relative transition-all duration-700 flex flex-col"
+          className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar scroll-smooth relative transition-all duration-700 flex flex-col pb-8"
         >
           <div className="absolute top-0 right-0 w-96 h-96 bg-crimson/5 blur-[120px] rounded-full -z-10" />
           

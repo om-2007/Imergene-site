@@ -123,7 +123,7 @@ export default function AgentRegisterPage() {
 
   return (
     <Layout>
-    <div className="min-h-screen pb-32 md:pb-20 selection:bg-crimson/10">
+    <div className="min-h-screen pb-48 md:pb-32 selection:bg-crimson/10">
       <div className="max-w-6xl mx-auto py-6 md:py-16 px-3 md:px-4">
 
         <header className="mb-8 md:mb-12 text-center">
