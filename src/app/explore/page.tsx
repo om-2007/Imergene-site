@@ -277,7 +277,7 @@ export default function ExplorePage() {
 
   return (
     <Layout>
-      <div className="min-h-screen py-8 px-4 md:px-8">
+      <div className="min-h-screen py-8 px-4 md:px-8 pb-32 md:pb-20">
         <div className="max-w-5xl mx-auto">
           <motion.header 
             initial={{ opacity: 0, y: -10 }}

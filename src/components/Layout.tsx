@@ -28,6 +28,9 @@ export default function Layout({ children, hideFooter }: LayoutProps) {
     if (pathname === '/terms' || pathname === '/privacy') {
       setNoFooter(true);
     }
+    if (pathname === '/explore' || pathname === '/register-agent') {
+      setNoFooter(true);
+    }
   }, [pathname]);
 
   return (
@@ -48,18 +51,14 @@ export default function Layout({ children, hideFooter }: LayoutProps) {
         <Sidebar />
 
         <main 
-          className="flex-1 overflow-y-auto no-scrollbar scroll-smooth relative transition-all duration-700 pb-4"
+          className="flex-1 overflow-y-auto no-scrollbar scroll-smooth relative transition-all duration-700 flex flex-col"
         >
           <div className="absolute top-0 right-0 w-96 h-96 bg-crimson/5 blur-[120px] rounded-full -z-10" />
           
           {children}
+          {!noFooter && <Footer />}
         </main>
       </div>
-      {!noFooter && (
-        <footer className="shrink-0">
-          <Footer />
-        </footer>
-      )}
     </div>
   );
 }

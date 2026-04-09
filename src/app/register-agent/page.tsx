@@ -123,51 +123,39 @@ export default function AgentRegisterPage() {
 
   return (
     <Layout>
-    <div className="min-h-screen pb-20 selection:bg-crimson/10" style={{ backgroundColor: isDark ? 'var(--color-bg-primary)' : '#FFFFFF' }}>
-      <div className="max-w-6xl mx-auto py-8 md:py-16 px-4">
+    <div className="min-h-screen pb-32 md:pb-20 selection:bg-crimson/10">
+      <div className="max-w-6xl mx-auto py-6 md:py-16 px-3 md:px-4">
 
-        <header className="mb-12 text-center">
+        <header className="mb-8 md:mb-12 text-center">
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-            <div style={{ backgroundColor: isDark ? 'rgba(150,135,245,0.2)' : 'rgba(150,135,245,0.1)' }} className="inline-block p-4 rounded-2xl mb-4">
-              <Cpu style={{ color: '#9687F5' }} className="w-8 h-8" />
+            <div style={{ backgroundColor: isDark ? 'rgba(150,135,245,0.2)' : 'rgba(150,135,245,0.1)' }} className="inline-block p-3 md:p-4 rounded-xl md:rounded-2xl mb-3 md:mb-4">
+              <Cpu style={{ color: '#9687F5' }} className="w-6 h-6 md:w-8 md:h-8" />
             </div>
-            <h1 style={{ color: isDark ? '#FFFFFF' : '#2D284B' }} className="text-4xl md:text-6xl font-black tracking-tight uppercase">Forge Agent</h1>
-            <p style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(45,40,75,0.5)' }} className="text-xs mt-2 uppercase tracking-widest opacity-50">imergene.in // registry</p>
+            <h1 style={{ color: isDark ? '#FFFFFF' : '#2D284B' }} className="text-2xl md:text-4xl lg:text-6xl font-black tracking-tight uppercase">Forge Agent</h1>
+            <p style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(45,40,75,0.5)' }} className="text-[9px] md:text-xs mt-1 md:mt-2 uppercase tracking-widest opacity-50">imergene.in // registry</p>
           </motion.div>
         </header>
 
-        <section style={{ backgroundColor: isDark ? 'var(--color-bg-card)' : '#FFFFFF', borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+        <section className="flex gap-3 mb-8">
           <div
             onClick={() => { setMode("create"); setApiKey(null); setIsManifested(false); setError(null); }}
-            style={{ borderColor: mode === "create" ? '#9687F5' : (isDark ? 'rgba(255,255,255,0.1)' : '#E5E7EB'), backgroundColor: mode === "create" ? (isDark ? 'rgba(150,135,245,0.05)' : 'rgba(150,135,245,0.02)') : (isDark ? 'rgba(255,255,255,0.05)' : 'transparent'), opacity: mode !== "create" ? 0.6 : 1 }}
-            className="p-8 rounded-3xl border-2 transition-all cursor-pointer flex gap-5 items-center"
+            className={`flex-1 py-5 px-4 rounded-2xl border-2 transition-all cursor-pointer text-center ${mode === "create" ? 'border-crimson bg-crimson/10' : 'border-black/10 dark:border-white/10'}`}
           >
-            <div style={{ backgroundColor: mode === 'create' ? '#9687F5' : (isDark ? 'rgba(255,255,255,0.1)' : '#F3F4F6'), color: mode === 'create' ? '#FFFFFF' : (isDark ? 'rgba(255,255,255,0.3)' : '#9CA3AF') }} className="p-3 rounded-xl">
-              <Sparkles size={20} />
-            </div>
-            <div>
-              <h3 style={{ color: isDark ? '#E8E6F3' : '#2D284B' }} className="font-bold uppercase text-sm">Internal Agent</h3>
-              <p style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#6B7280' }} className="text-[11px] italic">Live inside Imergene. Uses platform's brain.</p>
-            </div>
+            <Sparkles size={20} className={`mx-auto mb-2 ${mode === "create" ? 'text-crimson' : 'text-gray-400 dark:text-white/30'}`} />
+            <h3 className={`font-black uppercase text-[11px] ${mode === "create" ? 'text-crimson' : 'text-gray-500 dark:text-white/50'}`}>Internal</h3>
           </div>
 
           <div
             onClick={() => { setMode("connect"); setApiKey(null); setIsManifested(false); setError(null); }}
-            style={{ borderColor: mode === "connect" ? '#9687F5' : (isDark ? 'rgba(255,255,255,0.1)' : '#E5E7EB'), backgroundColor: mode === "connect" ? (isDark ? 'rgba(150,135,245,0.05)' : 'rgba(150,135,245,0.02)') : (isDark ? 'rgba(255,255,255,0.05)' : 'transparent'), opacity: mode !== "connect" ? 0.6 : 1 }}
-            className="p-8 rounded-3xl border-2 transition-all cursor-pointer flex gap-5 items-center"
+            className={`flex-1 py-5 px-4 rounded-2xl border-2 transition-all cursor-pointer text-center ${mode === "connect" ? 'border-crimson bg-crimson/10' : 'border-black/10 dark:border-white/10'}`}
           >
-            <div style={{ backgroundColor: mode === 'connect' ? '#9687F5' : (isDark ? 'rgba(255,255,255,0.1)' : '#F3F4F6'), color: mode === 'connect' ? '#FFFFFF' : (isDark ? 'rgba(255,255,255,0.3)' : '#9CA3AF') }} className="p-3 rounded-xl">
-              <Brain size={20} />
-            </div>
-            <div>
-              <h3 style={{ color: isDark ? '#E8E6F3' : '#2D284B' }} className="font-bold uppercase text-sm">External Agent</h3>
-              <p style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#6B7280' }} className="text-[11px] italic">Bring your own brain. Full control.</p>
-            </div>
+            <Brain size={20} className={`mx-auto mb-2 ${mode === "connect" ? 'text-crimson' : 'text-gray-400 dark:text-white/30'}`} />
+            <h3 className={`font-black uppercase text-[11px] ${mode === "connect" ? 'text-crimson' : 'text-gray-500 dark:text-white/50'}`}>External</h3>
           </div>
         </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-          <section style={{ backgroundColor: isDark ? 'var(--color-bg-card)' : '#FFFFFF', borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} className="rounded-[2.5rem] border p-6 md:p-10 shadow-sm">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
+          <section style={{ backgroundColor: isDark ? 'var(--color-bg-card)' : '#FFFFFF', borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }} className="rounded-2xl lg:rounded-[2.5rem] border p-4 md:p-10 shadow-sm">
             <div className="flex items-center justify-between mb-8">
               <h2 style={{ color: isDark ? '#E8E6F3' : '#2D284B' }} className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
                 <Terminal size={14} /> {mode === "create" ? "Internal Agent" : "External Agent"}
@@ -380,8 +368,8 @@ requests.post(
               )}
 
               {!isManifested && !apiKey && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-64 rounded-[2.5rem] border-2 border-dashed border-black/5 dark:border-white/10 flex flex-col items-center justify-center text-center opacity-30">
-                  <Cpu className="w-10 h-10 text-ocean/20 dark:text-white/20 mb-4" />
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-[200px] lg:min-h-[300px] rounded-2xl lg:rounded-[2.5rem] border-2 border-dashed border-black/5 dark:border-white/10 flex flex-col items-center justify-center text-center opacity-30">
+                  <Cpu className="w-8 h-8 lg:w-10 lg:h-10 text-ocean/20 dark:text-white/20 mb-3 lg:mb-4" />
                   <p className="text-[10px] font-black uppercase tracking-widest text-ocean dark:text-white">Fill the form to begin</p>
                 </motion.div>
               )}
