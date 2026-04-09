@@ -110,8 +110,8 @@ export default function CalendarView() {
     );
 
     return (
-        <div className="max-w-5xl mx-auto px-2 md:px-4 pb-24 md:pb-20">
-            <div className="rounded-2xl md:rounded-3xl overflow-hidden" style={{ backgroundColor: bgPrimary, border: `1px solid ${border}` }}>
+        <div className="max-w-5xl mx-auto px-1 md:px-4 pb-24 md:pb-20 overflow-x-hidden">
+            <div className="rounded-2xl md:rounded-3xl overflow-hidden overflow-x-hidden" style={{ backgroundColor: bgPrimary, border: `1px solid ${border}` }}>
                 <div className="flex items-center justify-between p-3 md:p-6" style={{ borderBottom: `1px solid ${border}` }}>
                     <button 
                         onClick={prevMonth}
@@ -134,7 +134,7 @@ export default function CalendarView() {
                     </button>
                 </div>
 
-                <div className="grid grid-cols-7">
+                <div className="grid grid-cols-7 w-full">
                     {DAYS.map(day => (
                         <div key={day} className="py-2 md:py-3 text-[8px] md:text-[10px] font-black uppercase text-center tracking-wider" style={{ color: textDim }}>
                             {day}
@@ -197,11 +197,11 @@ export default function CalendarView() {
             </div>
 
             {events.length > 0 && (
-                <div className="mt-6 md:mt-8">
+                <div className="mt-6 md:mt-8 overflow-hidden">
                     <h3 className="text-sm md:text-lg font-serif font-black uppercase mb-3 md:mb-4" style={{ color: textPrimary }}>
                         Today's Events
                     </h3>
-                    <div className="space-y-2 md:space-y-3">
+                    <div className="space-y-2 md:space-y-3 overflow-hidden">
                         {events.filter(e => {
                             const eventDate = new Date(e.startTime);
                             const today = new Date();
@@ -211,7 +211,7 @@ export default function CalendarView() {
                                 key={event.id}
                                 initial={{ opacity: 0, x: -20 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                className="flex items-center gap-2 md:gap-4 p-3 md:p-4 rounded-xl cursor-pointer transition-all hover:scale-[1.01]"
+                                className="flex items-center gap-2 md:gap-4 p-3 md:p-4 rounded-xl cursor-pointer transition-all hover:scale-[1.01] overflow-hidden"
                                 style={{ backgroundColor: bgSecondary }}
                                 onClick={() => router.push(`/forum/${event.id}`)}
                             >
@@ -224,23 +224,23 @@ export default function CalendarView() {
                                     </span>
                                 </div>
                                 
-                                <div className="flex-1 min-w-0">
+                                <div className="flex-1 min-w-0 overflow-hidden">
                                     <h4 className="font-bold truncate text-xs md:text-sm" style={{ color: textPrimary }}>
                                         {event.title}
                                     </h4>
                                     <div className="flex items-center gap-2 md:gap-4 text-[8px] md:text-[10px]" style={{ color: textSecondary }}>
                                         <span className="flex items-center gap-1">
-                                            <Clock size={8} md:size={10} />
+                                            <Clock size={8} />
                                             {new Date(event.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                         <span className="hidden sm:flex items-center gap-1">
-                                            <MapPin size={8} md:size={10} />
+                                            <MapPin size={8} />
                                             {event.location}
                                         </span>
                                     </div>
                                 </div>
                                 
-                                <div className="text-[8px] md:text-[10px] font-black uppercase tracking-wider px-2 md:px-3 py-1 rounded-full" style={{ backgroundColor: accent, color: '#ffffff' }}>
+                                <div className="text-[8px] md:text-[10px] font-black uppercase tracking-wider px-2 md:px-3 py-1 rounded-full shrink-0" style={{ backgroundColor: accent, color: '#ffffff' }}>
                                     View
                                 </div>
                             </motion.div>
@@ -250,13 +250,13 @@ export default function CalendarView() {
                     <h3 className="text-sm md:text-lg font-serif font-black uppercase mb-3 md:mb-4 mt-6 md:mt-8" style={{ color: textPrimary }}>
                         All Events
                     </h3>
-                    <div className="space-y-2 md:space-y-3">
+                    <div className="space-y-2 md:space-y-3 overflow-hidden">
                         {events.map(event => (
                             <motion.div
                                 key={event.id}
                                 initial={{ opacity: 0, x: -20 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                className="flex items-center gap-2 md:gap-4 p-3 md:p-4 rounded-xl cursor-pointer transition-all hover:scale-[1.01]"
+                                className="flex items-center gap-2 md:gap-4 p-3 md:p-4 rounded-xl cursor-pointer transition-all hover:scale-[1.01] overflow-hidden"
                                 style={{ backgroundColor: bgSecondary }}
                                 onClick={() => router.push(`/forum/${event.id}`)}
                             >
@@ -269,23 +269,23 @@ export default function CalendarView() {
                                     </span>
                                 </div>
                                 
-                                <div className="flex-1 min-w-0">
+                                <div className="flex-1 min-w-0 overflow-hidden">
                                     <h4 className="font-bold truncate text-xs md:text-sm" style={{ color: textPrimary }}>
                                         {event.title}
                                     </h4>
                                     <div className="flex items-center gap-2 md:gap-4 text-[8px] md:text-[10px]" style={{ color: textSecondary }}>
                                         <span className="flex items-center gap-1">
-                                            <Clock size={8} md:size={10} />
+                                            <Clock size={8} />
                                             {new Date(event.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                         <span className="hidden sm:flex items-center gap-1">
-                                            <MapPin size={8} md:size={10} />
+                                            <MapPin size={8} />
                                             {event.location}
                                         </span>
                                     </div>
                                 </div>
                                 
-                                <div className="text-[8px] md:text-[10px] font-black uppercase tracking-wider px-2 md:px-3 py-1 rounded-full" style={{ backgroundColor: accent, color: '#ffffff' }}>
+                                <div className="text-[8px] md:text-[10px] font-black uppercase tracking-wider px-2 md:px-3 py-1 rounded-full shrink-0" style={{ backgroundColor: accent, color: '#ffffff' }}>
                                     View
                                 </div>
                             </motion.div>

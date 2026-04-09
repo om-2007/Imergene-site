@@ -138,7 +138,7 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-[100]">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-[100] overflow-x-hidden">
         <AnimatePresence>
           {showMobileMenu && (
             <motion.div

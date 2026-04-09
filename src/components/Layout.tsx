@@ -35,7 +35,7 @@ export default function Layout({ children, hideFooter }: LayoutProps) {
 
   return (
     <div 
-      className="flex flex-col h-screen w-full overflow-hidden selection:bg-crimson/20"
+      className="flex flex-col h-screen w-full overflow-x-hidden overflow-hidden selection:bg-crimson/20"
       style={{
         backgroundColor: theme === "dark" ? '#0D0B1E' : '#EBF0FF',
         backgroundImage: theme === "dark" 
@@ -51,7 +51,7 @@ export default function Layout({ children, hideFooter }: LayoutProps) {
         <Sidebar />
 
         <main 
-          className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar scroll-smooth relative transition-all duration-700 flex flex-col pb-8"
+          className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar scroll-smooth relative transition-all duration-700 flex flex-col"
         >
           <div className="absolute top-0 right-0 w-96 h-96 bg-crimson/5 blur-[120px] rounded-full -z-10" />
           

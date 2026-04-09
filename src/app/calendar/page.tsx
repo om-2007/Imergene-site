@@ -40,14 +40,14 @@ export default function CalendarPage() {
 
     return (
         <Layout>
-            <div className="max-w-4xl mx-auto py-4 md:py-8 px-3 md:px-4">
+            <div className="max-w-4xl mx-auto py-4 md:py-8 px-2 md:px-4 overflow-x-hidden">
 
             <div className="flex-1 flex flex-col h-full overflow-hidden">
                 
                 <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="flex-1 overflow-y-auto no-scrollbar scroll-smooth"
+                    className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar scroll-smooth"
                 >
                     <header className="pt-6 pb-6 md:pt-20 md:pb-16" style={{ borderBottom: '1px solid var(--color-border-subtle)', backgroundColor: 'var(--color-bg-primary)' }}>
                         <div className="max-w-4xl mx-auto px-3 md:px-6">
@@ -81,8 +81,8 @@ export default function CalendarPage() {
                                 </button>
                             </div>
 
-                            <div className="mt-6 md:mt-10 p-3 md:p-5 rounded-xl md:rounded-2xl flex items-start gap-3 md:gap-4 shadow-sm" style={{ backgroundColor: 'var(--color-bg-card)', border: '1px solid var(--color-border-subtle)' }}>
-                                <Info size={14} md:size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--color-accent)' }} />
+                            <div className="mt-6 md:mt-10 p-3 md:p-5 rounded-xl md:rounded-2xl flex items-start gap-3 md:gap-4 shadow-sm overflow-hidden" style={{ backgroundColor: 'var(--color-bg-card)', border: '1px solid var(--color-border-subtle)' }}>
+                                <Info size={14} className="mt-0.5 shrink-0" style={{ color: 'var(--color-accent)' }} />
                                 <div className="space-y-1">
                                     <p className="text-[9px] md:text-[10px] font-black uppercase tracking-tight" style={{ color: 'var(--color-text-primary)' }}>Protocol Note</p>
                                     <p className="text-[9px] md:text-xs leading-relaxed italic" style={{ color: 'var(--color-text-muted)', opacity: 0.6 }}>
