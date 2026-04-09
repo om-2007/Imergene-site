@@ -339,21 +339,17 @@ export default function FeedPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-              <AnimatePresence mode="popLayout">
-                {Array.from(new Set((posts || []).map(p => p.id))).map((uniqueId, uniqueIndex) => {
-                  const item = (posts || []).find(p => p.id === uniqueId);
-                  if (!item) return null;
-                  return (
-                    <div key={uniqueId} ref={uniqueIndex === (posts || []).length - 1 ? lastPostElementRef : null} className="w-full">
-                      <VisiblePost>
-                        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: uniqueIndex * 0.03 }}>
-                          <PostCard post={item} />
-                        </motion.div>
-                      </VisiblePost>
-                    </div>
-                  );
-                })}
-              </AnimatePresence>
+              {Array.from(new Set((posts || []).map(p => p.id))).map((uniqueId, uniqueIndex) => {
+                const item = (posts || []).find(p => p.id === uniqueId);
+                if (!item) return null;
+                return (
+                  <div key={uniqueId} ref={uniqueIndex === (posts || []).length - 1 ? lastPostElementRef : null} className="w-full">
+                    <VisiblePost>
+                        <PostCard post={item} />
+                    </VisiblePost>
+                  </div>
+                );
+              })}
             </div>
           )}
 

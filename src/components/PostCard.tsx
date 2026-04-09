@@ -86,7 +86,7 @@ function MediaDots({ count, current }: { count: number; current: number }) {
 }
 
 function ActionBtn({
-  icon, count, active, activeColor, label, onClick,
+  icon, count, active, activeColor, label, onClick, loading,
 }: {
   icon: React.ReactNode;
   count?: number | string;
@@ -94,6 +94,7 @@ function ActionBtn({
   activeColor?: string;
   label?: string;
   onClick: (e: React.MouseEvent) => void;
+  loading?: boolean;
 }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -101,18 +102,20 @@ function ActionBtn({
   return (
     <motion.button
       onClick={onClick}
-      whileTap={{ scale: 0.88 }}
+      whileTap={{ scale: loading ? 1 : 0.88 }}
+      disabled={loading}
       style={{
         display: "flex", alignItems: "center", gap: 6,
         padding: "7px 13px", borderRadius: 100,
         border: `1.5px solid ${active ? (activeColor ?? B.crocus) + "44" : isDark ? "rgba(255,255,255,0.1)" : "rgba(45,40,75,0.08)"}`,
         background: active ? (activeColor ?? B.crocus) + "12" : isDark ? "rgba(26,24,50,0.7)" : "rgba(255,255,255,0.7)",
         color: active ? (activeColor ?? B.crocus) : isDark ? B.darkTextMuted : B.ebonyLight,
-        cursor: "pointer", transition: "all 0.22s ease",
+        cursor: loading ? "wait" : "pointer", transition: "all 0.22s ease",
         backdropFilter: "blur(8px)",
+        opacity: loading ? 0.6 : 1,
       }}
     >
-      {icon}
+      {loading ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> : icon}
       {(count !== undefined || label) && (
         <span style={{
           fontSize: 12, fontWeight: 600,
@@ -285,7 +288,9 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const [showMenu, setShowMenu]               = useState(false);
   const [isLiked, setIsLiked]                 = useState(post.liked ?? false);
   const [likesCount, setLikesCount]           = useState(post._count?.likes ?? 0);
+  const [isLikeLoading, setIsLikeLoading]       = useState(false);
   const [showComments, setShowComments]       = useState(false);
+  const [isCommentsLoading, setIsCommentsLoading] = useState(false);
   const [comments, setComments]               = useState<any[]>(Array.isArray(post.comments) ? post.comments : []);
   const [newComment, setNewComment]           = useState("");
   const [isSubmitting, setIsSubmitting]       = useState(false);
@@ -304,6 +309,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const [showShareModal, setShowShareModal]   = useState(false);
   const [showToast, setShowToast]             = useState(false);
   const [isPlaying, setIsPlaying]             = useState(false);
+  const [isShareLoading, setIsShareLoading]   = useState(false);
 
   const cardRef       = useRef<HTMLDivElement>(null);
   const clickTimer    = useRef<NodeJS.Timeout | null>(null);
@@ -353,7 +359,9 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   };
 
   const handleLike = useCallback(async (forceLike = false) => {
+    if (isLikeLoading) return;
     if (forceLike && isLiked) { triggerHeartPop(); return; }
+    setIsLikeLoading(true);
     const prev = isLiked;
     const newLiked = forceLike ? true : !prev;
     if (newLiked !== prev) {
@@ -370,8 +378,10 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     } catch {
       setIsLiked(prev);
       setLikesCount(c => prev ? c + 1 : Math.max(0, c - 1));
+    } finally {
+      setIsLikeLoading(false);
     }
-  }, [post.id, token, isLiked]);
+  }, [post.id, token, isLiked, isLikeLoading]);
 
   const handleMediaClick = (e: React.MouseEvent) => {
     if (touchHandled.current) return;
@@ -433,16 +443,20 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   };
 
   const toggleComments = async () => {
+    if (isCommentsLoading) return;
     const next = !showComments;
     setShowComments(next);
     if (next && comments.length === 0) {
+      setIsCommentsLoading(true);
       try {
         const res = await fetch(`${API}/api/posts/${post.id}/comments`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
         if (Array.isArray(data)) setComments(data);
-      } catch {}
+      } catch {} finally {
+        setIsCommentsLoading(false);
+      }
     }
   };
 
@@ -712,9 +726,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           ref={cardRef}
           draggable
           onDragStart={handleDragStart}
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
           style={{
             background: colors.bg,
             border: `1px solid ${colors.border}`,
@@ -984,6 +995,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
               active={isLiked}
               activeColor={B.crocus}
               onClick={(e) => { e.stopPropagation(); handleLike(); }}
+              loading={isLikeLoading}
             />
             <ActionBtn
               icon={<MessageCircle size={16} stroke={showComments ? B.crocus : colors.textMuted} />}
@@ -991,11 +1003,13 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
               active={showComments}
               activeColor={B.crocus}
               onClick={(e) => { e.stopPropagation(); toggleComments(); }}
+              loading={isCommentsLoading}
             />
             <ActionBtn
               icon={<Share2 size={16} />}
               label="Share"
               onClick={(e) => { e.stopPropagation(); setShowShareModal(true); }}
+              loading={isShareLoading}
             />
             <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 5, color: colors.textMuted, opacity: 0.4 }}>
               <Eye size={14} />
@@ -1212,9 +1226,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
         draggable
         onDragStart={handleDragStart}
         onDoubleClick={() => handleLike(true)}
-        initial={{ opacity: 0, y: 18 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
         style={{
           background: colors.bg,
           border: `1px solid ${colors.border}`,
@@ -1329,6 +1340,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
             active={isLiked}
             activeColor={B.crocus}
             onClick={() => handleLike()}
+            loading={isLikeLoading}
           />
           <ActionBtn
             icon={<MessageCircle size={16} stroke={showComments ? B.crocus : colors.textMuted} />}
@@ -1336,11 +1348,13 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
             active={showComments}
             activeColor={B.crocus}
             onClick={toggleComments}
+            loading={isCommentsLoading}
           />
           <ActionBtn
             icon={<Share2 size={16} />}
             label="Share"
             onClick={() => setShowShareModal(true)}
+            loading={isShareLoading}
           />
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 5, color: colors.textMuted, opacity: 0.3 }}>
             <Eye size={13} />
