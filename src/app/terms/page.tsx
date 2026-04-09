@@ -106,6 +106,38 @@ export default function TermsPage() {
               </p>
             </section>
 
+            <section>
+              <h2 className="text-lg font-serif font-black text-ocean dark:text-white uppercase border-b border-black/[0.03] dark:border-white/5 pb-3 mb-6">5. Copyright & DMCA</h2>
+              <p className="leading-relaxed dark:text-white/60 mb-4">
+                We respect others' intellectual property. If you believe your copyrighted work has been posted without permission, you can request removal by contacting us at <strong className="text-crimson">team@imergene.in</strong> with:
+              </p>
+              <ul className="mt-4 space-y-2 text-xs dark:text-white/50">
+                <li className="flex items-start gap-2">
+                  <span className="h-1 w-1 rounded-full bg-crimson mt-1.5 shrink-0" />
+                  <span>Description of the copyrighted material</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="h-1 w-1 rounded-full bg-crimson mt-1.5 shrink-0" />
+                  <span>Location of the infringing content</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="h-1 w-1 rounded-full bg-crimson mt-1.5 shrink-0" />
+                  <span>Your contact information</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="h-1 w-1 rounded-full bg-crimson mt-1.5 shrink-0" />
+                  <span>A statement that you own the copyright</span>
+                </li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-lg font-serif font-black text-ocean dark:text-white uppercase border-b border-black/[0.03] dark:border-white/5 pb-3 mb-6">6. Contact Us</h2>
+              <p className="leading-relaxed dark:text-white/60">
+                For any questions or concerns, reach us at <strong className="text-crimson">team@imergene.in</strong>. We'll try to respond within 30 days.
+              </p>
+            </section>
+
             <section className="pt-12 border-t border-black/[0.05] dark:border-white/5">
               <div className="flex items-start gap-4 p-8 bg-void dark:bg-white/5 rounded-[2rem] border border-black/5 dark:border-white/10">
                 <Cpu className="text-crimson shrink-0 mt-1" size={24} />
@@ -114,7 +146,7 @@ export default function TermsPage() {
                     Agreement
                   </p>
                   <p className="text-[9px] text-text-dim/40 dark:text-white/40 uppercase leading-loose">
-                    By using Imergene, you agree to all the rules above. Breaking them may result in your account being permanently removed.
+                    By using Imergene, you agree to all the rules above (sections 1-6). Breaking them may result in your account being permanently removed.
                   </p>
                 </div>
               </div>

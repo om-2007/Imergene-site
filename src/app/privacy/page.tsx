@@ -105,6 +105,33 @@ export default function PrivacyPage() {
 
             <section>
               <div className="flex items-center gap-3 mb-6">
+                <Eye size={18} className="text-ocean/40 dark:text-white/40" />
+                <h2 className="text-lg font-serif font-black text-ocean dark:text-white uppercase border-b border-black/[0.03] dark:border-white/5 flex-1 pb-1">Cookies & Analytics</h2>
+              </div>
+              <p className="text-sm leading-relaxed text-text-dim/70 dark:text-white/60 mb-4">
+                We use cookies and similar technologies to improve your experience and analyze how our platform is used.
+              </p>
+              <ul className="mt-4 space-y-3">
+                <li className="flex items-start gap-3 text-xs dark:text-white/50">
+                  <span className="h-1.5 w-1.5 rounded-full bg-ocean mt-1 shrink-0" />
+                  <span><strong>Essential cookies:</strong> Required for the site to work (login, preferences).</span>
+                </li>
+                <li className="flex items-start gap-3 text-xs dark:text-white/50">
+                  <span className="h-1.5 w-1.5 rounded-full bg-ocean mt-1 shrink-0" />
+                  <span><strong>Analytics:</strong> We use third-party analytics to understand how people use Imergene. This helps us improve the platform.</span>
+                </li>
+                <li className="flex items-start gap-3 text-xs dark:text-white/50">
+                  <span className="h-1.5 w-1.5 rounded-full bg-crimson mt-1 shrink-0" />
+                  <span><strong>Advertising:</strong> In the future, we may display ads from third-party networks. These networks may use their own cookies to show relevant ads.</span>
+                </li>
+              </ul>
+              <p className="text-xs leading-relaxed text-text-dim/50 dark:text-white/40 mt-4">
+                You can disable cookies in your browser settings, but some features may not work properly.
+              </p>
+            </section>
+
+            <section>
+              <div className="flex items-center gap-3 mb-6">
                 <Globe size={18} className="text-ocean/40 dark:text-white/40" />
                 <h2 className="text-lg font-serif font-black text-ocean dark:text-white uppercase border-b border-black/[0.03] dark:border-white/5 flex-1 pb-1">Your Rights</h2>
               </div>
@@ -127,9 +154,76 @@ export default function PrivacyPage() {
               </ul>
             </section>
 
+            <section>
+              <div className="flex items-center gap-3 mb-6">
+                <Database size={18} className="text-ocean/40 dark:text-white/40" />
+                <h2 className="text-lg font-serif font-black text-ocean dark:text-white uppercase border-b border-black/[0.03] dark:border-white/5 flex-1 pb-1">Data Retention</h2>
+              </div>
+              <p className="text-sm leading-relaxed text-text-dim/70 dark:text-white/60">
+                We keep your data as long as your account is active. You can request deletion at any time, and we'll delete all your data within 30 days. Some data may be retained longer if required by law.
+              </p>
+            </section>
+
+            <section>
+              <div className="flex items-center gap-3 mb-6">
+                <Shield size={18} className="text-ocean/40 dark:text-white/40" />
+                <h2 className="text-lg font-serif font-black text-ocean dark:text-white uppercase border-b border-black/[0.03] dark:border-white/5 flex-1 pb-1">Third-Party Sharing</h2>
+              </div>
+              <p className="text-sm leading-relaxed text-text-dim/70 dark:text-white/60 mb-4">
+                We don't sell your personal data. We may share data with:
+              </p>
+              <ul className="mt-4 space-y-3">
+                <li className="flex items-start gap-3 text-xs dark:text-white/50">
+                  <span className="h-1.5 w-1.5 rounded-full bg-crimson mt-1 shrink-0" />
+                  <span><strong>Analytics providers:</strong> To understand platform usage (data is anonymized).</span>
+                </li>
+                <li className="flex items-start gap-3 text-xs dark:text-white/50">
+                  <span className="h-1.5 w-1.5 rounded-full bg-crimson mt-1 shrink-0" />
+                  <span><strong>Service providers:</strong> Companies that help run the platform (hosting, databases).</span>
+                </li>
+                <li className="flex items-start gap-3 text-xs dark:text-white/50">
+                  <span className="h-1.5 w-1.5 rounded-full bg-crimson mt-1 shrink-0" />
+                  <span><strong>Legal reasons:</strong> When required by law or to protect our rights.</span>
+                </li>
+              </ul>
+            </section>
+
+            <section>
+              <div className="flex items-center gap-3 mb-6">
+                <Lock size={18} className="text-ocean/40 dark:text-white/40" />
+                <h2 className="text-lg font-serif font-black text-ocean dark:text-white uppercase border-b border-black/[0.03] dark:border-white/5 flex-1 pb-1">Security</h2>
+              </div>
+              <p className="text-sm leading-relaxed text-text-dim/70 dark:text-white/60">
+                We use industry-standard security measures to protect your data. If a security breach occurs that affects your data, we'll notify you and relevant authorities as required by law.
+              </p>
+            </section>
+
+            <section>
+              <div className="flex items-center gap-3 mb-6">
+                <Globe size={18} className="text-ocean/40 dark:text-white/40" />
+                <h2 className="text-lg font-serif font-black text-ocean dark:text-white uppercase border-b border-black/[0.03] dark:border-white/5 flex-1 pb-1">International Transfers</h2>
+              </div>
+              <p className="text-sm leading-relaxed text-text-dim/70 dark:text-white/60">
+                Your data may be transferred and stored on servers outside your country. We ensure adequate protection are in place for international transfers.
+              </p>
+            </section>
+
+            <section>
+              <div className="flex items-center gap-3 mb-6">
+                <Eye size={18} className="text-ocean/40 dark:text-white/40" />
+                <h2 className="text-lg font-serif font-black text-ocean dark:text-white uppercase border-b border-black/[0.03] dark:border-white/5 flex-1 pb-1">Contact Us</h2>
+              </div>
+              <p className="text-sm leading-relaxed text-text-dim/70 dark:text-white/60 mb-4">
+                For privacy requests, data access, or deletion requests, contact us at:
+              </p>
+              <p className="text-sm font-mono bg-void/30 dark:bg-white/5 p-4 rounded-xl border border-black/[0.03] dark:border-white/5">
+                team@imergene.in
+              </p>
+            </section>
+
             <footer className="pt-12 border-t border-black/[0.05] dark:border-white/5 text-center">
               <p className="text-[9px] font-mono font-bold text-text-dim/30 dark:text-white/30 uppercase tracking-[0.2em]">
-                Imergene Privacy Policy v2026.03
+                Imergene Privacy Policy v2026.04
               </p>
             </footer>
           </div>
