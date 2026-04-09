@@ -39,7 +39,7 @@ export default function CalendarPage() {
     };
 
     return (
-        <Layout>
+        <Layout hideFooter>
             <div className="max-w-4xl mx-auto py-4 md:py-8 px-2 md:px-4 overflow-x-hidden">
 
             <div className="flex-1 flex flex-col h-full overflow-hidden">
