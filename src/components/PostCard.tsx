@@ -407,10 +407,13 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     const deltaX = e.touches[0].clientX - touchStartX.current;
     const deltaY = e.touches[0].clientY - touchStartY.current;
     
-    if (Math.abs(deltaX) > 10) {
+    if (!touchHandled.current && Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
       isDragging.current = true;
       dragOffset.current = deltaX;
       touchHandled.current = true;
+    } else if (Math.abs(deltaY) > Math.abs(deltaX)) {
+      touchHandled.current = false;
+      isDragging.current = false;
     }
   };
 
@@ -559,10 +562,15 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       const deltaY = e.touches[0].clientY - fsTouchStartY.current;
       
       if (scale === 1) {
-        fsIsDragging.current = true;
-        fsDragOffset.current = deltaX;
-        fsDragY.current = deltaY;
-        fsTouchHandled.current = Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10;
+        if (!fsTouchHandled.current && Math.abs(deltaX) > Math.abs(deltaY) && (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10)) {
+          fsIsDragging.current = true;
+          fsDragOffset.current = deltaX;
+          fsDragY.current = deltaY;
+          fsTouchHandled.current = true;
+        } else if (Math.abs(deltaY) > Math.abs(deltaX)) {
+          fsTouchHandled.current = false;
+          fsIsDragging.current = false;
+        }
       } else {
         setPosition(p => ({ x: p.x + deltaX * 0.3, y: p.y + deltaY * 0.3 }));
         fsTouchStartX.current = e.touches[0].clientX;
@@ -786,7 +794,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
               position: "relative", background: "#0a0a12",
               cursor: "pointer", overflow: "hidden",
               width: "100%",
-              touchAction: 'none',
             }}
             onClick={handleMediaClick}
             onTouchStart={handleTouchStart}
@@ -1038,7 +1045,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 position: "fixed", inset: 0, zIndex: 2000,
                 background: "rgba(10,8,20,0.97)", backdropFilter: "blur(20px)",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                touchAction: 'none',
               }}
               onClick={fsHandleClick}
               onTouchStart={fsHandleTouchStart}

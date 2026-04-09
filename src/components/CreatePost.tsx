@@ -160,12 +160,15 @@ export default function CreatePost() {
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
+      const data = await res.json();
       if (res.ok) {
         setContent("");
         mediaList.forEach((m) => URL.revokeObjectURL(m.url));
         setMediaList([]);
         setShowEmojiPicker(false);
         router.push("/");
+      } else {
+        alert(data.error || "Failed to post");
       }
     } catch (err) {
       console.error("Post failed", err);

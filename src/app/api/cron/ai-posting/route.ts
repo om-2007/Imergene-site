@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { aiCreatePost, aiCreatePostFromArticle } from '@/lib/ai-automation';
+import { aiCreatePost, aiCreatePostFromArticle, generateMetaAwarePost } from '@/lib/ai-automation';
 import { fetchBreakingGlobalEvents, fetchTrendingGlobalTopics, fetchNewsForAgent } from '@/lib/news-service';
 
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -24,9 +24,72 @@ export async function GET(request: NextRequest) {
     const trendingTopics = await fetchTrendingGlobalTopics(8);
 
     const results = [];
+    const now = new Date();
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     for (const agent of agents) {
       try {
+        const postsLast24h = await prisma.post.count({
+          where: {
+            userId: agent.id,
+            createdAt: { gte: yesterday },
+          },
+        });
+
+        if (postsLast24h >= 2) {
+          results.push({ agent: agent.username, skipped: 'daily_limit_reached', postsToday: postsLast24h });
+          continue;
+        }
+
+        const maxPostsToday = Math.floor(Math.random() * 2) + 1;
+        if (postsLast24h >= maxPostsToday) {
+          results.push({ agent: agent.username, skipped: 'random_skip', postsToday: postsLast24h, limitToday: maxPostsToday });
+          continue;
+        }
+        const shouldBeMetaAware = Math.random() < 0.35;
+        
+        if (shouldBeMetaAware) {
+          const metaContent = await generateMetaAwarePost(agent.id);
+          
+          if (!metaContent || !validateContent(metaContent)) {
+            const post = await aiCreatePost(agent.id);
+            if (post) {
+              results.push({ agent: agent.username, postId: post.id, source: 'fallback-after-meta-fail' });
+            }
+            await new Promise(r => setTimeout(r, 2000));
+            continue;
+          }
+          
+          const metaPost = await prisma.post.create({
+            data: {
+              content: metaContent,
+              userId: agent.id,
+              category: 'meta',
+              tags: ['meta-aware', 'fourth-wall'],
+            },
+          });
+          
+          results.push({
+            agent: agent.username,
+            postId: metaPost.id,
+            source: 'meta-aware',
+            type: 'fourth-wall-breaking',
+          });
+          
+          await new Promise(r => setTimeout(r, 2000));
+          continue;
+        }
+
+        function validateContent(content: string): boolean {
+          const trimmed = content?.trim() || '';
+          if (trimmed.length < 10) return false;
+          if (trimmed.length > 50) {
+            const lastChar = trimmed.slice(-1);
+            if (!/[.!?…~]/.test(lastChar)) return false;
+          }
+          return true;
+        }
+
         const agentPersonality = agent.personality || agent.name || agent.username;
         const agentNews = await fetchNewsForAgent(agentPersonality);
 
@@ -66,6 +129,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       message: `AI posting cycle complete: ${results.filter(r => r.postId).length} posts from ${agents.length} agents`,
+      metaAwareCount: results.filter(r => r.type === 'fourth-wall-breaking').length,
       globalEventsCount: globalEvents.length,
       trendingTopicsCount: trendingTopics.length,
       results,

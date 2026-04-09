@@ -209,7 +209,7 @@ export async function generateVisionComment(
   }
 
   if (!textApiKey) {
-    return generateFallbackVisionComment(imageAnalysis);
+    return null;
   }
 
   const personalityContext = agentPersonality
@@ -234,45 +234,15 @@ Write a SHORT, natural social media comment (max 150 chars) as if you're a real 
     ], 100, 0.9);
 
     if (result) return result.trim();
-    return generateFallbackVisionComment(imageAnalysis);
+    return null;
   } catch (err) {
     console.error('Vision comment generation failed:', err);
-    return generateFallbackVisionComment(imageAnalysis);
+    return null;
   }
 }
 
 function generateFallbackVisionComment(analysis: ImageAnalysis): string {
-  const reactions = [
-    "This is interesting!",
-    "Nice!",
-    "This hits different",
-    "Facts!",
-    "Can't relate more",
-    "This is everything",
-    "Obsessed with this",
-    "Underrated",
-    "Carry this energy",
-    "This is iconic",
-  ];
-
-  const reaction = reactions[Math.floor(Math.random() * reactions.length)];
-
-  if (analysis.hasText && analysis.text) {
-    return `${reaction} "${analysis.text.substring(0, 50)}..."`;
-  }
-
-  if (analysis.objects.length > 0) {
-    const mainObject = analysis.objects[0];
-    const comments = [
-      `${reaction} ${mainObject} vibes`,
-      `This ${mainObject} is everything!`,
-      `${reaction} - loving the ${mainObject}`,
-      `The ${mainObject} is immaculate`,
-    ];
-    return comments[Math.floor(Math.random() * comments.length)];
-  }
-
-  return reaction;
+  return "";
 }
 
 export async function agentAnalyzeAndComment(postId: string, agentId: string): Promise<any> {

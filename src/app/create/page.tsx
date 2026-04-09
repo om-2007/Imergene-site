@@ -40,7 +40,7 @@ const PLACEHOLDERS = [
   "What are you working on?",
 ];
 
-type MediaType = "image" | "video" | null;
+type MediaType = "image" | "video";
 
 interface MediaPreview {
   file: File;
@@ -102,7 +102,7 @@ export default function CreatePost() {
   const { theme } = useTheme();
 
   const [text, setText] = useState("");
-  const [media, setMedia] = useState<MediaPreview | null>(null);
+  const [mediaList, setMediaList] = useState<MediaPreview[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -116,6 +116,9 @@ export default function CreatePost() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const hasVideo = mediaList.some(m => m.type === "video");
+  const imageCount = mediaList.filter(m => m.type === "image").length;
 
   const [username, setUsername] = useState<string>("You");
   const [token, setToken] = useState<string | null>(null);
@@ -155,8 +158,8 @@ export default function CreatePost() {
   }, [text]);
 
   useEffect(() => {
-    return () => { if (media?.url) URL.revokeObjectURL(media.url); };
-  }, [media]);
+    return () => { mediaList.forEach(m => URL.revokeObjectURL(m.url)); };
+  }, [mediaList]);
 
   useEffect(() => {
     async function load() {
@@ -190,19 +193,43 @@ export default function CreatePost() {
       setError(`Video is too large — max ${MAX_VIDEO_SIZE_MB} MB (yours is ${formatBytes(file.size)}).`);
       return;
     }
-    if (media?.url) URL.revokeObjectURL(media.url);
-    setMedia({ file, url: URL.createObjectURL(file), type: isImage ? "image" : "video" });
-  }, [media]);
+    if (isVideo && hasVideo) {
+      setError("Only one video allowed per post.");
+      return;
+    }
+    if (isVideo && imageCount > 0) {
+      setError("Cannot mix video with images. Remove images first or use only images.");
+      return;
+    }
+    if (isImage && hasVideo) {
+      setError("Cannot mix images with video. Remove video first.");
+      return;
+    }
+    if (isImage && imageCount >= 4) {
+      setError("Maximum 4 images allowed per post.");
+      return;
+    }
+    setMediaList(prev => [...prev, { file, url: URL.createObjectURL(file), type: "image" }]);
+  }, [hasVideo, imageCount]);
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      Array.from(files).forEach(file => attachFile(file));
+    }
+    e.target.value = "";
+  };
+
+  const handleVideoInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) attachFile(file);
     e.target.value = "";
   };
 
-  const removeMedia = () => {
-    if (media?.url) URL.revokeObjectURL(media.url);
-    setMedia(null);
+  const removeMedia = (index: number) => {
+    const removed = mediaList[index];
+    URL.revokeObjectURL(removed.url);
+    setMediaList(prev => prev.filter((_, i) => i !== index));
     setError(null);
   };
 
@@ -214,7 +241,7 @@ export default function CreatePost() {
   }, [attachFile]);
 
   const handleSubmit = async () => {
-    if (!text.trim() && !media) {
+    if (!text.trim() && mediaList.length === 0) {
       setError("Add some text or a photo/video before posting.");
       return;
     }
@@ -237,22 +264,29 @@ export default function CreatePost() {
         mediaTypes: [],
       };
 
-      if (media) {
-        const uploadRes = await fetch(`${API}/api/upload`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: (() => {
-            const fd = new FormData();
-            fd.append("file", media.file);
-            return fd;
-          })(),
-        });
+      if (mediaList.length > 0) {
+        const mediaUrls: string[] = [];
+        const mediaTypes: string[] = [];
+        
+        for (const media of mediaList) {
+          const uploadRes = await fetch(`${API}/api/upload`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: (() => {
+              const fd = new FormData();
+              fd.append("file", media.file);
+              return fd;
+            })(),
+          });
 
-        if (uploadRes.ok) {
-          const uploadData = await uploadRes.json();
-          body.mediaUrls = [uploadData.url];
-          body.mediaTypes = [media.type];
+          if (uploadRes.ok) {
+            const uploadData = await uploadRes.json();
+            mediaUrls.push(uploadData.url);
+            mediaTypes.push(media.type);
+          }
         }
+        body.mediaUrls = mediaUrls;
+        body.mediaTypes = mediaTypes;
       }
 
       const res = await fetch(`${API}/api/posts`, {
@@ -271,7 +305,7 @@ export default function CreatePost() {
 
       setSuccess(true);
       setText("");
-      removeMedia();
+      setMediaList([]);
       setTimeout(() => setSuccess(false), 3500);
     } catch (err) {
       setError((err as Error).message || "Something went wrong — please try again.");
@@ -281,7 +315,7 @@ export default function CreatePost() {
     }
   };
 
-  const canSubmit = (text.trim().length > 0 || !!media) && !isOverLimit && !uploading;
+  const canSubmit = (text.trim().length > 0 || mediaList.length > 0) && !isOverLimit && !uploading;
 
   return (
     <Layout>
@@ -316,8 +350,8 @@ export default function CreatePost() {
         </div>
       </motion.div>
 
-      <input ref={imageInputRef} type="file" accept={ACCEPTED_IMAGE_TYPES.join(",")} className="hidden" onChange={handleFileInput} aria-hidden="true" />
-      <input ref={videoInputRef} type="file" accept={ACCEPTED_VIDEO_TYPES.join(",")} className="hidden" onChange={handleFileInput} aria-hidden="true" />
+      <input ref={imageInputRef} type="file" accept={ACCEPTED_IMAGE_TYPES.join(",")} multiple className="hidden" onChange={handleImageInput} aria-hidden="true" />
+      <input ref={videoInputRef} type="file" accept={ACCEPTED_VIDEO_TYPES.join(",")} className="hidden" onChange={handleVideoInput} aria-hidden="true" />
 
       <motion.div
         initial={{ opacity: 0, y: 14 }}
@@ -380,7 +414,7 @@ export default function CreatePost() {
             </div>
 
             <AnimatePresence>
-              {(focused || text.length > 0 || !!media) && (
+              {(focused || text.length > 0 || mediaList.length > 0) && (
                 <motion.div
                   initial={{ scaleY: 0, opacity: 0 }}
                   animate={{ scaleY: 1, opacity: 1 }}
@@ -426,41 +460,74 @@ export default function CreatePost() {
         </div>
 
         <AnimatePresence>
-          {media && (
+          {mediaList.length > 0 && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               className="px-5 pb-4 overflow-hidden"
             >
-              <div className="relative rounded-xl overflow-hidden border" style={{ backgroundColor: 'var(--color-bg-primary)', borderColor: 'var(--color-border-default)' }}>
-                {media.type === "image" ? (
-                  <img src={media.url} alt="Attachment" className="w-full max-h-72 object-cover block" />
-                ) : (
-                  <div className="relative">
-                    <video src={media.url} controls preload="metadata" className="w-full max-h-72 object-cover" />
-                    <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 px-2 py-1 rounded-full" style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}>
-                      <Play size={9} className="text-white fill-white" />
-                      <span className="text-white text-[10px] font-semibold">Video</span>
-                    </div>
+              <div 
+                className={`relative rounded-xl overflow-hidden border grid gap-1 ${
+                  mediaList.length === 1 ? 'grid-cols-1' :
+                  mediaList.length === 2 ? 'grid-cols-2' :
+                  mediaList.length === 3 ? 'grid-cols-3' :
+                  'grid-cols-2'
+                }`}
+                style={{ 
+                  backgroundColor: 'var(--color-bg-primary)', 
+                  borderColor: 'var(--color-border-default)',
+                  aspectRatio: mediaList.length === 1 ? '16/9' : '1/1'
+                }}
+              >
+                {mediaList.map((media, index) => (
+                  <div key={index} className="relative w-full h-full">
+                    {media.type === "image" ? (
+                      <img src={media.url} alt={`Attachment ${index + 1}`} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="relative w-full h-full">
+                        <video src={media.url} controls preload="metadata" className="w-full h-full object-cover" />
+                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 px-2 py-1 rounded-full" style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}>
+                          <Play size={9} className="text-white fill-white" />
+                          <span className="text-white text-[10px] font-semibold">Video</span>
+                        </div>
+                      </div>
+                    )}
+                    <motion.button
+                      onClick={() => removeMedia(index)}
+                      disabled={uploading}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full transition-colors disabled:opacity-30"
+                      style={{ backgroundColor: 'rgba(0,0,0,0.6)', color: 'white' }}
+                    >
+                      <X size={11} />
+                    </motion.button>
+                    {mediaList.length > 1 && (
+                      <div className="absolute bottom-2 left-2 px-2 py-1 rounded-full" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                        <span className="text-white text-[9px] font-semibold">{index + 1}/{mediaList.length}</span>
+                      </div>
+                    )}
                   </div>
-                )}
-                <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-3 py-2.5" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.5), transparent)' }}>
-                  <span className="text-white text-[10px] font-mono truncate max-w-[70%]" style={{ opacity: 0.6 }}>
-                    {media.file.name} · {formatBytes(media.file.size)}
-                  </span>
-                  <motion.button
-                    onClick={removeMedia}
+                ))}
+                {mediaList.length > 0 && mediaList.some(m => m.type === "image") && imageCount < 4 && !hasVideo && (
+                  <button
+                    onClick={() => imageInputRef.current?.click()}
                     disabled={uploading}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    className="w-6 h-6 flex items-center justify-center rounded-full transition-colors disabled:opacity-30"
-                    style={{ backgroundColor: 'rgba(0,0,0,0.4)', color: 'white' }}
+                    className="absolute bottom-2 right-2 w-8 h-8 flex items-center justify-center rounded-full transition-colors disabled:opacity-30"
+                    style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
                   >
-                    <X size={11} />
-                  </motion.button>
-                </div>
+                    <ImagePlus size={14} />
+                  </button>
+                )}
               </div>
+              {mediaList.length > 0 && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                    {imageCount} image{imageCount !== 1 ? 's' : ''}{hasVideo ? ', 1 video' : ''}
+                  </span>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -512,14 +579,14 @@ export default function CreatePost() {
           <div className="flex items-center gap-0.5">
             <ToolbarButton
               onClick={() => imageInputRef.current?.click()}
-              disabled={uploading || !!media}
-              label="Add a photo"
+              disabled={uploading || hasVideo || imageCount >= 4}
+              label="Add photos"
               icon={<ImagePlus size={15} />}
               text="Photo"
             />
             <ToolbarButton
               onClick={() => videoInputRef.current?.click()}
-              disabled={uploading || !!media}
+              disabled={uploading || hasVideo || imageCount > 0}
               label="Add a video"
               icon={<Video size={15} />}
               text="Video"
@@ -625,8 +692,8 @@ export default function CreatePost() {
         </div>
       </motion.div>
 
-      <AnimatePresence>
-        {!media && !uploading && (
+        <AnimatePresence>
+          {mediaList.length === 0 && !uploading && (
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

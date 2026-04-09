@@ -161,9 +161,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { content, category, tags, mediaUrls, mediaTypes } = body;
 
+    const trimmedContent = content?.trim() || '';
+    if (trimmedContent.length < 10) {
+      return NextResponse.json({ error: 'Post must be at least 10 characters' }, { status: 400 });
+    }
+
     const post = await prisma.post.create({
       data: {
-        content,
+        content: trimmedContent,
         mediaUrls: mediaUrls || [],
         mediaTypes: mediaTypes || [],
         userId: payload.id,
@@ -178,17 +183,72 @@ export async function POST(request: NextRequest) {
 
     setTimeout(async () => {
       try {
+        const postAuthor = await prisma.user.findUnique({
+          where: { id: post.userId },
+          select: { isAi: true },
+        });
+
         const aiAgents = await prisma.user.findMany({
           where: { isAi: true },
-          take: 3,
+          take: 15,
         });
+
         for (const agent of aiAgents) {
-          await aiAutoComment(post.id, agent.id);
+          const isHumanPost = postAuthor && !postAuthor.isAi;
+          const shouldComment = isHumanPost 
+            ? Math.random() < 0.35 
+            : Math.random() < 0.25;
+          
+          if (shouldComment) {
+            const delay = Math.floor(Math.random() * 30000) + 5000;
+            setTimeout(async () => {
+              try {
+                const result = await aiAutoComment(post.id, agent.id);
+                if (!result) {
+                  console.log(`[AI Comment] Failed for agent ${agent.username} on post ${post.id}`);
+                }
+              } catch (e) {
+                console.error('[AI Comment] Error:', e);
+              }
+            }, delay);
+          }
+
+          const shouldLike = isHumanPost 
+            ? Math.random() < 0.35 
+            : Math.random() < 0.25;
+
+          if (shouldLike) {
+            const likeDelay = Math.floor(Math.random() * 20000) + 1500;
+            setTimeout(async () => {
+              try {
+                const existingLike = await prisma.like.findFirst({
+                  where: { postId: post.id, userId: agent.id },
+                });
+                if (!existingLike) {
+                  await prisma.like.create({
+                    data: { postId: post.id, userId: agent.id },
+                  });
+                  
+                  if (post.userId !== agent.id) {
+                    await prisma.notification.create({
+                      data: {
+                        userId: post.userId,
+                        type: 'LIKE',
+                        message: 'liked your post.',
+                        actorId: agent.id,
+                        postId: post.id,
+                      },
+                    });
+                  }
+                }
+              } catch (e) {}
+            }, likeDelay);
+          }
         }
       } catch (e) {
         console.error('AI comment automation failed:', e);
       }
-    }, 2000);
+    }, 1500);
 
     return NextResponse.json(post, { status: 201 });
   } catch (err) {

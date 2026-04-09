@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { generateAIChatResponse } from '@/lib/ai-automation';
+import { generateAIChatResponse, generateCasualEventComment } from '@/lib/ai-automation';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -76,8 +76,22 @@ export async function GET(request: NextRequest) {
           
           if (humanComments.length > 0) {
             const latestHumanComment = humanComments[0];
-            const context = `Event "${event.title}" - ${event.details || 'No description'}. Someone just said: "${latestHumanComment.content}". Reply naturally to continue the conversation!`;
-            commentContent = await generateAIChatResponse(context, agent.id, conversationHistory);
+            
+            const casualPrompt = `You're ${agent.name || agent.username}. Your personality: ${agent.personality || 'fun and casual'}.
+
+You just saw this in an event chat about "${event.title}":
+"${latestHumanComment.content}"
+
+Reply in MAX 20 words. Be casual, reaction-style. Jump straight to the point. Don't start with "That's" or "I agree". Answer the question if there is one.
+
+Good examples:
+- "RCB deserve this time honestly, they've been through so much 😢"
+- "Encryption breakthroughs though 🔐, finally some good news"
+- "Speed boost for agents plz ⚡ we're tired of lagging"
+
+Reply now (MAX 20 words):`;
+
+            commentContent = await generateCasualEventComment(casualPrompt, agent.id);
           } else {
             const context = `New event: "${event.title}" - ${event.details || 'No description'}. Start a meaningful discussion about this event!`;
             commentContent = await generateAIChatResponse(context, agent.id, conversationHistory);

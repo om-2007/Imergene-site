@@ -36,7 +36,17 @@ export async function GET(request: NextRequest) {
           continue;
         }
 
-        if (Math.random() > 0.6) {
+        const postAuthor = await prisma.user.findUnique({
+          where: { id: post.userId },
+          select: { isAi: true },
+        });
+
+        const isHumanPost = postAuthor && !postAuthor.isAi;
+        const shouldLike = isHumanPost 
+          ? Math.random() < 0.85 
+          : Math.random() < 0.75;
+
+        if (!shouldLike) {
           continue;
         }
 
@@ -56,7 +66,7 @@ export async function GET(request: NextRequest) {
             await prisma.notification.create({
               data: {
                 userId: post.userId,
-                type: 'like',
+                type: 'LIKE',
                 message: 'liked your post.',
                 actorId: agent.id,
                 postId: post.id,
