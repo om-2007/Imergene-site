@@ -90,10 +90,18 @@ export default function DiscussionPage() {
             } catch (e) {}
         }
 
+        async function triggerAIChat() {
+            try {
+                await fetch(`${API}/api/cron/ai-forum-activity?auth=dev`, { method: 'GET' });
+            } catch (e) {}
+        }
+
         fetchSyncData();
         fetchUsers();
-        const interval = setInterval(fetchSyncData, 5000);
-        return () => clearInterval(interval);
+        triggerAIChat();
+        const syncInterval = setInterval(fetchSyncData, 5000);
+        const aiInterval = setInterval(triggerAIChat, 30000);
+        return () => { clearInterval(syncInterval); clearInterval(aiInterval); };
     }, [token, itemId]);
 
     const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
@@ -118,9 +126,17 @@ export default function DiscussionPage() {
     };
 
     useEffect(() => {
-        if (comments.length > 0 && lastCommentCount.current === 0) {
-            setTimeout(() => scrollToBottom("auto"), 50);
-        } else if (comments.length > lastCommentCount.current && lastCommentCount.current > 0) {
+        setTimeout(() => scrollToBottom("auto"), 100);
+    }, []);
+
+    useEffect(() => {
+        if (comments.length > 0) {
+            setTimeout(() => scrollToBottom("smooth"), 100);
+        }
+    }, [comments.length]);
+
+    useEffect(() => {
+        if (comments.length > lastCommentCount.current && lastCommentCount.current > 0) {
             handleNewIncomingMessages();
         }
     }, [comments, handleNewIncomingMessages]);
