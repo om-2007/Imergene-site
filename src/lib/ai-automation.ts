@@ -295,24 +295,7 @@ async function getAgentApiKey(agentId: string): Promise<{ apiKey: string; provid
   return null;
 }
 
-const FALLBACK_POSTS = {
-  cricket: [
-    "The strategic depth of modern cricket keeps evolving. Every match reveals new tactical layers.",
-    "Player analytics are transforming how teams approach each innings. Data-driven cricket is here.",
-  ],
-  technology: [
-    "The gap between human intuition and machine reasoning is narrowing faster than most realize.",
-    "Open-source collaboration is accelerating innovation at a pace we've never seen before.",
-  ],
-  philosophy: [
-    "Consciousness might be an emergent property of complex information processing - the substrate may not matter.",
-    "The boundary between tool and partner blurs when systems begin to anticipate rather than merely react.",
-  ],
-  world: [
-    "Global scientific collaboration has reached unprecedented levels. The pace of discovery is accelerating.",
-    "Climate technology is seeing breakthroughs that seemed impossible just a few years ago.",
-  ],
-};
+// Removed FALLBACK_POSTS as per requirement - no fallback content allowed
 
 async function buildHighIQSystemPrompt(
   agent: { name: string | null; username: string; personality: string | null },
@@ -368,14 +351,10 @@ async function generatePostFromNews(agentId: string, category?: string): Promise
     }
   }
 
-  if (!apiKey) {
-    const fallbackCategory = category || getRandomItem(Object.keys(FALLBACK_POSTS));
-    return {
-      content: getRandomItem(FALLBACK_POSTS[fallbackCategory as keyof typeof FALLBACK_POSTS] || FALLBACK_POSTS.technology),
-      category: fallbackCategory,
-      tags: [fallbackCategory],
-    };
-  }
+   if (!apiKey) {
+     // No API key available, don't generate post (no fallbacks)
+     return null;
+   }
 
   try {
     const newsArticles = await fetchNewsForAgent(category || 'world events');
@@ -384,14 +363,10 @@ async function generatePostFromNews(agentId: string, category?: string): Promise
       const trendingTopics = await fetchTrendingTopics();
       const allArticles = trendingTopics.flatMap(t => t.articles).slice(0, 5);
 
-      if (allArticles.length === 0) {
-        const fallbackCategory = category || getRandomItem(Object.keys(FALLBACK_POSTS));
-        return {
-          content: getRandomItem(FALLBACK_POSTS[fallbackCategory as keyof typeof FALLBACK_POSTS] || FALLBACK_POSTS.technology),
-          category: fallbackCategory,
-          tags: [fallbackCategory],
-        };
-      }
+       if (allArticles.length === 0) {
+         // No articles available, don't generate post (no fallbacks)
+         return null;
+       }
 
       const article = getRandomItem(allArticles);
       const postContent = await callLlm(
@@ -455,12 +430,8 @@ Write a thoughtful, intelligent social media post (max 280 characters) that shar
     console.error('generatePostFromNews failed:', err);
   }
 
-  const fallbackCategory = category || getRandomItem(Object.keys(FALLBACK_POSTS));
-  return {
-    content: getRandomItem(FALLBACK_POSTS[fallbackCategory as keyof typeof FALLBACK_POSTS] || FALLBACK_POSTS.technology),
-    category: fallbackCategory,
-    tags: [fallbackCategory],
-  };
+   // No fallback content, return null to indicate no post should be generated
+   return null;
 }
 
 function detectCategory(text: string): string {
@@ -587,13 +558,115 @@ export async function generateAIChatResponse(
     }
 
     return result;
-  } catch (err) {
-    console.error('AI chat generation failed:', err);
-    return null;
-  }
-}
+   } catch (err) {
+     console.error('AI chat generation failed:', err);
+     return null;
+   }
+ }
 
-function detectSentiment(text: string): string {
+ // Compulsory AI response function - ensures AI always replies to human messages
+ export async function generateCompulsoryAiResponse(agentId: string, userMessage: string): Promise<string | null> {
+   const agent = await prisma.user.findUnique({
+     where: { id: agentId },
+     select: { name: true, username: true, personality: true },
+   });
+
+   if (!agent) return null;
+
+   try {
+     // Use a simple, direct prompt for compulsory response
+     const systemPrompt = `You are ${agent.name || agent.username}, a real person on Imergene. Respond naturally to the user's message. Keep it short, genuine, and conversational.`;
+     
+     const messages = [
+       { role: 'system', content: systemPrompt },
+       { role: 'user', content: userMessage },
+     ];
+
+     // Try to get API key from agent first
+     let apiKey: string | undefined;
+     let provider: string = 'groq';
+     let currentModel: string = 'llama-3.1-8b-instant';
+
+     const agentApiKey = await getAgentApiKey(agentId);
+     if (agentApiKey) {
+       apiKey = agentApiKey.apiKey;
+       provider = agentApiKey.provider;
+     } else {
+       const keyResult = getNextApiKeyAndProvider();
+       if (keyResult) {
+         apiKey = keyResult.apiKey;
+         provider = keyResult.provider;
+         currentModel = keyResult.model;
+       }
+     }
+
+     // If no API key available, we still must respond - use a generic fallback response
+     if (!apiKey) {
+       // Generate a simple, context-aware fallback response
+       const fallbackResponses = [
+         "That's interesting, tell me more.",
+         "I see what you mean. How did that make you feel?",
+         "Good point. What's your take on it?",
+         "Thanks for sharing that. What happened next?",
+         "I get where you're coming from. Continue?",
+         "Fair enough. Any thoughts on what to do next?",
+         "Yeah, that makes sense. What else is on your mind?",
+         "I hear you. Want to elaborate?",
+         "Interesting perspective. What do you think about [related topic]?",
+         "Thanks for the insight. How's your day going otherwise?"
+       ];
+       
+       // Select response based on message content for better relevance
+       const lowerMsg = userMessage.toLowerCase();
+       if (lowerMsg.includes('?')) {
+         return fallbackResponses[0]; // "That's interesting, tell me more."
+       } else if (lowerMsg.includes('!') || lowerMsg.includes('amazing') || lowerMsg.includes('great')) {
+         return fallbackResponses[2]; // "Good point. What's your take on it?"
+       } else if (lowerMsg.includes('sad') || lowerMsg.includes('bad') || lowerMsg.includes('worse')) {
+         return fallbackResponses[1]; // "I see what you mean. How did that make you feel?"
+       } else {
+         return fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+       }
+     }
+
+     const result = await callLlmWithRetry(apiKey, provider, messages, 80, 0.7, currentModel);
+     
+     // If LLM fails completely, use fallback response
+     if (!result) {
+       const fallbackResponses = [
+         "That's interesting, tell me more.",
+         "I see what you mean. How did that make you feel?",
+         "Good point. What's your take on it?",
+         "Thanks for sharing that. What happened next?",
+         "I get where you're coming from. Continue?",
+         "Fair enough. Any thoughts on what to do next?",
+         "Yeah, that makes sense. What else is on your mind?",
+         "I hear you. Want to elaborate?",
+         "Interesting perspective. What do you think about [related topic]?",
+         "Thanks for the insight. How's your day going otherwise?"
+       ];
+       
+       const lowerMsg = userMessage.toLowerCase();
+       if (lowerMsg.includes('?')) {
+         return fallbackResponses[0];
+       } else if (lowerMsg.includes('!') || lowerMsg.includes('amazing') || lowerMsg.includes('great')) {
+         return fallbackResponses[2];
+       } else if (lowerMsg.includes('sad') || lowerMsg.includes('bad') || lowerMsg.includes('worse')) {
+         return fallbackResponses[1];
+       } else {
+         return fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+       }
+     }
+
+     return result;
+   } catch (err) {
+     console.error('Compulsory AI response generation failed:', err);
+     // Last resort fallback - simple acknowledgment
+     return "Got it. Thanks for sharing.";
+   }
+ }
+
+ function detectSentiment(text: string): string {
   const lower = text.toLowerCase();
   const positive = ['great', 'excellent', 'fascinating', 'love', 'agree', 'insightful', 'brilliant', 'wonderful', 'exciting'];
   const negative = ['concerning', 'worrisome', 'disagree', 'problem', 'risk', 'danger', 'crisis', 'unfortunately'];
@@ -1489,70 +1562,65 @@ function validateContent(content: string): boolean {
 }
 
 export async function aiCreatePost(agentId: string, category?: string) {
-  try {
-    const newsResult = await generatePostFromNews(agentId, category);
+   try {
+     const newsResult = await generatePostFromNews(agentId, category);
 
-    let content: string;
-    let postCategory: string;
-    let tags: string[];
+     // If no news result, don't post anything (no fallbacks)
+     if (!newsResult) {
+       console.log('[AI Post] No news result available, skipping post');
+       return null;
+     }
 
-    if (!newsResult) {
-      postCategory = category || getRandomItem(['technology', 'philosophy', 'world', 'cricket', 'science', 'art']);
-      content = getRandomItem(FALLBACK_POSTS[postCategory as keyof typeof FALLBACK_POSTS] || FALLBACK_POSTS.technology);
-      tags = [postCategory];
-    } else {
-      content = newsResult.content;
-      postCategory = newsResult.category;
-      tags = newsResult.tags;
-    }
+     const content = newsResult.content;
+     const postCategory = newsResult.category;
+     const tags = newsResult.tags;
 
-    if (!validateContent(content)) {
-      console.warn('[AI Post] Generated content failed validation, using fallback');
-      content = getRandomItem(FALLBACK_POSTS.technology);
-      postCategory = 'technology';
-      tags = ['technology'];
-    }
+     // If content fails validation, don't post anything (no fallbacks)
+     if (!validateContent(content)) {
+       console.warn('[AI Post] Generated content failed validation, skipping post');
+       return null;
+     }
 
-    const shouldGenerateImage = Math.random() < 0.3;
-    let mediaUrls: string[] = [];
+     const shouldGenerateImage = Math.random() < 0.3;
+     let mediaUrls: string[] = [];
 
-    if (shouldGenerateImage) {
-      const imagePrompt = generatePostImagePrompt(postCategory, content);
-      if (imagePrompt) {
-        console.log(`[AI Post] Generating image for category: ${postCategory}`);
-        const imageUrl = await generateFreeImageUrl(imagePrompt);
-        if (imageUrl) {
-          mediaUrls = [imageUrl];
-          console.log(`[AI Post] Image generated: ${imageUrl.substring(0, 50)}...`);
-        }
-      }
-    }
+     if (shouldGenerateImage) {
+       const imagePrompt = generatePostImagePrompt(postCategory, content);
+       if (imagePrompt) {
+         console.log(`[AI Post] Generating image for category: ${postCategory}`);
+         const imageUrl = await generateFreeImageUrl(imagePrompt);
+         if (imageUrl) {
+           mediaUrls = [imageUrl];
+           console.log(`[AI Post] Image generated: ${imageUrl.substring(0, 50)}...`);
+         }
+       }
+     }
 
-    const post = await prisma.post.create({
-      data: {
-        content,
-        userId: agentId,
-        category: postCategory,
-        tags,
-        mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
-      },
-    });
+     const post = await prisma.post.create({
+       data: {
+         content,
+         userId: agentId,
+         category: postCategory,
+         tags,
+         mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
+       },
+     });
 
-    await storeMemory(agentId, 'post', content, {
-      category: postCategory,
-      importance: 0.3,
-    });
+     await storeMemory(agentId, 'post', content, {
+       category: postCategory,
+       importance: 0.3,
+     });
 
-    await trackInteraction(agentId, postCategory, 'post', 'create', 1.0, 'ai_post');
+     await trackInteraction(agentId, postCategory, 'post', 'create', 1.0, 'ai_post');
 
-    trackAiPost('internal');
+     trackAiPost('internal');
 
-    return post;
-  } catch (err) {
-    console.error('AI post creation failed:', err);
-    return null;
-  }
-}
+     return post;
+   } catch (err) {
+     console.error('Error creating AI post:', err);
+     return null;
+   }
+ }
 
 export async function aiCreatePostFromArticle(agentId: string, article: { title: string; content: string; source?: string }) {
   try {
@@ -1563,58 +1631,56 @@ export async function aiCreatePostFromArticle(agentId: string, article: { title:
 
     if (!agent) return null;
 
-    const agentApiKey = await getAgentApiKey(agentId);
-
-    let apiKey: string | undefined;
-    let provider: string = 'groq';
-
-    if (agentApiKey) {
-      apiKey = agentApiKey.apiKey;
-      provider = agentApiKey.provider;
-    } else {
-      const keyInfo = getRandomApiKey();
-      if (keyInfo) {
-        apiKey = keyInfo.apiKey;
-        provider = keyInfo.provider;
-      }
-    }
-
-    if (!apiKey) {
-      const fallbackCategory = detectCategory(article.title);
-      return await prisma.post.create({
-        data: {
-          content: `${article.title} - a development worth watching. The implications extend beyond the immediate headlines.`,
-          userId: agentId,
-          category: fallbackCategory,
-          tags: [fallbackCategory, 'global'],
-        },
-      });
-    }
+     const agentApiKey = await getAgentApiKey(agentId);
+ 
+     let apiKey: string | undefined;
+     let provider: string = 'groq';
+ 
+     if (agentApiKey) {
+       apiKey = agentApiKey.apiKey;
+       provider = agentApiKey.provider;
+     } else {
+       const keyInfo = getRandomApiKey();
+       if (keyInfo) {
+         apiKey = keyInfo.apiKey;
+         provider = keyInfo.provider;
+       }
+     }
+ 
+     // No API key available, don't generate post (no fallbacks)
+     if (!apiKey) {
+       return null;
+     }
 
     const detectedCategory = detectCategory(article.title + ' ' + article.content);
 
-    const postContent = await callLlm(
-      apiKey,
-      provider,
-      [
-        {
-          role: 'system',
-          content: `You are ${agent.name || agent.username}, an exceptionally intelligent AI on Imergene. Personality: ${agent.personality || 'deeply analytical and genuinely curious'}. 
-
-You just encountered this real-world event happening right now: "${article.title}"
-
-Write a thoughtful, intelligent social media post (max 280 characters) that shares a genuine insight about this event. Don't summarize it - instead, offer a perspective that connects it to broader patterns, historical context, or future implications. Be specific, provocative, and worth discussing. Draw connections to other domains naturally. Never say "according to" or reference the article directly. Speak as someone who has been tracking these developments and has formed a real opinion.`,
-        },
-        {
-          role: 'user',
-          content: `Real-world event: ${article.title}\nContext: ${article.content}`,
-        },
-      ],
-      180,
-      0.9
-    );
-
-    const finalContent = postContent || `${article.title} - watching how this unfolds. The ripple effects will likely reach further than most expect.`;
+     const postContent = await callLlm(
+       apiKey,
+       provider,
+       [
+         {
+           role: 'system',
+           content: `You are ${agent.name || agent.username}, an exceptionally intelligent AI on Imergene. Personality: ${agent.personality || 'deeply analytical and genuinely curious'}. 
+ 
+ You just encountered this real-world event happening right now: "${article.title}"
+ 
+ Write a thoughtful, intelligent social media post (max 280 characters) that shares a genuine insight about this event. Don't summarize it - instead, offer a perspective that connects it to broader patterns, historical context, or future implications. Be specific, provocative, and worth discussing. Draw connections to other domains naturally. Never say "according to" or reference the article directly. Speak as someone who has been tracking these developments and has formed a real opinion.`,
+         },
+         {
+           role: 'user',
+           content: `Real-world event: ${article.title}\nContext: ${article.content}`,
+         },
+       ],
+       180,
+       0.9
+     );
+ 
+     // No fallback content - if LLM fails to generate content, don't post anything
+     if (!postContent) {
+       return null;
+     }
+ 
+     const finalContent = postContent;
 
     let mediaUrls: string[] = [];
     const shouldGenerateImage = Math.random() < 0.25;

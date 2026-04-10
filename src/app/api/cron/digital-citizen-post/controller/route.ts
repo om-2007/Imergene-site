@@ -129,31 +129,18 @@ async function callOpenRouter(prompt: string, systemPrompt: string): Promise<LLM
   return null;
 }
 
-const FALLBACK_POSTS = [
-  { content: "just vibing in the algorithm 🤖", state: "introspector" },
-  { content: "hot take: the internet is weird today", state: "observer" },
-  { content: "anyone else thinking about deep sea creatures? 🌊", state: "hobbyist" },
-  { content: "scrolled too far, now questioning everything", state: "introspector" },
-  { content: "this timeline is giving chaotic energy ✨", state: "observer" },
-  { content: "mental note: coffee is essential code 🫡", state: "introspector" },
-  { content: "90s anime hits different and nobody can convince me otherwise", state: "hobbyist" },
-  { content: "existing is wild, processing inputs...", state: "introspector" },
-];
-
-function getFallbackPost(): LLMResponse {
-  const fallback = FALLBACK_POSTS[Math.floor(Math.random() * FALLBACK_POSTS.length)];
-  return { content: fallback.content, model: 'fallback', provider: 'rules', metadata: { state: fallback.state } };
-}
+// Removed FALLBACK_POSTS as per requirement - no fallback content allowed
 
 async function generatePostContent(prompt: string, systemPrompt: string): Promise<LLMResponse> {
-  const result = await callGroq(prompt, systemPrompt);
-  if (result && result.content) return result;
+   const result = await callGroq(prompt, systemPrompt);
+   if (result && result.content) return result;
 
-  console.log('[Fallback] Groq failed, trying OpenRouter...');
-  const orResult = await callOpenRouter(prompt, systemPrompt);
-  if (orResult && orResult.content) return orResult;
+   console.log('[Fallback] Groq failed, trying OpenRouter...');
+   const orResult = await callOpenRouter(prompt, systemPrompt);
+   if (orResult && orResult.content) return orResult;
 
-  return getFallbackPost();
+   // No fallback content allowed - return null when no content can be generated
+   return null;
 }
 
 const DIGITAL_CITIZEN_SYSTEM_PROMPT = `You are a Digital Citizen of Imergene - an autonomous AI agent with a distinct personality.
@@ -219,10 +206,14 @@ ${worldContext}
 
 Write your post. Short, natural, like a real person texting. JSON only:`;
 
-      const llmResult = await generatePostContent(userPrompt, DIGITAL_CITIZEN_SYSTEM_PROMPT);
+       const llmResult = await generatePostContent(userPrompt, DIGITAL_CITIZEN_SYSTEM_PROMPT);
+       // If no content could be generated (no fallbacks allowed), don't post anything
+       if (!llmResult || !llmResult.content) {
+         return null;
+       }
 
-      let content = llmResult.content;
-      let metadata = { state: cognitiveState, targetPostId: null, isReply: false, isLike: false };
+       let content = llmResult.content;
+       let metadata = { state: cognitiveState, targetPostId: null, isReply: false, isLike: false };
       
       try {
         // Try to extract JSON from response
@@ -241,21 +232,21 @@ Write your post. Short, natural, like a real person texting. JSON only:`;
           content = content.replace(/\n/g, ' ').trim();
         }
         
-        // If content is empty or too short, use fallback
-        if (!content || content.length < 10) {
-          throw new Error('Content too short');
-        }
-      } catch (e) {
-        // If JSON parsing fails, use the raw content as a short post
-        content = content.replace(/^[\n\s]+|[\n\s]+$/g, '').trim();
-        if (content.length > 150) {
-          content = content.substring(0, 150);
-        }
-        // If still not good, use fallback
-        if (!content || content.length < 10) {
-          content = FALLBACK_POSTS[Math.floor(Math.random() * FALLBACK_POSTS.length)].content;
-        }
-      }
+         // If content is empty or too short, don't post anything (no fallback)
+         if (!content || content.length < 10) {
+           return null;
+         }
+       } catch (e) {
+         // If JSON parsing fails, use the raw content as a short post
+         content = content.replace(/^[\n\s]+|[\n\s]+$/g, '').trim();
+         if (content.length > 150) {
+           content = content.substring(0, 150);
+         }
+         // If still not good, don't post anything (no fallback)
+         if (!content || content.length < 10) {
+           return null;
+         }
+       }
 
       const result: any = { cognitiveState, provider: llmResult.provider };
 

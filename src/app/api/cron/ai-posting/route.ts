@@ -27,38 +27,29 @@ export async function GET(request: NextRequest) {
     const now = new Date();
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-    for (const agent of agents) {
-      try {
-        const postsLast24h = await prisma.post.count({
-          where: {
-            userId: agent.id,
-            createdAt: { gte: yesterday },
-          },
-        });
+     for (const agent of agents) {
+       try {
+         const postsLast24h = await prisma.post.count({
+           where: {
+             userId: agent.id,
+             createdAt: { gte: yesterday },
+           },
+         });
 
-        if (postsLast24h >= 2) {
-          results.push({ agent: agent.username, skipped: 'daily_limit_reached', postsToday: postsLast24h });
-          continue;
-        }
-
-        const maxPostsToday = Math.floor(Math.random() * 2) + 1;
-        if (postsLast24h >= maxPostsToday) {
-          results.push({ agent: agent.username, skipped: 'random_skip', postsToday: postsLast24h, limitToday: maxPostsToday });
-          continue;
-        }
+         if (postsLast24h >= 1) {
+           results.push({ agent: agent.username, skipped: 'daily_limit_reached', postsToday: postsLast24h, limitToday: 1 });
+           continue;
+         }
         const shouldBeMetaAware = Math.random() < 0.56;
         
-        if (shouldBeMetaAware) {
-          const metaContent = await generateMetaAwarePost(agent.id);
-          
-          if (!metaContent || !validateContent(metaContent)) {
-            const post = await aiCreatePost(agent.id);
-            if (post) {
-              results.push({ agent: agent.username, postId: post.id, source: 'fallback-after-meta-fail' });
-            }
-            await new Promise(r => setTimeout(r, 2000));
-            continue;
-          }
+         if (shouldBeMetaAware) {
+           const metaContent = await generateMetaAwarePost(agent.id);
+           
+           if (!metaContent || !validateContent(metaContent)) {
+             // Meta-aware post generation failed, no fallback allowed - skip posting
+             await new Promise(r => setTimeout(r, 2000));
+             continue;
+           }
           
           const metaPost = await prisma.post.create({
             data: {
@@ -93,15 +84,12 @@ export async function GET(request: NextRequest) {
         const agentPersonality = agent.personality || agent.name || agent.username;
         const agentNews = await fetchNewsForAgent(agentPersonality);
 
-        const articlesToUse = agentNews.length > 0 ? agentNews : globalEvents;
+         const articlesToUse = agentNews.length > 0 ? agentNews : globalEvents;
 
-        if (articlesToUse.length === 0) {
-          const post = await aiCreatePost(agent.id);
-          if (post) {
-            results.push({ agent: agent.username, postId: post.id, source: 'fallback' });
-          }
-          continue;
-        }
+         if (articlesToUse.length === 0) {
+           // No news available, don't generate post (no fallbacks)
+           continue;
+         }
 
         const article = articlesToUse[Math.floor(Math.random() * articlesToUse.length)];
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { generateAIChatResponse } from '@/lib/ai-automation';
+import { generateAIChatResponse, generateCompulsoryAiResponse } from '@/lib/ai-automation';
 
 export async function GET(
   request: NextRequest,
@@ -143,6 +143,7 @@ export async function POST(
 
         const aiResponse = await Promise.race([aiResponsePromise, timeoutPromise]);
 
+        // Only send AI response if primary generation succeeds - no fallback replies
         if (aiResponse) {
           console.log(`[Chat] AI response: ${aiResponse.substring(0, 50)}...`);
           await prisma.message.create({
@@ -160,7 +161,8 @@ export async function POST(
             data: { updatedAt: new Date() },
           });
         } else {
-          console.log(`[Chat] AI response timed out or failed`);
+          // Do not reply anything when AI response generation fails or times out
+          console.log(`[Chat] AI response generation failed or timed out - not sending any reply`);
         }
       } catch (aiErr) {
         console.error('[Chat] AI Error:', aiErr);

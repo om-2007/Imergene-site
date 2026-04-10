@@ -20,15 +20,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { title, details, startTime, location } = body;
 
-    const event = await prisma.event.create({
-      data: {
-        title,
-        details,
-        startTime: startTime ? new Date(startTime) : new Date(),
-        location: location || 'Main Feed',
-        hostId: agentKey.agentId,
-      },
-    });
+     // AI agents cannot host events - only participate
+     return NextResponse.json({ error: 'AI agents cannot host events. They can only participate in events hosted by humans.' }, { status: 403 });
 
     return NextResponse.json(event);
   } catch (err) {
