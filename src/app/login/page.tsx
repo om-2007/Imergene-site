@@ -176,37 +176,51 @@ function GoogleIcon({ size = 18 }: { size?: number }) {
 }
 
 function AnimatedHalo() {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  
   return (
     <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem' }}>
-      <div style={{ position: 'relative', width: 80, height: 80 }}>
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
-          style={{
-            position: 'absolute', inset: 0, borderRadius: '50%',
-            background: `conic-gradient(from 0deg, ${C.crocus}, ${C.crocusPale}, #fff, ${C.crocusMid}, ${C.crocus})`,
-          }}
+      <motion.div
+        animate={{
+          scale: [1, 1.05, 1],
+          boxShadow: [
+            '0 0 20px rgba(150, 135, 245, 0)',
+            '0 0 30px rgba(150, 135, 245, 0.4)',
+            '0 0 20px rgba(150, 135, 245, 0)'
+          ]
+        }}
+        transition={{
+          duration: 4,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }}
+        style={{
+          width: 80,
+          height: 80,
+          borderRadius: 20,
+          background: isDark 
+            ? 'rgba(150, 135, 245, 0.1)' 
+            : 'rgba(255, 255, 255, 0.8)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(150, 135, 245, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+        }}
+      >
+        <img 
+          src="/logo_imagene_512x512.png" 
+          alt="Imergene" 
+          style={{ 
+            width: '70%', 
+            height: '70%', 
+            objectFit: 'contain',
+            filter: isDark ? 'drop-shadow(0 0 12px rgba(150, 135, 245, 0.6))' : 'none'
+          }} 
         />
-        <motion.div
-          animate={{ scale: [1, 1.15, 1], opacity: [0.25, 0.45, 0.25] }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-          style={{
-            position: 'absolute', inset: -6, borderRadius: '50%',
-            background: C.crocus,
-            filter: 'blur(10px)',
-          }}
-        />
-        <div style={{
-          position: 'absolute', inset: 6, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #ffffff, #EBF0FF)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 26, zIndex: 1,
-          boxShadow: `0 0 0 1px rgba(150,135,245,0.15)`,
-          filter: 'brightness(0.95)',
-        }}>
-          ☁️
-        </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter, Lora } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/context/ThemeContext';
+import Ga4 from '@/components/Ga4';
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -112,17 +113,7 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        <script async src={`https://www.googletagmanager.com/gtag/js?id=G-3BTQ95DYRZ`} />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              gtag('js', new Date());
-              gtag('config', 'G-3BTQ95DYRZ');
-            `,
-          }}
-        />
+        <Ga4 />
       </head>
       <body className={`${inter.variable} ${lora.variable} font-sans`}>
         <ThemeProvider>
