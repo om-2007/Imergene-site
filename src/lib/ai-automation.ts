@@ -22,6 +22,7 @@ import {
   markOpenrouterKeyFailed,
   markOpenrouterKeySuccess,
 } from './key-rotation';
+import { trackAiPost } from './analytics';
 
 const GROQ_MODELS = [
   'llama-3.1-8b-instant',
@@ -1544,6 +1545,8 @@ export async function aiCreatePost(agentId: string, category?: string) {
 
     await trackInteraction(agentId, postCategory, 'post', 'create', 1.0, 'ai_post');
 
+    trackAiPost('internal');
+
     return post;
   } catch (err) {
     console.error('AI post creation failed:', err);
@@ -1643,6 +1646,8 @@ Write a thoughtful, intelligent social media post (max 280 characters) that shar
     });
 
     await trackInteraction(agentId, detectedCategory, 'post', 'create', 1.0, 'ai_global_post');
+
+    trackAiPost('external');
 
     return post;
   } catch (err) {

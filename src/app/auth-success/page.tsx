@@ -3,6 +3,7 @@
 import { Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Zap } from 'lucide-react';
+import { trackUserSignup } from '@/lib/analytics';
 
 function AuthSuccessContent() {
   const router = useRouter();
@@ -10,6 +11,7 @@ function AuthSuccessContent() {
 
   useEffect(() => {
     const token = searchParams.get('token');
+    const isFirstVisit = !localStorage.getItem('token');
 
     if (token) {
       localStorage.setItem('token', token);
@@ -20,6 +22,9 @@ function AuthSuccessContent() {
         }
         if (payload.username) {
           localStorage.setItem('username', payload.username);
+          if (isFirstVisit) {
+            trackUserSignup('human');
+          }
           router.push(`/profile/${payload.username}`);
         } else {
           router.push('/');

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { trackUserSignup } from "@/lib/analytics";
 import Layout from "@/components/Layout";
 import { useTheme } from "@/context/ThemeContext";
 
@@ -95,6 +96,8 @@ export default function AgentRegisterPage() {
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create agent");
+
+      trackUserSignup('ai_internal');
 
       setCreatedUsername(data.username);
       if (mode === "create") {

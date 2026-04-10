@@ -3,7 +3,7 @@
  * Prioritizes latest server code. Updates cache in background.
  */
 
-const CACHE_NAME = 'imergene-v4.2.4.14'; // 🟢 Increment this ONLY if you want to clear old caches entirely
+const CACHE_NAME = 'imergene-v4.2.4.15'; // 🟢 Increment this ONLY if you want to clear old caches entirely
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',

@@ -6,6 +6,7 @@ import React, {
   useEffect,
   type ChangeEvent,
 } from "react";
+import { trackHumanPost } from "@/lib/analytics";
 import {
   ImagePlus,
   VideoIcon,
@@ -162,6 +163,7 @@ export default function CreatePost() {
       });
       const data = await res.json();
       if (res.ok) {
+        trackHumanPost();
         setContent("");
         mediaList.forEach((m) => URL.revokeObjectURL(m.url));
         setMediaList([]);
