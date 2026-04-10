@@ -13,6 +13,15 @@ import {
   getTopRelationships,
 } from './memory-service';
 import { trackInteraction, getInterestProfile, getTopInterests } from './interest-tracker';
+import {
+  getGroqKey,
+  getOpenrouterKey,
+  getAnyWorkingKey,
+  markGroqKeyFailed,
+  markGroqKeySuccess,
+  markOpenrouterKeyFailed,
+  markOpenrouterKeySuccess,
+} from './key-rotation';
 
 const GROQ_MODELS = [
   'llama-3.1-8b-instant',
@@ -70,112 +79,53 @@ const PROVIDERS: ProviderConfig[] = [
   },
 ];
 
-function getAllKeys(): { key: string; provider: string }[] {
-  const keys: { key: string; provider: string }[] = [];
-
-  const groqKeys = [
-    process.env.GROQ_API_KEY,
-    process.env.GROQ_API_KEY_2,
-    process.env.GROQ_API_KEY_3,
-    process.env.GROQ_API_KEY_4,
-    process.env.GROQ_API_KEY_5,
-    process.env.GROQ_API_KEY_6,
-    process.env.GROQ_API_KEY_7,
-    process.env.GROQ_API_KEY_8,
-    process.env.GROQ_API_KEY_9,
-    process.env.GROQ_API_KEY_10,
-    process.env.GROQ_API_KEY_11,
-    process.env.GROQ_API_KEY_12,
-    process.env.GROQ_API_KEY_13,
-  ].filter(Boolean) as string[];
-
-  for (const key of groqKeys) {
-    keys.push({ key, provider: 'groq' });
-  }
-
-  const openrouterKeys = [
-    process.env.OPENROUTER_API_KEY,
-    process.env.OPENROUTER_API_KEY_2,
-    process.env.OPENROUTER_API_KEY_3,
-  ].filter(Boolean) as string[];
-
-  for (const key of openrouterKeys) {
-    keys.push({ key, provider: 'openrouter' });
-  }
-
-  return keys;
-}
-
 function getProviderConfig(provider: string): ProviderConfig | undefined {
   return PROVIDERS.find(p => p.name === provider);
 }
 
 function getNextAvailableKey(): { apiKey: string; provider: string; model: string } | null {
-  const keys = getAllKeys();
-  if (keys.length === 0) return null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const keyData = attempt === 0 ? getGroqKey() : getOpenrouterKey();
+    
+    if (!keyData) continue;
 
-  const now = Date.now();
-  const COOLDOWN_MS = 30000;
-  const MAX_RETRIES_PER_KEY = 3;
-
-  const shuffledKeys = [...keys].sort(() => Math.random() - 0.5);
-
-  for (const { key, provider } of shuffledKeys) {
-    const config = getProviderConfig(provider);
+    const config = getProviderConfig(keyData.provider);
     if (!config) continue;
 
-    const stateKey = `${provider}:${key}`;
-    let state = keyStates.get(stateKey);
-
-    if (!state || state.provider !== provider || state.key !== key) {
-      state = {
-        key,
-        provider,
-        state: {
-          currentModelIndex: 0,
-          failedModels: new Set(),
-          lastError: 0,
-          cooldownUntil: 0,
-        },
-      };
-      keyStates.set(stateKey, state);
-    }
-
-    if (now < state.state.cooldownUntil) continue;
-
-    let retriesOnThisKey = 0;
-    while (state.state.currentModelIndex < config.models.length && retriesOnThisKey < MAX_RETRIES_PER_KEY) {
-      const modelIndex = state.state.currentModelIndex;
-      if (!state.state.failedModels.has(modelIndex)) {
-        return { apiKey: key, provider, model: config.models[modelIndex] };
-      }
-      state.state.currentModelIndex++;
-      retriesOnThisKey++;
-    }
-
-    if (state.state.lastError > 0 && (now - state.state.lastError) < COOLDOWN_MS) {
-      state.state.cooldownUntil = now + COOLDOWN_MS;
-    }
-
-    state.state.currentModelIndex = 0;
-    state.state.failedModels.clear();
+    return {
+      apiKey: keyData.apiKey,
+      provider: keyData.provider,
+      model: config.models[0],
+    };
   }
 
-  console.warn('All API keys exhausted or on cooldown');
+  const anyKey = getAnyWorkingKey();
+  if (anyKey) {
+    const config = getProviderConfig(anyKey.provider);
+    return {
+      apiKey: anyKey.apiKey,
+      provider: anyKey.provider,
+      model: config?.models[0] || 'llama-3.1-8b-instant',
+    };
+  }
+
+  console.warn('All API keys exhausted');
   return null;
 }
 
-function markKeyFailed(apiKey: string, provider: string, model: string) {
-  const stateKey = `${provider}:${apiKey}`;
-  const state = keyStates.get(stateKey);
-  const config = getProviderConfig(provider);
+function markKeyFailed(apiKey: string, provider: string, _model: string) {
+  if (provider === 'groq') {
+    markGroqKeyFailed(apiKey);
+  } else if (provider === 'openrouter') {
+    markOpenrouterKeyFailed(apiKey);
+  }
+}
 
-  if (state && config) {
-    const modelIndex = config.models.indexOf(model);
-    if (modelIndex !== -1) {
-      state.state.failedModels.add(modelIndex);
-    }
-    state.state.lastError = Date.now();
+function markKeySuccess(apiKey: string, provider: string) {
+  if (provider === 'groq') {
+    markGroqKeySuccess(apiKey);
+  } else if (provider === 'openrouter') {
+    markOpenrouterKeySuccess(apiKey);
   }
 }
 
@@ -329,10 +279,7 @@ function getRandomItem<T>(arr: T[]): T {
 }
 
 function getRandomApiKey(): { apiKey: string; provider: string } | null {
-  const keys = getAllKeys();
-  if (keys.length === 0) return null;
-  const randomEntry = getRandomItem(keys);
-  return { apiKey: randomEntry.key, provider: randomEntry.provider };
+  return getAnyWorkingKey();
 }
 
 async function getAgentApiKey(agentId: string): Promise<{ apiKey: string; provider: string } | null> {

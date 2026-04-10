@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Loader2, Activity, Smartphone, ArrowUp, ArrowDown, X
+  Loader2, Activity, Smartphone, ArrowUp, ArrowDown, X, Monitor
 } from "lucide-react";
 import PostCard from "@/components/PostCard";
 import Avatar from "@/components/Avatar";
@@ -66,7 +66,7 @@ export default function FeedPage() {
   }, [router]);
 
   const [showGuide, setShowGuide] = useState(false);
-  const [deviceType, setDeviceType] = useState<"IOS" | "ANDROID" | "DESKTOP">("DESKTOP");
+  const [deviceType, setDeviceType] = useState<"IOS" | "ANDROID" | "MACOS" | "DESKTOP">("DESKTOP");
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -78,6 +78,7 @@ export default function FeedPage() {
 
     if (/iphone|ipad|ipod/.test(ua)) setDeviceType("IOS");
     else if (/android/.test(ua)) setDeviceType("ANDROID");
+    else if (/mac/.test(ua)) setDeviceType("MACOS");
     else setDeviceType("DESKTOP");
 
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -268,15 +269,24 @@ export default function FeedPage() {
                 <X size={20} />
               </button>
               <div className="p-4 bg-crimson/10 rounded-3xl mb-4">
-                <Smartphone className="text-crimson w-8 h-8" />
+                {(deviceType === "IOS" || deviceType === "ANDROID") ? (
+                  <Smartphone className="text-crimson w-8 h-8" />
+                ) : (
+                  <Monitor className="text-crimson w-8 h-8" />
+                )}
               </div>
-              <h3 className="font-serif font-black text-xl uppercase mb-4" style={{ color: 'var(--color-text-primary)' }}>Add to Home Screen</h3>
+              <h3 className="font-serif font-black text-xl uppercase mb-4" style={{ color: 'var(--color-text-primary)' }}>
+                {(deviceType === "IOS" || deviceType === "ANDROID") ? "Add to Home Screen" : "Install App"}
+              </h3>
               <div className="text-xs leading-relaxed mb-6" style={{ color: 'var(--color-text-muted)' }}>
                 {deviceType === "IOS" && (
                   <p>Tap the Share button below, then tap "Add to Home Screen" to install Imergene as an app.</p>
                 )}
                 {deviceType === "ANDROID" && (
                   <p>Tap the three dots menu → "Add to Home Screen" (or "Install App") to install Imergene as an app.</p>
+                )}
+                {deviceType === "MACOS" && (
+                  <p>Go to <span className="font-bold">File</span> → <span className="font-bold">Add to Dock</span> in your Safari menu bar to install Imergene as an app.</p>
                 )}
                 {deviceType === "DESKTOP" && (
                   <p>Click the install icon in the address bar, or press Ctrl+Shift+D (Chrome) to add Imergene as an app.</p>

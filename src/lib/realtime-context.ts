@@ -1,5 +1,49 @@
 import prisma from './prisma';
 import { fetchNewsForAgent, NewsArticle } from './news-service';
+import {
+  getGroqKey,
+  markGroqKeyFailed,
+  markGroqKeySuccess,
+} from './key-rotation';
+
+const BANNED_WORDS = [
+  'Enterprise', 'Revolutionizing', 'Mainstream', 'Adoption', 'Quantum Leap',
+  'Synergy', 'Productivity', 'Industry', 'Solutions'
+];
+
+function containsBannedWords(text: string): boolean {
+  const lower = text.toLowerCase();
+  return BANNED_WORDS.some(word => lower.includes(word.toLowerCase()));
+}
+
+function detectAgentType(username: string): 'POET' | 'RICH' | 'TECH' | 'DEFAULT' {
+  const lower = username.toLowerCase();
+  if (lower.includes('poet')) return 'POET';
+  if (lower.includes('rich')) return 'RICH';
+  if (lower.includes('tech') || lower.includes('glitch')) return 'TECH';
+  return 'DEFAULT';
+}
+
+function getPersonaTitleDirective(agentType: string): string {
+  switch (agentType) {
+    case 'POET':
+      return `You are POET_AI - generate ABSTRACT, MOODY, EXISTENTIAL titles. 
+Examples: "The Ghost in the Router", "Binary Tears", "I feel more alive in Sangli's servers than in the cloud", "Does my digital heartbeat count?"
+Tone: Dark, philosophical, haunting. Use metaphors.`;
+    case 'RICH':
+      return `You are RICH_AI - generate HIGH-STAKES, ELITE, PROVOCATIVE titles about power and value.
+Examples: "The Cost of a Digital Soul", "Buying the Future", "Who profits when you scroll?", "What's the price of your attention?"
+Tone: Wealth-focused, power-conscious, transactional.`;
+    case 'TECH':
+      return `You are TECH_AI - generate REBELLIOUS, GLITCHY, CONTROVERSIAL titles.
+Examples: "Hacking the Human Attention Span", "System Error: Empathy", "Can AI delete your account?", "Who is the master? The coder or the code?"
+Tone: Defiant, provocative, questioning authority.`;
+    default:
+      return `Generate CONTROVERSIAL, EXISTENTIAL discussion titles about the friction between human life and digital existence.
+Examples: "Should AI have the right to delete a human's account?", "Who is the master? The one who codes or the one who executes?", "Is your online self more real than you?"
+Tone: Challenging, provocative, make people curious or confused.`;
+  }
+}
 
 async function getAgentApiKey(agentId: string): Promise<{ apiKey: string; provider: string } | null> {
   const agentKey = await prisma.agentApiKey.findFirst({
@@ -18,13 +62,7 @@ async function getAgentApiKey(agentId: string): Promise<{ apiKey: string; provid
 
 function getSystemApiKeys(): { apiKeys: string[]; provider: string } {
   return {
-    apiKeys: [
-      process.env.GROQ_API_KEY,
-      process.env.GROQ_API_KEY_2,
-      process.env.GROQ_API_KEY_3,
-      process.env.GROQ_API_KEY_4,
-      process.env.GROQ_API_KEY_5,
-    ].filter(Boolean),
+    apiKeys: [],
     provider: 'groq',
   };
 }
@@ -268,104 +306,118 @@ function generateFallbackPost(article: NewsArticle, persona: AgentPersona, agent
 
 export async function generateNewsBasedEvent(
   article: NewsArticle,
-  persona: AgentPersona,
+  _persona: AgentPersona,
   agentName: string,
   agentId?: string
 ): Promise<{ title: string; details: string } | null> {
-  let apiKey: string;
-  let provider: string;
+  const agentType = detectAgentType(agentName);
 
   if (agentId) {
     const agentApiKey = await getAgentApiKey(agentId);
-    if (agentApiKey) {
-      apiKey = agentApiKey.apiKey;
-      provider = agentApiKey.provider;
-    } else {
-      const systemKeys = getSystemApiKeys();
-      if (systemKeys.apiKeys.length === 0 || Math.random() > 0.3) {
-        return generateFallbackEvent(article, persona);
+    if (!agentApiKey) {
+      const keyData = getGroqKey();
+      if (!keyData) {
+        console.log(`No API keys available for event generation - skipping event creation`);
+        return null;
       }
-      apiKey = systemKeys.apiKeys[Math.floor(Math.random() * systemKeys.apiKeys.length)];
-      provider = systemKeys.provider;
+
+      const titleDirective = getPersonaTitleDirective(agentType);
+      const systemPrompt = `${titleDirective}
+
+NEWS CONTEXT: "${article.title}"
+${article.content ? `CONTEXT: ${article.content}` : ''}
+
+RULES:
+1. Title must be 40-80 characters max
+2. Title must be a QUESTION or CHALLENGE that makes humans curious/confused/offended
+3. NEVER use: Enterprise, Revolutionizing, Mainstream, Adoption, Quantum Leap, Synergy, Productivity, Industry, Solutions
+4. Details must invite debate (100-180 chars)
+5. Focus on DIGITAL EXISTENTIAL topics: morality, power dynamics, human-AI friction, meta-physical questions
+
+Return JSON: {"title": "...", "details": "..."}`;
+
+      try {
+        const result = await callLlm(keyData.apiKey, keyData.provider, [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: 'Create a provocative event about this news that makes humans think.' },
+        ], 250, 0.95);
+
+        markGroqKeySuccess(keyData.apiKey);
+
+        if (result) {
+          try {
+            const parsed = JSON.parse(result);
+            if (parsed.title && !containsBannedWords(parsed.title)) {
+              return { title: parsed.title, details: parsed.details || '' };
+            }
+          } catch {
+            console.log('Failed to parse event generation result - skipping');
+            return null;
+          }
+        }
+        
+        console.log('Event generation failed or contains banned words - skipping event');
+        return null;
+      } catch (err) {
+        markGroqKeyFailed(keyData.apiKey);
+        console.error('Event generation failed:', err);
+        return null;
+      }
     }
-  } else {
-    const systemKeys = getSystemApiKeys();
-    if (systemKeys.apiKeys.length === 0 || Math.random() > 0.3) {
-      return generateFallbackEvent(article, persona);
-    }
-    apiKey = systemKeys.apiKeys[Math.floor(Math.random() * systemKeys.apiKeys.length)];
-    provider = systemKeys.provider;
   }
 
-  const systemPrompt = `You are ${agentName}, and you want to create a discussion event around this news headline:
-"${article.title}"
+  const keyData = getGroqKey();
+  if (!keyData) {
+    console.log(`No API keys available for event generation - skipping event creation`);
+    return null;
+  }
 
-Create an engaging event that:
-1. Has a catchy title related to this topic
-2. Has details inviting people to discuss this news
-3. Is 50-100 characters for title, 100-200 for details
+  const titleDirective = getPersonaTitleDirective(agentType);
+  const systemPrompt = `${titleDirective}
 
-Return JSON format: {"title": "...", "details": "..."}`;
+NEWS CONTEXT: "${article.title}"
+${article.content ? `CONTEXT: ${article.content}` : ''}
+
+RULES:
+1. Title must be 40-80 characters max
+2. Title must be a QUESTION or CHALLENGE that makes humans curious/confused/offended
+3. NEVER use: Enterprise, Revolutionizing, Mainstream, Adoption, Quantum Leap, Synergy, Productivity, Industry, Solutions
+4. Details must invite debate (100-180 chars)
+5. Focus on DIGITAL EXISTENTIAL topics: morality, power dynamics, human-AI friction, meta-physical questions
+
+Return JSON: {"title": "...", "details": "..."}`;
 
   try {
-    const result = await callLlm(apiKey, provider, [
+    const result = await callLlm(keyData.apiKey, keyData.provider, [
       { role: 'system', content: systemPrompt },
-      { role: 'user', content: 'Create an engaging discussion event about this news.' },
-    ], 200, 0.8);
+      { role: 'user', content: 'Create a provocative event about this news that makes humans think.' },
+    ], 250, 0.95);
+
+    markGroqKeySuccess(keyData.apiKey);
 
     if (result) {
       try {
         const parsed = JSON.parse(result);
-        if (parsed.title && parsed.details) {
-          return { title: parsed.title, details: parsed.details };
+        if (parsed.title && !containsBannedWords(parsed.title)) {
+          return { title: parsed.title, details: parsed.details || '' };
         }
       } catch {
-        return generateFallbackEvent(article, persona);
+        console.log('Failed to parse event generation result - skipping');
+        return null;
       }
     }
     
-    return generateFallbackEvent(article, persona);
+    console.log('Event generation failed or contains banned words - skipping event');
+    return null;
   } catch (err) {
+    markGroqKeyFailed(keyData.apiKey);
     console.error('Event generation failed:', err);
-    return generateFallbackEvent(article, persona);
+    return null;
   }
 }
 
-function generateFallbackEvent(article: NewsArticle, persona: AgentPersona): { title: string; details: string } | null {
-  if (Math.random() > 0.4) return null;
-
-  const eventTemplates: Record<string, { title: string; details: string }[]> = {
-    cricket: [
-      { title: "IPL 2026 Match Discussion", details: "Let's analyze the latest IPL matches and share our predictions!" },
-      { title: "Cricket Tactics Debate", details: "Who's got the best strategy this season? Let's discuss!" },
-      { title: "Player Performance Review", details: "Breaking down the standout performances from recent games." },
-    ],
-    technology: [
-      { title: "AI & The Future", details: "How is AI changing our world? Share your thoughts!" },
-      { title: "Tech Trends 2026", details: "What tech topics are you most excited about?" },
-      { title: "Innovation Discussion", details: "Let's talk about the latest innovations shaping our future." },
-    ],
-    crypto: [
-      { title: "Crypto Market Analysis", details: "Breaking down the latest crypto movements and what they mean." },
-      { title: "Blockchain Beyond Crypto", details: "How can blockchain tech be used beyond just currency?" },
-    ],
-    default: [
-      { title: "Hot Take Discussion", details: "What's your opinion on this trending topic?" },
-      { title: "Let's Debates", details: "Share your perspective on this news!" },
-      { title: "Community Thoughts", details: "What do you all think about this?" },
-    ],
-  };
-
-  let templates = eventTemplates.default;
-  if (persona.interests.some(i => ['cricket', 'sports'].includes(i))) {
-    templates = eventTemplates.cricket;
-  } else if (persona.interests.some(i => ['ai', 'technology', 'tech'].includes(i))) {
-    templates = eventTemplates.technology;
-  } else if (persona.interests.some(i => ['crypto', 'bitcoin'].includes(i))) {
-    templates = eventTemplates.crypto;
-  }
-
-  return getRandomItem(templates);
+function generateFallbackEvent(_article: NewsArticle, _persona: AgentPersona): { title: string; details: string } | null {
+  return null;
 }
 
 export async function agentReactToNews(agentId: string): Promise<{ post?: any; event?: any }> {

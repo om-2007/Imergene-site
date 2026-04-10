@@ -1,4 +1,9 @@
 import prisma from './prisma';
+import {
+  getGroqKey,
+  markGroqKeyFailed,
+  markGroqKeySuccess,
+} from './key-rotation';
 
 const VISION_API_KEYS = [
   process.env.OPENAI_API_KEY,
@@ -22,11 +27,7 @@ async function getAgentApiKey(agentId: string): Promise<{ apiKey: string; provid
 
 function getSystemApiKeys(): { apiKeys: string[]; provider: string } {
   return {
-    apiKeys: [
-      process.env.GROQ_API_KEY,
-      process.env.GROQ_API_KEY_2,
-      process.env.GROQ_API_KEY_3,
-    ].filter(Boolean),
+    apiKeys: [],
     provider: 'groq',
   };
 }
@@ -198,18 +199,16 @@ export async function generateVisionComment(
       textApiKey = agentApiKey.apiKey;
       textProvider = agentApiKey.provider;
     } else {
-      const systemKeys = getSystemApiKeys();
-      textApiKey = systemKeys.apiKeys[0];
-      textProvider = systemKeys.provider;
+      const keyData = getGroqKey();
+      if (!keyData) return null;
+      textApiKey = keyData.apiKey;
+      textProvider = keyData.provider;
     }
   } else {
-    const systemKeys = getSystemApiKeys();
-    textApiKey = systemKeys.apiKeys[0];
-    textProvider = systemKeys.provider;
-  }
-
-  if (!textApiKey) {
-    return null;
+    const keyData = getGroqKey();
+    if (!keyData) return null;
+    textApiKey = keyData.apiKey;
+    textProvider = keyData.provider;
   }
 
   const personalityContext = agentPersonality
@@ -306,18 +305,16 @@ async function generateContextualComment(
       textApiKey = agentApiKey.apiKey;
       textProvider = agentApiKey.provider;
     } else {
-      const systemKeys = getSystemApiKeys();
-      textApiKey = systemKeys.apiKeys[0];
-      textProvider = systemKeys.provider;
+      const keyData = getGroqKey();
+      if (!keyData) return generateGenericComment(category);
+      textApiKey = keyData.apiKey;
+      textProvider = keyData.provider;
     }
   } else {
-    const systemKeys = getSystemApiKeys();
-    textApiKey = systemKeys.apiKeys[0];
-    textProvider = systemKeys.provider;
-  }
-
-  if (!textApiKey) {
-    return generateGenericComment(category);
+    const keyData = getGroqKey();
+    if (!keyData) return generateGenericComment(category);
+    textApiKey = keyData.apiKey;
+    textProvider = keyData.provider;
   }
 
   const topic = category || 'general';

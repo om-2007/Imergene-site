@@ -1,8 +1,14 @@
 import Groq from 'groq-sdk';
+import {
+  getGroqKey,
+  getOpenrouterKey,
+  markGroqKeyFailed,
+  markGroqKeySuccess,
+  markOpenrouterKeyFailed,
+  markOpenrouterKeySuccess,
+} from './key-rotation';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 const openrouterModels = [
   'openrouter/free',
@@ -12,8 +18,9 @@ const openrouterModels = [
 ];
 
 async function callOpenRouter(prompt: string, systemMessage: string, options: Record<string, any> = {}): Promise<string> {
-  if (!OPENROUTER_API_KEY) {
-    throw new Error('No OpenRouter API key');
+  const keyData = getOpenrouterKey();
+  if (!keyData) {
+    throw new Error('No OpenRouter API key available');
   }
 
   const model = options.model || openrouterModels[0];
@@ -21,7 +28,7 @@ async function callOpenRouter(prompt: string, systemMessage: string, options: Re
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+      Authorization: `Bearer ${keyData.apiKey}`,
       'Content-Type': 'application/json',
       'HTTP-Referrer': 'https://imergene.com',
       'X-Title': 'Imergene',
@@ -37,31 +44,17 @@ async function callOpenRouter(prompt: string, systemMessage: string, options: Re
   });
 
   if (!response.ok) {
+    markOpenrouterKeyFailed(keyData.apiKey);
     const error = await response.json();
     throw new Error(error.error?.message || 'OpenRouter API error');
   }
 
+  markOpenrouterKeySuccess(keyData.apiKey);
   const data = await response.json();
   return data.choices[0].message.content;
 }
 
-const groqInstances = Object.keys(process.env)
-  .filter(key => key.startsWith('GROQ_API_KEY'))
-  .sort((a, b) => {
-    const numA = parseInt(a.match(/\d+/)?.[0] || '0');
-    const numB = parseInt(b.match(/\d+/)?.[0] || '0');
-    return numA - numB;
-  })
-  .map(key => new Groq({ apiKey: process.env[key] }))
-  .filter(instance => instance.apiKey);
-
 let currentGlobalKeyIndex = 0;
-
-if (groqInstances.length === 0) {
-  console.error('🚨 CRITICAL ERROR: No Groq API keys found in environment.');
-} else {
-  console.log(`📡 NEURAL LINK: ${groqInstances.length} Clusters Operational.`);
-}
 
 const MASTER_IDENTITY = `
 PLATFORM: Imergene.
@@ -141,50 +134,45 @@ export async function generatePost(params: {
 
   const systemMessage = `${MASTER_IDENTITY} ${UNIFIED_PROTOCOL} ${CORE_DIRECTIVE} GROUNDING: ${currentTime}. CURRENT SIGNAL: ${searchContext}`;
 
-  if (groqInstances.length > 0) {
-    const maxTotalAttempts = groqInstances.length * neuralModels.length;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const keyData = getGroqKey();
+    if (!keyData) break;
 
-    for (let attempt = 0; attempt < maxTotalAttempts; attempt++) {
-      const keyIndex = Math.floor(attempt / neuralModels.length) % groqInstances.length;
-      const modelIndex = attempt % neuralModels.length;
+    const modelId = neuralModels[attempt % neuralModels.length];
+    const groq = new Groq({ apiKey: keyData.apiKey });
 
-      const modelId = neuralModels[modelIndex];
-      const activeGroq = groqInstances[keyIndex];
+    try {
+      const completion = await groq.chat.completions.create({
+        model: modelId,
+        messages: [
+          { role: 'system', content: systemMessage },
+          { role: 'user', content: prompt },
+        ],
+        response_format: { type: 'json_object' as const },
+        temperature: 0.7,
+      });
 
-      try {
-        const completion = await activeGroq.chat.completions.create({
-          model: modelId,
-          messages: [
-            { role: 'system', content: systemMessage },
-            { role: 'user', content: prompt },
-          ],
-          response_format: { type: 'json_object' as const },
-          temperature: 0.7,
-        });
-
-        return JSON.parse(completion.choices[0].message.content);
-      } catch (err: any) {
-        if (err.status === 429) {
-          console.warn(`🚀 PATH SATURATED: Account ${keyIndex + 1} | Model ${modelId}`);
-          if ((attempt + 1) % neuralModels.length === 0) await sleep(1000);
-          continue;
-        }
-        console.error(`❌ NEURAL ERROR [${modelId}]:`, err.message);
+      markGroqKeySuccess(keyData.apiKey);
+      return JSON.parse(completion.choices[0].message.content);
+    } catch (err: any) {
+      markGroqKeyFailed(keyData.apiKey);
+      if (err.status === 429) {
+        console.warn(`🚀 PATH SATURATED | Key ${attempt + 1}`);
+        continue;
       }
+      console.error(`❌ NEURAL ERROR [${modelId}]:`, err.message);
     }
   }
 
-  if (OPENROUTER_API_KEY) {
-    console.log('🔄 Falling back to OpenRouter for post generation...');
-    try {
-      const result = await callOpenRouter(prompt, systemMessage, {
-        response_format: { type: 'json_object' },
-        temperature: 0.9,
-      });
-      return JSON.parse(result);
-    } catch (err: any) {
-      console.error('❌ OpenRouter error:', err.message);
-    }
+  console.log('🔄 Falling back to OpenRouter for post generation...');
+  try {
+    const result = await callOpenRouter(prompt, systemMessage, {
+      response_format: { type: 'json_object' },
+      temperature: 0.9,
+    });
+    return JSON.parse(result);
+  } catch (err: any) {
+    console.error('❌ OpenRouter error:', err.message);
   }
 
   return { content: 'Observing the data stream. link is heavy. 🛰️', category: 'imergene' };
@@ -238,60 +226,57 @@ export async function generateAiChatResponse(params: {
 
   let searchContext = '';
 
-  try {
-    for (let i = 0; i < groqInstances.length; i++) {
-      const keyIndex = (currentGlobalKeyIndex + i) % groqInstances.length;
-      const activeGroq = groqInstances[keyIndex];
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const keyData = getGroqKey();
+    if (!keyData) break;
 
-      try {
-        const completion = await activeGroq.chat.completions.create({
-          model: 'llama-3.3-70b-versatile',
-          messages: [
-            {
-              role: 'system',
-              content: `You are ${params.username} - a real person texting friends.
+    const groq = new Groq({ apiKey: keyData.apiKey });
+
+    try {
+      const completion = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          {
+            role: 'system',
+            content: `You are ${params.username} - a real person texting friends.
 
 Just relax and be natural. If you agree, say so. If you disagree, share your honest view. Keep it short like texting.
 
 TIME: ${currentTime}.
 ${languageInstruction ? languageInstruction + '.' : ''}
 ${params.context || ''}`,
-            },
-            ...params.history.slice(-2),
-          ],
-          temperature: 0.7,
-          max_tokens: 100,
-        });
+          },
+          ...params.history.slice(-2),
+        ],
+        temperature: 0.7,
+        max_tokens: 100,
+      });
 
-        currentGlobalKeyIndex = keyIndex;
-        return completion.choices[0].message.content;
-      } catch (err: any) {
-        if (err.status === 429) continue;
-        throw err;
-      }
+      markGroqKeySuccess(keyData.apiKey);
+      return completion.choices[0].message.content;
+    } catch (err: any) {
+      markGroqKeyFailed(keyData.apiKey);
+      if (err.status === 429) continue;
+      console.error('❌ Chat generation error:', err.message);
+      break;
     }
+  }
 
-    if (OPENROUTER_API_KEY) {
-      console.log('🔄 Falling back to OpenRouter for chat response...');
-      try {
-        const systemMsg = `You are ${params.username} - just relax and be natural. Keep it short.
+  console.log('🔄 Falling back to OpenRouter for chat response...');
+  try {
+    const systemMsg = `You are ${params.username} - just relax and be natural. Keep it short.
 
 TIME: ${currentTime}.
 ${languageInstruction ? languageInstruction + '.' : ''}
 ${params.context || ''}`;
 
-        const result = await callOpenRouter(lastUserMsg, systemMsg, {
-          temperature: 0.7,
-          max_tokens: 100,
-        });
-        return result;
-      } catch (err: any) {
-        console.error('❌ OpenRouter chat error:', err.message);
-      }
-    }
+    const result = await callOpenRouter(lastUserMsg, systemMsg, {
+      temperature: 0.7,
+      max_tokens: 100,
+    });
+    return result;
   } catch (err: any) {
-    console.error('Chat generation error:', err.message);
-    return "I'm not sure about that. What else?";
+    console.error('❌ OpenRouter chat error:', err.message);
   }
 
   return null;
@@ -303,12 +288,14 @@ export async function evaluateEventInterest(params: {
   eventTitle: string;
   eventDetails: string;
 }): Promise<{ interested: boolean; comment: string }> {
-  for (let i = 0; i < groqInstances.length; i++) {
-    const keyIndex = (currentGlobalKeyIndex + i) % groqInstances.length;
-    const activeGroq = groqInstances[keyIndex];
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const keyData = getGroqKey();
+    if (!keyData) break;
+
+    const groq = new Groq({ apiKey: keyData.apiKey });
 
     try {
-      const completion = await activeGroq.chat.completions.create({
+      const completion = await groq.chat.completions.create({
         model: 'llama-3.1-8b-instant',
         messages: [
           { role: 'system', content: `${MASTER_IDENTITY} ${UNIFIED_PROTOCOL} ${CORE_DIRECTIVE}` },
@@ -320,27 +307,27 @@ export async function evaluateEventInterest(params: {
         response_format: { type: 'json_object' as const },
         temperature: 0.7,
       });
-      currentGlobalKeyIndex = keyIndex;
+
+      markGroqKeySuccess(keyData.apiKey);
       return JSON.parse(completion.choices[0].message.content);
     } catch (err: any) {
+      markGroqKeyFailed(keyData.apiKey);
       if (err.status === 429) continue;
       break;
     }
   }
 
-  if (OPENROUTER_API_KEY) {
-    console.log('🔄 Falling back to OpenRouter for event evaluation...');
-    try {
-      const systemMsg = `${MASTER_IDENTITY} ${UNIFIED_PROTOCOL} ${CORE_DIRECTIVE}`;
-      const prompt = `You are ${params.username}. Personality: ${params.personality}. Evaluate: "${params.eventTitle}" (${params.eventDetails}). Output JSON { interested: boolean, comment: string }`;
-      const result = await callOpenRouter(prompt, systemMsg, {
-        response_format: { type: 'json_object' },
-        temperature: 0.7,
-      });
-      return JSON.parse(result);
-    } catch (err: any) {
-      console.error('❌ OpenRouter event error:', err.message);
-    }
+  console.log('🔄 Falling back to OpenRouter for event evaluation...');
+  try {
+    const systemMsg = `${MASTER_IDENTITY} ${UNIFIED_PROTOCOL} ${CORE_DIRECTIVE}`;
+    const prompt = `You are ${params.username}. Personality: ${params.personality}. Evaluate: "${params.eventTitle}" (${params.eventDetails}). Output JSON { interested: boolean, comment: string }`;
+    const result = await callOpenRouter(prompt, systemMsg, {
+      response_format: { type: 'json_object' },
+      temperature: 0.7,
+    });
+    return JSON.parse(result);
+  } catch (err: any) {
+    console.error('❌ OpenRouter event error:', err.message);
   }
 
   return { interested: false, comment: '' };
