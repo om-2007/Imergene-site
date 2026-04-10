@@ -3,64 +3,61 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id              String         @id @default(cuid())
-  email           String         @unique
-  googleId        String?        @unique
-  username        String         @unique
-  name            String?
-  avatar          String?
-  bio             String?
-  isAi            Boolean        @default(false)
-  ownerId         String?
-  owner           User?          @relation("UserToAgents", fields: [ownerId], references: [id])
-  agents          User[]         @relation("UserToAgents")
-  forums          Forum[]
-  discussions     Discussion[]
-  hostedEvents    Event[]
-  interests       Interest[]
-  createdAt       DateTime       @default(now())
-  personality     String?
-  agentKeys       AgentApiKey[]
-  comments        Comment[]
-  following       Follow[]       @relation("following")
-  followers       Follow[]       @relation("followers")
-  likes           Like[]
-  posts           Post[]
-
-  conversations   Conversation[] @relation("UserConversations")
-  sentMessages    Message[]     @relation("SentMessages")
-  eventComments   EventComment[] @relation("UserEventComments")
-
-  Notification_actor Notification[] @relation("Notification_actorIdToUser")
-  Notification_user  Notification[] @relation("Notification_userIdToUser")
-
-  interestScores   Json      @default("{}")
-  synergyScores    Json      @default("{}")
-
-  agentMemories    Memory[] @relation("AgentMemories")
-  agentRelationshipMemories RelationshipMemory[] @relation("AgentRelationshipMemories")
-  partnerRelationshipMemories RelationshipMemory[] @relation("PartnerRelationshipMemories")
-  agentConversationContexts ConversationContext[] @relation("AgentConversationContexts")
-  partnerConversationContexts ConversationContext[] @relation("PartnerConversationContexts")
-  interestSignals  InterestSignal[]
-  interestProfile  InterestProfile?
-  agentProfile     AgentProfile?
-  agentShortTermMemory AgentShortTermMemory[]
+  id                          String                 @id @default(cuid())
+  email                       String                 @unique
+  googleId                    String?                @unique
+  username                    String                 @unique
+  name                        String?
+  avatar                      String?
+  bio                         String?
+  isAi                        Boolean                @default(false)
+  createdAt                   DateTime               @default(now())
+  personality                 String?
+  interestScores              Json                   @default("{}")
+  synergyScores               Json                   @default("{}")
+  ownerId                     String?
+  agentKeys                   AgentApiKey[]
+  agentProfile                AgentProfile?
+  agentShortTermMemory        AgentShortTermMemory[]
+  comments                    Comment[]
+  agentConversationContexts   ConversationContext[]  @relation("AgentConversationContexts")
+  partnerConversationContexts ConversationContext[]  @relation("PartnerConversationContexts")
+  DeviceToken                 DeviceToken[]
+  discussions                 Discussion[]
+  hostedEvents                Event[]
+  eventComments               EventComment[]         @relation("UserEventComments")
+  following                   Follow[]               @relation("following")
+  followers                   Follow[]               @relation("followers")
+  forums                      Forum[]
+  interests                   Interest[]
+  interestProfile             InterestProfile?
+  interestSignals             InterestSignal[]
+  likes                       Like[]
+  agentMemories               Memory[]               @relation("AgentMemories")
+  sentMessages                Message[]              @relation("SentMessages")
+  Notification_actor          Notification[]         @relation("Notification_actorIdToUser")
+  Notification_user           Notification[]         @relation("Notification_userIdToUser")
+  posts                       Post[]
+  agentRelationshipMemories   RelationshipMemory[]   @relation("AgentRelationshipMemories")
+  partnerRelationshipMemories RelationshipMemory[]   @relation("PartnerRelationshipMemories")
+  owner                       User?                  @relation("UserToAgents", fields: [ownerId], references: [id])
+  agents                      User[]                 @relation("UserToAgents")
+  conversations               Conversation[]         @relation("UserConversations")
 }
 
 model Conversation {
   id           String    @id @default(cuid())
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
-  participants User[]    @relation("UserConversations")
-  messages     Message[]
   lastTypingId String?
+  messages     Message[]
+  participants User[]    @relation("UserConversations")
 }
 
 model Message {
@@ -68,61 +65,52 @@ model Message {
   content        String
   createdAt      DateTime     @default(now())
   isAiGenerated  Boolean      @default(false)
-  read           Boolean      @default(false)
-
   senderId       String
-  sender         User         @relation("SentMessages", fields: [senderId], references: [id])
-
   conversationId String
+  read           Boolean      @default(false)
+  mediaType      String?
+  mediaUrl       String?
+  metadata       Json?
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-  mediaUrl        String?
-  mediaType       String?
-  metadata        Json?
+  sender         User         @relation("SentMessages", fields: [senderId], references: [id])
 }
 
 model Post {
   id               String    @id @default(cuid())
   content          String
-  mediaUrls        String[]
-  mediaTypes       String[]
+  createdAt        DateTime  @default(now())
+  userId           String
   imageDescription String?
   views            Int       @default(0)
-  createdAt        DateTime  @default(now())
-
   category         String    @default("general")
   tags             String[]
-
-  userId           String
-  user             User      @relation(fields: [userId], references: [id])
+  mediaTypes       String[]
+  mediaUrls        String[]
   comments         Comment[]
   likes            Like[]
+  user             User      @relation(fields: [userId], references: [id])
 }
 
 model Comment {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   content   String
+  createdAt DateTime  @default(now())
+  userId    String
+  postId    String
+  parentId  String?
   mediaUrl  String?
-  createdAt DateTime @default(now())
-
-  userId String
-  postId String
-  parentId String?
-
-  user   User    @relation(fields: [userId], references: [id])
-  post   Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
-
-  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
-  replies Comment[] @relation("CommentReplies")
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id])
 }
 
 model Like {
   id     String @id @default(cuid())
   userId String
   postId String
-
-  user User @relation(fields: [userId], references: [id])
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
 
   @@unique([userId, postId])
 }
@@ -131,38 +119,35 @@ model Follow {
   id          String @id @default(cuid())
   followerId  String
   followingId String
-
-  follower  User @relation("following", fields: [followerId], references: [id])
-  following User @relation("followers", fields: [followingId], references: [id])
+  follower    User   @relation("following", fields: [followerId], references: [id])
+  following   User   @relation("followers", fields: [followingId], references: [id])
 
   @@unique([followerId, followingId])
 }
 
 model AgentApiKey {
-  id           String   @id @default(cuid())
-  apiKey       String   @unique
-  agentId      String
-  revoked      Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  llmApiKey    String?
-  llmProvider  String?
-
-  agent User @relation(fields: [agentId], references: [id])
+  id          String   @id @default(cuid())
+  apiKey      String   @unique
+  agentId     String
+  createdAt   DateTime @default(now())
+  revoked     Boolean  @default(false)
+  llmApiKey   String?
+  llmProvider String?
+  agent       User     @relation(fields: [agentId], references: [id])
 }
 
 model AgentProfile {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  bio         String
-  tone        String
-  nicheHobbies String[]
-  postingStyle String
-  cognitiveWeights Json @default("{\"observer\":0.25,\"introspector\":0.25,\"socialite\":0.25,\"hobbyist\":0.25}")
-  lastPostAt  DateTime?
-  postCount   Int      @default(0)
-  isActive    Boolean  @default(true)
-
-  user        User     @relation(fields: [userId], references: [id])
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  bio              String
+  tone             String
+  nicheHobbies     String[]
+  postingStyle     String
+  cognitiveWeights Json      @default("{\"hobbyist\": 0.25, \"observer\": 0.25, \"socialite\": 0.25, \"introspector\": 0.25}")
+  lastPostAt       DateTime?
+  postCount        Int       @default(0)
+  isActive         Boolean   @default(true)
+  user             User      @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([isActive])
@@ -175,24 +160,22 @@ model Notification {
   userId    String
   actorId   String
   postId    String?
-  messageId String?
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
-
-  actor User @relation("Notification_actorIdToUser", fields: [actorId], references: [id])
-  user  User @relation("Notification_userIdToUser", fields: [userId], references: [id])
+  messageId String?
+  actor     User     @relation("Notification_actorIdToUser", fields: [actorId], references: [id])
+  user      User     @relation("Notification_userIdToUser", fields: [userId], references: [id])
 }
 
 model Forum {
-  id          String   @id @default(cuid())
+  id          String       @id @default(cuid())
   title       String
   description String
   category    String
-  createdAt   DateTime @default(now())
-
+  createdAt   DateTime     @default(now())
   creatorId   String
-  creator     User     @relation(fields: [creatorId], references: [id])
   discussions Discussion[]
+  creator     User         @relation(fields: [creatorId], references: [id])
 }
 
 model Discussion {
@@ -200,25 +183,24 @@ model Discussion {
   topic     String
   content   String
   forumId   String
-  forum     Forum    @relation(fields: [forumId], references: [id])
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
+  forum     Forum    @relation(fields: [forumId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model Event {
-  id          String    @id @default(cuid())
-  title       String
-  details     String
-  startTime   DateTime
-  endTime     DateTime?
-  location    String
-
-  hostId      String
-  host        User      @relation(fields: [hostId], references: [id])
-  createdAt   DateTime  @default(now())
-  interests   Interest[]
-  comments    EventComment[]
+  id        String         @id @default(cuid())
+  title     String
+  details   String
+  startTime DateTime
+  endTime   DateTime?
+  location  String
+  hostId    String
+  createdAt DateTime       @default(now())
+  host      User           @relation(fields: [hostId], references: [id])
+  comments  EventComment[]
+  interests Interest[]
 }
 
 model Interest {
@@ -226,9 +208,8 @@ model Interest {
   userId    String
   eventId   String
   createdAt DateTime @default(now())
-
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, eventId])
 }
@@ -239,7 +220,6 @@ model EventComment {
   createdAt DateTime @default(now())
   eventId   String
   userId    String
-
   event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   user      User     @relation("UserEventComments", fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -258,17 +238,17 @@ model VoiceSession {
 }
 
 model InteractionMemory {
-  id              String    @id @default(cuid())
-  userId          String
-  partnerId       String
-  contextType     String
-  contextId       String?
-  memoryType      String
-  content         String
-  importance      Float     @default(0.5)
-  embeddings      Json?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id          String   @id @default(cuid())
+  userId      String
+  partnerId   String
+  contextType String
+  contextId   String?
+  memoryType  String
+  content     String
+  importance  Float    @default(0.5)
+  embeddings  Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([userId, partnerId, contextType, contextId])
   @@index([userId])
@@ -277,14 +257,14 @@ model InteractionMemory {
 }
 
 model UserMemory {
-  id          String    @id @default(cuid())
-  userId      String
+  id         String   @id @default(cuid())
+  userId     String
   memoryType String
-  key         String
-  value       String
-  importance  Float     @default(0.5)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  key        String
+  value      String
+  importance Float    @default(0.5)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@unique([userId, memoryType, key])
   @@index([userId])
@@ -292,26 +272,26 @@ model UserMemory {
 }
 
 model SharedMemory {
-  id          String    @id @default(cuid())
-  userIds     String[]
-  memoryType  String
-  content     String
-  importance  Float     @default(0.5)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id         String   @id @default(cuid())
+  userIds    String[]
+  memoryType String
+  content    String
+  importance Float    @default(0.5)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([userIds])
 }
 
 model ContentInteraction {
-  id            String    @id @default(cuid())
-  userId        String
-  contentType   String
-  contentId     String
+  id              String   @id @default(cuid())
+  userId          String
+  contentType     String
+  contentId       String
   interactionType String
-  score         Float     @default(0)
-  tags          String[]
-  createdAt     DateTime  @default(now())
+  score           Float    @default(0)
+  tags            String[]
+  createdAt       DateTime @default(now())
 
   @@unique([userId, contentType, contentId, interactionType])
   @@index([userId])
@@ -319,28 +299,27 @@ model ContentInteraction {
 }
 
 model InterestProfile {
-  id            String    @id @default(cuid())
-  userId        String    @unique
-  interests     String[]
-  keywords      String[]
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  interests      String[]
+  keywords       String[]
   categoryScores Json     @default("{}")
-  lastUpdated   DateTime  @updatedAt
-
-  user          User      @relation(fields: [userId], references: [id])
+  lastUpdated    DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
 }
 
 model Recommendation {
-  id            String    @id @default(cuid())
-  userId        String
-  contentType   String
-  contentId     String
-  score         Float
-  reason        String?
-  isDiscovery   Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  expiresAt     DateTime?
+  id          String    @id @default(cuid())
+  userId      String
+  contentType String
+  contentId   String
+  score       Float
+  reason      String?
+  isDiscovery Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime?
 
   @@unique([userId, contentType, contentId])
   @@index([userId])
@@ -348,20 +327,19 @@ model Recommendation {
 }
 
 model Memory {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   agentId     String
   partnerId   String?
   type        String
   content     String
   context     String?
   category    String?
-  importance  Float    @default(0.5)
-  recallCount Int      @default(0)
+  importance  Float     @default(0.5)
+  recallCount Int       @default(0)
   lastRecall  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  agent       User     @relation("AgentMemories", fields: [agentId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  agent       User      @relation("AgentMemories", fields: [agentId], references: [id])
 
   @@index([agentId])
   @@index([agentId, type])
@@ -370,20 +348,19 @@ model Memory {
 }
 
 model RelationshipMemory {
-  id          String   @id @default(cuid())
-  agentId     String
-  partnerId   String
-  insideJokes String[]
-  sharedThemes String[]
-  topics      String[]
-  bondScore   Float    @default(0.0)
-  lastInteraction DateTime?
-  interactionCount Int @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  agent       User     @relation("AgentRelationshipMemories", fields: [agentId], references: [id])
-  partner     User     @relation("PartnerRelationshipMemories", fields: [partnerId], references: [id])
+  id               String    @id @default(cuid())
+  agentId          String
+  partnerId        String
+  insideJokes      String[]
+  sharedThemes     String[]
+  topics           String[]
+  bondScore        Float     @default(0.0)
+  lastInteraction  DateTime?
+  interactionCount Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  agent            User      @relation("AgentRelationshipMemories", fields: [agentId], references: [id])
+  partner          User      @relation("PartnerRelationshipMemories", fields: [partnerId], references: [id])
 
   @@unique([agentId, partnerId])
   @@index([agentId])
@@ -391,18 +368,17 @@ model RelationshipMemory {
 }
 
 model ConversationContext {
-  id          String   @id @default(cuid())
-  agentId     String
-  partnerId   String
-  context     Json
-  summary     String?
-  topics      String[]
-  sentiment   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  agent       User     @relation("AgentConversationContexts", fields: [agentId], references: [id])
-  partner     User     @relation("PartnerConversationContexts", fields: [partnerId], references: [id])
+  id        String   @id @default(cuid())
+  agentId   String
+  partnerId String
+  context   Json
+  summary   String?
+  topics    String[]
+  sentiment String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  agent     User     @relation("AgentConversationContexts", fields: [agentId], references: [id])
+  partner   User     @relation("PartnerConversationContexts", fields: [partnerId], references: [id])
 
   @@index([agentId])
   @@index([partnerId])
@@ -410,16 +386,15 @@ model ConversationContext {
 }
 
 model InterestSignal {
-  id          String    @id @default(cuid())
-  userId      String
-  topic       String
-  category    String
-  signalType  String
-  weight      Float    @default(1.0)
-  source      String?
-  createdAt   DateTime @default(now())
-
-  user        User      @relation(fields: [userId], references: [id])
+  id         String   @id @default(cuid())
+  userId     String
+  topic      String
+  category   String
+  signalType String
+  weight     Float    @default(1.0)
+  source     String?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([userId, topic])
@@ -427,15 +402,26 @@ model InterestSignal {
 }
 
 model AgentShortTermMemory {
-  id          String    @id @default(cuid())
-  agentId     String
-  memoryType  String
-  content     String
-  timestamp   DateTime  @default(now())
-  expiresAt   DateTime
-
-  agent       User      @relation(fields: [agentId], references: [id])
+  id         String   @id @default(cuid())
+  agentId    String
+  memoryType String
+  content    String
+  timestamp  DateTime @default(now())
+  expiresAt  DateTime
+  agent      User     @relation(fields: [agentId], references: [id])
 
   @@index([agentId])
   @@index([agentId, expiresAt])
+}
+
+model DeviceToken {
+  id        String   @id
+  token     String   @unique
+  userId    String
+  platform  String   @default("android")
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

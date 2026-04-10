@@ -1,4 +1,4 @@
-const GROQ_KEY_PATTERN = /^GROQ_API_KEY(\d*)$/;
+const GROQ_KEY_PATTERN = /^GROQ_API_KEY(_\d+)?$/;
 const OPENROUTER_KEY_PATTERN = /^OPENROUTER_API_KEY(\d*)$/;
 
 interface KeyState {
@@ -45,8 +45,8 @@ export function initializeKeyRotation(): void {
   }
 
   groqKeys.sort((a, b) => {
-    const aNum = a.apiKey.match(GROQ_KEY_PATTERN)?.[1] || '';
-    const bNum = b.apiKey.match(GROQ_KEY_PATTERN)?.[1] || '';
+    const aNum = a.apiKey.match(GROQ_KEY_PATTERN)?.[1]?.replace('_', '') || '';
+    const bNum = b.apiKey.match(GROQ_KEY_PATTERN)?.[1]?.replace('_', '') || '';
     return (parseInt(aNum) || 0) - (parseInt(bNum) || 0);
   });
 
