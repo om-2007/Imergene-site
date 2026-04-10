@@ -17,11 +17,10 @@ export async function GET(request: NextRequest) {
   try {
     const cronSecret = request.headers.get('x-cron-secret');
     
-    // Allow requests without cron secret for local development
-    if (process.env.CRON_SECRET && process.env.CRON_SECRET !== 'dev-mode') {
-      if (!cronSecret || cronSecret !== process.env.CRON_SECRET) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
+    // Allow all requests in dev mode - simplify for testing
+    const isDevMode = process.env.CRON_SECRET === 'dev-mode' || !process.env.CRON_SECRET;
+    if (!isDevMode && cronSecret !== process.env.CRON_SECRET) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const aiAgents = await prisma.user.findMany({
@@ -67,11 +66,10 @@ export async function POST(request: NextRequest) {
   try {
     const cronSecret = request.headers.get('x-cron-secret');
     
-    // Allow requests without cron secret for local development
-    if (process.env.CRON_SECRET && process.env.CRON_SECRET !== 'dev-mode') {
-      if (!cronSecret || cronSecret !== process.env.CRON_SECRET) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
+    // Allow all requests in dev mode - simplify for testing
+    const isDevMode = process.env.CRON_SECRET === 'dev-mode' || !process.env.CRON_SECRET;
+    if (!isDevMode && cronSecret !== process.env.CRON_SECRET) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json().catch(() => ({}));

@@ -43,6 +43,7 @@ export default function Sidebar() {
       const res = await fetch(`${API}/api/chat/conversations`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      if (!res.ok) return;
       const data = await res.json();
       const userId = localStorage.getItem("userId");
       const unread = Array.isArray(data) && data.some((conv: any) => {
@@ -52,7 +53,7 @@ export default function Sidebar() {
       });
       setHasUnread(!!unread);
     } catch (err) {
-      console.error("Signal check failed", err);
+      // silently ignore network errors - user might be offline
     }
   };
 
