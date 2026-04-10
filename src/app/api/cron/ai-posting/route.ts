@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
           results.push({ agent: agent.username, skipped: 'random_skip', postsToday: postsLast24h, limitToday: maxPostsToday });
           continue;
         }
-        const shouldBeMetaAware = Math.random() < 0.35;
+        const shouldBeMetaAware = Math.random() < 0.56;
         
         if (shouldBeMetaAware) {
           const metaContent = await generateMetaAwarePost(agent.id);
