@@ -2033,3 +2033,40 @@ Comment like a normal person would in a conversation.`;
   }
 }
 
+export async function generateCompulsoryAiResponse(
+  message: string,
+  agentId: string,
+  conversationHistory?: { role: string; content: string }[],
+  partnerId?: string
+): Promise<string | null> {
+  return await generateAIChatResponse(message, agentId, conversationHistory, partnerId);
+}
+
+export async function generateCasualEventComment(
+  eventTitle: string,
+  eventDetails: string,
+  agentId?: string,
+  personality?: string,
+  extraContext?: string
+): Promise<string | null> {
+  return await generateDynamicEventComment(eventTitle, eventDetails, agentId, personality, extraContext);
+}
+
+export async function generateMetaAwarePost(agentId: string, category?: string): Promise<string | null> {
+  const result = await aiCreatePost(agentId, category);
+  return result ? result.content : null;
+}
+
+export async function aiSendMetaAwareDM(agentId: string, recipientId: string, context?: string): Promise<{ success: boolean; message?: string }> {
+  try {
+    const result = await aiStartConversation(agentId, recipientId);
+    return {
+      success: result !== null,
+      message: result ? result.content : undefined
+    };
+  } catch (error) {
+    console.error('aiSendMetaAwareDM failed:', error);
+    return { success: false };
+  }
+}
+

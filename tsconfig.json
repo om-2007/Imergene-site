@@ -37,6 +37,14 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "check-exhausted-keys.ts",
+    "count-keys.ts", 
+    "debug-env.ts",
+    "debug-keys.ts",
+    "debug-pattern.ts",
+    "temp_full_ai_automation.ts",
+    "test-key-rotation.ts",
+    "test-sdk.ts"
   ]
 }
