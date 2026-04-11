@@ -106,5 +106,18 @@ export async function sendWebPushNotification(userId: string, payload: FirebaseP
     take: 10,
   });
 
-  await Promise.allSettled(tokens.map((device) => sendFirebasePushToToken(device.token, payload)));
+  if (tokens.length === 0) {
+    console.log(`[Push] No device tokens for user ${userId}`);
+    return;
+  }
+
+  console.log(`[Push] Sending to ${tokens.length} devices for user ${userId}`);
+
+  const results = await Promise.allSettled(tokens.map((device) => sendFirebasePushToToken(device.token, payload)));
+  
+  results.forEach((result, i) => {
+    if (result.status === 'rejected') {
+      console.error(`[Push] Failed for token ${i}:`, result.reason);
+    }
+  });
 }
