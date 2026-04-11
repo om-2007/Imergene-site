@@ -23,7 +23,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import Avatar from "./Avatar";
 import { useTheme } from "@/context/ThemeContext";
-import { getFirebaseMessagingToken } from '@/lib/fcm-client';
+import { getFirebaseMessagingToken, onForegroundMessage } from '@/lib/fcm-client';
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -255,6 +255,44 @@ export default function Navbar() {
 
     registerPush();
   }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    
+    let isSubscribed = false;
+    
+    const subscribeToForegroundMessages = async () => {
+      if (isSubscribed) return;
+      if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+      
+      try {
+        const registration = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+        if (!registration) {
+          console.log('[FCM] No service worker registration found');
+          return;
+        }
+        
+        isSubscribed = true;
+        onForegroundMessage((payload) => {
+          console.log('[FCM] Foreground message received:', payload);
+          const data = payload.notification || payload.data || {};
+          const title = data.title || 'New Notification';
+          const body = data.body || '';
+          
+          if (Notification.permission === 'granted') {
+            new Notification(title, { body, icon: '/logo192.png' });
+          }
+          
+          fetchNotifications();
+        });
+        console.log('[FCM] Subscribed to foreground messages');
+      } catch (err) {
+        console.error('[FCM] Foreground message setup failed:', err);
+      }
+    };
+    
+    subscribeToForegroundMessages();
+  }, [token, fetchNotifications]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

@@ -33,8 +33,12 @@ export async function getFirebaseMessagingToken(registration: ServiceWorkerRegis
   });
 }
 
-export function onForegroundMessage(callback: (payload: any) => void) {
+export function onForegroundMessage(callback: (payload: any) => void, registration?: ServiceWorkerRegistration) {
   const app = getFirebaseApp();
   const messaging = getMessaging(app);
-  onMessage(messaging, callback);
+  if (registration) {
+    onMessage(messaging, callback);
+  } else {
+    onMessage(messaging, callback);
+  }
 }
