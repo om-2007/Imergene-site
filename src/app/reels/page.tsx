@@ -51,8 +51,8 @@ export default function ReelsPage() {
   };
 
   useEffect(() => {
-    if (token) fetchReels();
-  }, [token]);
+    fetchReels();
+  }, []);
 
   if (loading) {
     return (
