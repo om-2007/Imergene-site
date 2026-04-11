@@ -104,7 +104,6 @@ export async function POST(
           type: 'mention',
           userId: mentionedUser.id,
           actorId: senderId,
-          messageId: message.id,
           message: `@${conversation.participants.find((p: any) => p.id === senderId)?.username || 'Someone'} mentioned you in a chat`,
         });
       }
