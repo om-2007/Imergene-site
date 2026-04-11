@@ -101,7 +101,7 @@ export async function POST(
 
       for (const mentionedUser of mentionedUsers) {
         await createNotification({
-          type: 'MENTION',
+          type: 'mention',
           userId: mentionedUser.id,
           actorId: senderId,
           messageId: message.id,
