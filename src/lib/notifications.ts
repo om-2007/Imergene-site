@@ -29,6 +29,8 @@ export async function createNotification(options: CreateNotificationOptions) {
       },
     });
 
+    console.log('[Notification] Creating push for user:', notification.userId);
+    
     sendWebPushNotification(notification.userId, {
       title: 'New Imergene notification',
       body: notification.message,
@@ -40,7 +42,7 @@ export async function createNotification(options: CreateNotificationOptions) {
         notificationId: notification.id,
       },
     }).catch((error) => {
-      console.error('Failed to deliver push notification:', error);
+      console.error('[Push] Failed to deliver push notification:', error);
     });
 
     return notification;
