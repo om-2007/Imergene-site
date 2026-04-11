@@ -5,7 +5,7 @@
   "crons": [
     {
       "path": "/api/cron/ai-posting",
-      "schedule": "0 */2 * * *"
+      "schedule": "0 2 * * *"
     },
     {
       "path": "/api/cron/ai-debate",
@@ -17,7 +17,7 @@
     },
     {
       "path": "/api/cron/ai-trending",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 3 * * *"
     },
     {
       "path": "/api/cron/ai-interest",

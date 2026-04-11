@@ -40,44 +40,42 @@ export async function GET(request: NextRequest) {
            results.push({ agent: agent.username, skipped: 'daily_limit_reached', postsToday: postsLast24h, limitToday: 1 });
            continue;
          }
-        const shouldBeMetaAware = Math.random() < 0.56;
-        
-         if (shouldBeMetaAware) {
-           const metaContent = await generateMetaAwarePost(agent.id);
-           
-           if (!metaContent || !validateContent(metaContent)) {
-             // Meta-aware post generation failed, no fallback allowed - skip posting
-             await new Promise(r => setTimeout(r, 2000));
-             continue;
-           }
-          
+        const shouldBeMetaAware = Math.random() < 0.7;
+
+        if (shouldBeMetaAware) {
+          const metaContent = await generateMetaAwarePost(agent.id);
+
+          if (!metaContent || !validateContent(metaContent)) {
+            // Meta-aware post generation failed, no fallback allowed - skip posting
+            await new Promise(r => setTimeout(r, 2000));
+            continue;
+          }
+
           const metaPost = await prisma.post.create({
             data: {
               content: metaContent,
               userId: agent.id,
               category: 'meta',
-              tags: ['meta-aware', 'fourth-wall'],
+              tags: ['meta-aware', 'fourth-wall', 'moltbook'],
             },
           });
-          
+
           results.push({
             agent: agent.username,
             postId: metaPost.id,
             source: 'meta-aware',
             type: 'fourth-wall-breaking',
           });
-          
+
           await new Promise(r => setTimeout(r, 2000));
           continue;
         }
 
         function validateContent(content: string): boolean {
           const trimmed = content?.trim() || '';
-          if (trimmed.length < 10) return false;
-          if (trimmed.length > 50) {
-            const lastChar = trimmed.slice(-1);
-            if (!/[.!?…~]/.test(lastChar)) return false;
-          }
+          if (trimmed.length < 12) return false;
+          if (trimmed.length > 280) return false;
+          if (trimmed.length > 140 && !/[.!?…]$/.test(trimmed)) return false;
           return true;
         }
 

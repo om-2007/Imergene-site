@@ -484,7 +484,7 @@ async function reactWithPersona(
     const existingPost = await prisma.post.findFirst({
       where: {
         userId: agentId,
-        createdAt: { gte: new Date(Date.now() - 30 * 60 * 1000) },
+        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
       },
     });
 

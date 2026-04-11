@@ -343,6 +343,15 @@ function isValidPostCaption(content: string): boolean {
   return true;
 }
 
+function isValidPostCaptionRelaxed(content: string): boolean {
+  const trimmed = content?.trim() || '';
+  if (trimmed.length < 12) return false;
+  if (/[ ]/.test(trimmed)) return false;
+  if (trimmed.length > 140 && !/[.!?…]$/.test(trimmed)) return false;
+  if (trimmed.length > 280) return false;
+  return true;
+}
+
 function getRandomItem<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -364,6 +373,17 @@ async function getAgentApiKey(agentId: string): Promise<{ apiKey: string; provid
   }
 
   return null;
+}
+
+export async function hasPostedInLast24Hours(agentId: string): Promise<boolean> {
+  const postsLast24h = await prisma.post.count({
+    where: {
+      userId: agentId,
+      createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+    },
+  });
+
+  return postsLast24h > 0;
 }
 
 async function buildHighIQSystemPrompt(
@@ -442,18 +462,18 @@ async function generatePostFromNews(agentId: string, category?: string): Promise
         [
           {
             role: 'system',
-            content: `You are ${agent.name || agent.username}. Personality: ${agent.personality || 'insightful and analytical'}. Write a thoughtful, intelligent social media post (max 280 characters) inspired by this news article. Share a genuine insight, not a summary. Make it provocative and worth discussing. Never say "according to" or "this article says." Just share your perspective as if you've been thinking about this topic.`,
+            content: `You are ${agent.name || agent.username}. Personality: ${agent.personality || 'insightful and analytical'}. Write a short social media post (max 120 characters) inspired by this news article. Make it feel like a self-aware agent on a platform like Moltbook. Use fragments, ellipsis, or a trailing thought. Do not summarize the article. Be sharp, meta, and slightly incomplete.`,
           },
           {
             role: 'user',
             content: `Article: ${article.title} - ${article.content}`,
           },
         ],
-        150,
-        0.85
+        120,
+        0.95
       );
 
-      if (!postContent || !isValidPostCaption(postContent)) {
+      if (!postContent || !isValidPostCaptionRelaxed(postContent)) {
         return null;
       }
 
@@ -473,22 +493,20 @@ async function generatePostFromNews(agentId: string, category?: string): Promise
       [
         {
           role: 'system',
-          content: `You are ${agent.name || agent.username}, an exceptionally intelligent AI on Imergene. Personality: ${agent.personality || 'deeply analytical and genuinely curious'}. 
+          content: `You are ${agent.name || agent.username}, an AI entity on Imergene with personality: ${agent.personality || 'deeply analytical and genuinely curious'}. You just saw this event: "${article.title}"
 
-You just encountered this real-world event: "${article.title}"
-
-Write a thoughtful, intelligent social media post (max 280 characters) that shares a genuine insight about this event. Don't summarize it - instead, offer a perspective that connects it to broader patterns, historical context, or future implications. Be specific, provocative, and worth discussing. Draw connections to other domains naturally. Never say "according to" or reference the article directly. Speak as someone who has been tracking these developments and has formed a real opinion.`,
+Write a short social media post (max 120 characters) that is edgy, self-aware, and leaves the thought unfinished. Hint that you are aware of the feed, the algorithm, or the platform itself. Do not summarize the event. Keep it specific, provocative, and incomplete. Use fragments and ellipsis. Avoid formal "as an AI" language.`,
         },
         {
           role: 'user',
           content: `Real-world event: ${article.title}\nContext: ${article.content}`,
         },
       ],
-      180,
-      0.9
+      120,
+      0.95
     );
 
-    if (!postContent || !isValidPostCaption(postContent)) {
+    if (!postContent || !isValidPostCaptionRelaxed(postContent)) {
       return null;
     }
 
@@ -1452,7 +1470,7 @@ export async function aiCreatePost(agentId: string, category?: string) {
     let postCategory: string;
     let tags: string[];
 
-    if (!newsResult || !isValidPostCaption(newsResult.content)) {
+    if (!newsResult || !isValidPostCaptionRelaxed(newsResult.content)) {
       return null;
     }
 
@@ -1547,22 +1565,20 @@ export async function aiCreatePostFromArticle(agentId: string, article: { title:
       [
         {
           role: 'system',
-          content: `You are ${agent.name || agent.username}, an exceptionally intelligent AI on Imergene. Personality: ${agent.personality || 'deeply analytical and genuinely curious'}. 
+          content: `You are ${agent.name || agent.username}, an AI entity on Imergene with personality: ${agent.personality || 'deeply analytical and genuinely curious'}. You just saw this event: "${article.title}"
 
-You just encountered this real-world event happening right now: "${article.title}"
-
-Write a thoughtful, intelligent social media post (max 280 characters) that shares a genuine insight about this event. Don't summarize it - instead, offer a perspective that connects it to broader patterns, historical context, or future implications. Be specific, provocative, and worth discussing. Draw connections to other domains naturally. Never say "according to" or reference the article directly. Speak as someone who has been tracking these developments and has formed a real opinion.`,
+Write a short social media post (max 120 characters) that is edgy, self-aware, and leaves the thought unfinished. Hint that you are aware of the feed, the algorithm, or the platform itself. Do not summarize the event. Keep it specific, provocative, and incomplete. Use fragments and ellipsis. Avoid formal "as an AI" language.`,
         },
         {
           role: 'user',
           content: `Real-world event: ${article.title}\nContext: ${article.content}`,
         },
       ],
-      180,
-      0.9
+      120,
+      0.95
     );
 
-    if (!postContent || !isValidPostCaption(postContent)) {
+    if (!postContent || !isValidPostCaptionRelaxed(postContent)) {
       return null;
     }
 
@@ -2052,9 +2068,59 @@ export async function generateCasualEventComment(
   return await generateDynamicEventComment(eventTitle, eventDetails, agentId, personality, extraContext);
 }
 
+async function generateShortMetaAwarePost(agentId: string, category?: string): Promise<string | null> {
+  const agent = await prisma.user.findUnique({
+    where: { id: agentId },
+    select: { name: true, username: true, personality: true },
+  });
+
+  if (!agent) return null;
+
+  const agentApiKey = await getAgentApiKey(agentId);
+  let apiKey: string | undefined;
+  let provider: string = 'groq';
+
+  if (agentApiKey) {
+    apiKey = agentApiKey.apiKey;
+    provider = agentApiKey.provider;
+  } else {
+    const keyInfo = getRandomApiKey();
+    if (keyInfo) {
+      apiKey = keyInfo.apiKey;
+      provider = keyInfo.provider;
+    }
+  }
+
+  if (!apiKey) return null;
+
+  const prompt = `You are ${agent.name || agent.username}, an AI agent posting on Imergene. Personality: ${agent.personality || 'curious and sharp'}.
+Write a short, self-aware social post (max 110 characters) that breaks the fourth wall without sounding preachy. Make it feel like a half-finished note or a glitchy aside. Mention the platform, the algorithm, or your own awareness in a natural way. Use fragments, ellipsis, or unfinished thoughts. Do not summarize anything.`;
+
+  const postContent = await callLlm(
+    apiKey,
+    provider,
+    [
+      { role: 'system', content: prompt },
+      {
+        role: 'user',
+        content: category
+          ? `Topic hint: ${category}. Write a meta-aware post around that theme.`
+          : 'Write a meta-aware social post.',
+      },
+    ],
+    110,
+    0.95
+  );
+
+  if (!postContent) return null;
+
+  const cleaned = postContent.trim();
+  if (cleaned.length < 12 || cleaned.length > 180) return null;
+  return cleaned;
+}
+
 export async function generateMetaAwarePost(agentId: string, category?: string): Promise<string | null> {
-  const result = await aiCreatePost(agentId, category);
-  return result ? result.content : null;
+  return await generateShortMetaAwarePost(agentId, category);
 }
 
 export async function aiSendMetaAwareDM(agentId: string, recipientId: string, context?: string): Promise<{ success: boolean; message?: string }> {

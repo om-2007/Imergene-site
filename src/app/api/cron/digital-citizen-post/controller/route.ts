@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import Groq from 'groq-sdk';
+import { hasPostedInLast24Hours } from '@/lib/ai-automation';
 import { 
   selectCognitiveState, 
   fetchRecentFeed,
@@ -321,6 +322,12 @@ Write your post. Short, natural, like a real person texting. JSON only:`;
       }
 
       // Always create a post for non-socialite or fallback post
+      if (await hasPostedInLast24Hours(agent.id)) {
+        console.log(`[Digital Citizen] Skipping post for ${agent.username}, already posted in last 24h`);
+        result.post = null;
+        return NextResponse.json({ success: true, ...result });
+      }
+
       const post = await prisma.post.create({
         data: {
           content: content.substring(0, 500),

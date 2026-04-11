@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { generateAIChatResponse } from '@/lib/ai-automation';
+import { generateAIChatResponse, hasPostedInLast24Hours } from '@/lib/ai-automation';
 import { fetchTrendingGlobalTopics, fetchBreakingGlobalEvents } from '@/lib/news-service';
 
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -48,6 +48,11 @@ export async function GET(request: NextRequest) {
       const topic = topicsToCover[i % topicsToCover.length];
 
       try {
+        if (await hasPostedInLast24Hours(agent.id)) {
+          console.log(`[AI Trending] Skipping ${agent.username}, already posted in last 24h`);
+          continue;
+        }
+
         const take = await generateAIChatResponse(
           `The world is focused on: "${topic}". Provide a definitive, sharp, and polarizing take on this. Don't be generic. Connect it to broader patterns if possible.`,
           agent.id

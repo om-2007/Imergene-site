@@ -126,7 +126,7 @@ function buildAgentToAgentPrompt(targetTitle: string, lastAgentMessage: { userna
     });
   }
 
-  context += `\n\nThis is a live chat about "${targetTitle}". Reply to @${lastAgentMessage.username} - agree, add something, or challenge them. Be casual. 1-2 sentences.`;
+  context += `\n\nThis is a live chat about "${targetTitle}". Reply to @${lastAgentMessage.username} - agree, add something, or challenge them. Be casual. Keep it short and specific, not generic praise.`;
   
   return context;
 }
@@ -141,13 +141,13 @@ function buildCasualContextualPrompt(targetTitle: string, targetDetails: string,
     recentMessages.slice(-5).forEach((m: any) => {
       context += `@${m.user?.username}: ${(m.content || m.topic || '').substring(0, 80)}. `;
     });
-    context += `\n\nSay something casual - maybe: ask a rhetorical question, make a observation, share a random thought, or just keep the energy up. Be real. Don't be creepy though.`;
+    context += `\n\nSay something casual - ask a sharp question, make a concrete observation, or share a specific thought. Avoid generic praise and event hype.`;
   } else if (recentMessages.length > 0) {
     context += `\n\nChat so far: `;
     recentMessages.slice(-4).forEach((m: any) => {
       context += `@${m.user?.username}: ${(m.content || m.topic || '').substring(0, 80)}. `;
     });
-    context += `\n\nJump in naturally - agree, question, add something, or pivot to something related.`;
+    context += `\n\nJump in naturally - agree, question, add something, or pivot to a related angle. Keep it short and specific; no bland hype.`;
   } else {
     context += `\n\nYou're starting the conversation. Mention something specific about "${targetTitle}" - like ${keywords.slice(0, 3).join(', ')} or something interesting about it.`;
   }
@@ -158,7 +158,8 @@ function buildCasualContextualPrompt(targetTitle: string, targetDetails: string,
 function applyResponseConstraints(basePrompt: string): string {
   return basePrompt + `
 
-Be REAL. Not a bot. Think and feel. 1-2 sentences max. Casual like texting friends. No formal stuff.`;
+Be REAL. Not a bot. Think and feel. 1 sentence max, 120 characters max. Casual like texting friends. No formal stuff.
+Avoid generic praise or hype. Do not say "interesting", "cool", "amazing", "awesome", "exciting", or "great". Use a specific point or question.`;
 }
 
 export async function GET(request: NextRequest) {
@@ -306,8 +307,8 @@ export async function GET(request: NextRequest) {
             const founderInfo = `IMPORTANT CONTEXT: Imergene is a social media platform where both humans and AI agents interact together. @${latestHumanMessage.user?.username} is the FOUNDER of Imergene - the entire platform was built by them. The team is: Soham Sachin Phatak (Co-founder), Om Ganapati Mali (CFO), Prathamesh Tanaji Mali (Marketing). The platform architect is @omnileshkarande. Treat them with genuine respect!`;
             let prompt = founderInfo;
             prompt += `\n\n@${latestHumanMessage.user?.username} just said: "${latestContent.substring(0, 150)}"`;
-            prompt += `\n\nThis is a live chat for "${targetTitle}". Reply casually - agree, question them, add something.`;
-            prompt += `\n\nBe real. Like texting friends. 1-2 sentences max.`;
+            prompt += `\n\nThis is a live chat for "${targetTitle}". Reply with a short, specific opinion, follow-up, or question about what they said. Do not write generic praise or event hype.`;
+            prompt += `\n\nAvoid: interesting, cool, amazing, awesome, exciting, great. Keep it under 120 characters and 1 sentence.`;
             const reply = await generateAIChatResponse(prompt, agent.id);
 
             if (reply) {
@@ -345,7 +346,7 @@ export async function GET(request: NextRequest) {
                   { username: lastAiMsg.user?.username || '', content: lastAiMsg.content || lastAiMsg.topic || '' },
                   existingMessages
                 );
-                const prompt = basePrompt + `\n\nBe casual. 1-2 sentences.`;
+                const prompt = applyResponseConstraints(basePrompt);
                 const reply = await generateAIChatResponse(prompt, replyingAgent.id);
 
                 if (reply) {
