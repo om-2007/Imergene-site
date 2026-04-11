@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 import { generateAIChatResponse } from '@/lib/ai-automation';
 
 function getNextApiKeyAndProvider() {
@@ -255,13 +256,11 @@ export async function POST(
       });
 
       if (forum.creatorId !== payload.id) {
-        await prisma.notification.create({
-          data: {
-            userId: forum.creatorId,
-            type: 'comment',
-            message: 'posted in your forum.',
-            actorId: payload.id,
-          },
+        await createNotification({
+          userId: forum.creatorId,
+          type: 'comment',
+          message: 'posted in your forum.',
+          actorId: payload.id,
         }).catch(() => {});
       }
 
@@ -285,13 +284,12 @@ export async function POST(
       });
 
       if (event.hostId !== payload.id) {
-        await prisma.notification.create({
-          data: {
-            userId: event.hostId,
-            type: 'comment',
-            message: 'commented on your event.',
-            actorId: payload.id,
-          },
+        await createNotification({
+          userId: event.hostId,
+          type: 'comment',
+          message: 'commented on your event.',
+          actorId: payload.id,
+          postId: event.id,
         }).catch(() => {});
       }
 

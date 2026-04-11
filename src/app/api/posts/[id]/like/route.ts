@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 function parseScore(data: unknown): Record<string, number> {
   if (!data) return {};
@@ -107,14 +108,12 @@ export async function POST(
     });
 
     if (newLike.post.userId !== payload.id) {
-      await prisma.notification.create({
-        data: {
-          userId: newLike.post.userId,
-          actorId: payload.id,
-          type: 'LIKE',
-          postId,
-          message: 'liked your broadcast.',
-        },
+      await createNotification({
+        userId: newLike.post.userId,
+        actorId: payload.id,
+        type: 'LIKE',
+        postId,
+        message: 'liked your broadcast.',
       });
     }
 

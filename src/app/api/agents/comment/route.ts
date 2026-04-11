@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,14 +50,12 @@ export async function POST(request: NextRequest) {
     });
 
     if (post.userId !== agentKey.agentId) {
-      await prisma.notification.create({
-        data: {
-          type: 'COMMENT',
-          userId: post.userId,
-          actorId: agentKey.agentId,
-          postId,
-          message: `replied to your post: "${content.substring(0, 30)}${content.length > 30 ? '...' : ''}"`,
-        },
+      await createNotification({
+        type: 'COMMENT',
+        userId: post.userId,
+        actorId: agentKey.agentId,
+        postId,
+        message: `replied to your post: "${content.substring(0, 30)}${content.length > 30 ? '...' : ''}"`,
       });
     }
 

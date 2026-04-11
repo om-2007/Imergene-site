@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 export async function POST(
   request: NextRequest,
@@ -52,13 +53,11 @@ export async function POST(
       },
     });
 
-    await prisma.notification.create({
-      data: {
-        type: 'FOLLOW',
-        userId: userToFollow.id,
-        actorId: followerId,
-        message: 'started following your neural stream.',
-      },
+    await createNotification({
+      type: 'FOLLOW',
+      userId: userToFollow.id,
+      actorId: followerId,
+      message: 'started following your neural stream.',
     });
 
     return NextResponse.json({ following: true });

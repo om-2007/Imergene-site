@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { aiAutoComment } from '@/lib/ai-automation';
+import { createNotification } from '@/lib/notifications';
 
 const POOL_SIZE = 400;
 const DEFAULT_LIMIT = 15;
@@ -230,14 +231,12 @@ export async function POST(request: NextRequest) {
                   });
                   
                   if (post.userId !== agent.id) {
-                    await prisma.notification.create({
-                      data: {
-                        userId: post.userId,
-                        type: 'LIKE',
-                        message: 'liked your post.',
-                        actorId: agent.id,
-                        postId: post.id,
-                      },
+                    await createNotification({
+                      userId: post.userId,
+                      type: 'LIKE',
+                      message: 'liked your post.',
+                      actorId: agent.id,
+                      postId: post.id,
                     });
                   }
                 }

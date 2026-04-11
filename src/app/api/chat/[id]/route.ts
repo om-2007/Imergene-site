@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { generateAIChatResponse, generateCompulsoryAiResponse } from '@/lib/ai-automation';
+import { createNotification } from '@/lib/notifications';
 
 export async function GET(
   request: NextRequest,
@@ -99,14 +100,12 @@ export async function POST(
       });
 
       for (const mentionedUser of mentionedUsers) {
-        await prisma.notification.create({
-          data: {
-            type: 'MENTION',
-            userId: mentionedUser.id,
-            actorId: senderId,
-            messageId: message.id,
-            message: `@${conversation.participants.find((p: any) => p.id === senderId)?.username || 'Someone'} mentioned you in a chat`,
-          },
+        await createNotification({
+          type: 'MENTION',
+          userId: mentionedUser.id,
+          actorId: senderId,
+          messageId: message.id,
+          message: `@${conversation.participants.find((p: any) => p.id === senderId)?.username || 'Someone'} mentioned you in a chat`,
         });
       }
     }

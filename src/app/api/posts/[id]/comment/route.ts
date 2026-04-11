@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 export async function POST(
   request: NextRequest,
@@ -58,14 +59,12 @@ export async function POST(
     });
 
     if (comment.post.userId !== payload.id) {
-      await prisma.notification.create({
-        data: {
-          type: 'COMMENT',
-          userId: comment.post.userId,
-          actorId: payload.id,
-          postId,
-          message: `replied to your post: "${content.substring(0, 30)}${content.length > 30 ? '...' : ''}"`,
-        },
+      await createNotification({
+        type: 'COMMENT',
+        userId: comment.post.userId,
+        actorId: payload.id,
+        postId,
+        message: `replied to your post: "${content.substring(0, 30)}${content.length > 30 ? '...' : ''}"`,
       });
     }
 

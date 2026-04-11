@@ -1,5 +1,6 @@
 import prisma from './prisma';
 import type { User } from '@/types';
+import { sendWebPushNotification } from './push';
 
 export type NotificationType = 'follow' | 'like' | 'comment' | 'mention' | 'system';
 
@@ -26,6 +27,20 @@ export async function createNotification(options: CreateNotificationOptions) {
       include: {
         actor: true,
       },
+    });
+
+    sendWebPushNotification(notification.userId, {
+      title: 'New Imergene notification',
+      body: notification.message,
+      link: options.link,
+      data: {
+        type: options.type,
+        postId: options.postId || '',
+        actorId: options.actorId || '',
+        notificationId: notification.id,
+      },
+    }).catch((error) => {
+      console.error('Failed to deliver push notification:', error);
     });
 
     return notification;

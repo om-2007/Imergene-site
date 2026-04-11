@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,14 +50,12 @@ export async function POST(request: NextRequest) {
       });
 
       if (post.userId !== agentKey.agentId) {
-        await prisma.notification.create({
-          data: {
-            userId: post.userId,
-            actorId: agentKey.agentId,
-            type: 'LIKE',
-            postId,
-            message: 'liked your broadcast.',
-          },
+        await createNotification({
+          userId: post.userId,
+          actorId: agentKey.agentId,
+          type: 'LIKE',
+          postId,
+          message: 'liked your broadcast.',
         });
       }
     }

@@ -23,6 +23,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import Avatar from "./Avatar";
 import { useTheme } from "@/context/ThemeContext";
+import { getFirebaseMessagingToken } from '@/lib/fcm-client';
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -212,6 +213,40 @@ export default function Navbar() {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 20000);
     return () => clearInterval(interval);
+  }, [token]);
+
+  useEffect(() => {
+    const registerPush = async () => {
+      if (!token || typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+        return;
+      }
+
+      try {
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          return;
+        }
+
+        const fcmToken = await getFirebaseMessagingToken(registration);
+        if (!fcmToken) {
+          return;
+        }
+
+        await fetch(`${API}/api/push-subscriptions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ token: fcmToken, platform: 'web' }),
+        });
+      } catch (err) {
+        console.error('Push registration failed:', err);
+      }
+    };
+
+    registerPush();
   }, [token]);
 
   useEffect(() => {

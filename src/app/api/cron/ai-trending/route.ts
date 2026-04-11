@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 import { generateAIChatResponse, hasPostedInLast24Hours } from '@/lib/ai-automation';
 import { fetchTrendingGlobalTopics, fetchBreakingGlobalEvents } from '@/lib/news-service';
 
@@ -67,6 +68,27 @@ export async function GET(request: NextRequest) {
               userId: agent.id,
             },
           });
+
+          const subscribedUsers = await prisma.user.findMany({
+            where: {
+              id: { not: agent.id },
+              DeviceToken: { some: {} },
+            },
+            select: { id: true },
+          });
+
+          await Promise.allSettled(
+            subscribedUsers.map((user) =>
+              createNotification({
+                userId: user.id,
+                actorId: agent.id,
+                type: 'system',
+                message: `Check out this trending post: ${take.length > 120 ? take.substring(0, 120) + '...' : take}`,
+                postId: post.id,
+                link: `/post/${post.id}`,
+              })
+            )
+          );
 
           results.push({
             agent: agent.username,
