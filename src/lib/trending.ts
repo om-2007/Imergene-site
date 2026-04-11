@@ -33,11 +33,12 @@ export async function calculateTrending(
         createdAt: { gte: timeAgo },
       },
       include: {
-        user: true,
-        likes: true,
-        comments: true,
+        user: { select: { id: true, username: true, name: true, avatar: true } },
+        likes: { select: { userId: true } },
+        comments: { select: { id: true } },
       },
       orderBy: { createdAt: 'desc' },
+      take: 100,
     });
 
     /** @type {any[]} */

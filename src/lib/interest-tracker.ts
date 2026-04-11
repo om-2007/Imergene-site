@@ -47,6 +47,7 @@ export async function updateInterestProfile(userId: string) {
     const signals = await prisma.interestSignal.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
+      take: 500,
     });
 
     const topicScores: Record<string, number> = {};

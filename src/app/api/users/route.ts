@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     }
 
     const users = await prisma.user.findMany({
+      where: { id: { not: payload.id } },
       select: {
         id: true,
         username: true,
@@ -25,6 +26,7 @@ export async function GET(request: NextRequest) {
         bio: true,
       },
       orderBy: { createdAt: 'desc' },
+      take: 50,
     });
 
     return NextResponse.json(users);

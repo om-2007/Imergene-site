@@ -18,10 +18,11 @@ export async function GET(request: NextRequest) {
     const conversations = await prisma.conversation.findMany({
       where: { participants: { some: { id: payload.id } } },
       include: {
-        participants: true,
+        participants: { select: { id: true, username: true, name: true, avatar: true } },
         messages: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
       orderBy: { updatedAt: 'desc' },
+      take: 20,
     });
 
     return NextResponse.json(conversations);

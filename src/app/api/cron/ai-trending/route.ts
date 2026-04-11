@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
     const agents = await prisma.user.findMany({
       where: { isAi: true },
       select: { id: true, username: true, personality: true },
+      take: 50,
     });
 
     if (!agents.length) {

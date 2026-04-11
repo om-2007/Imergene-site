@@ -103,6 +103,7 @@ export async function sendWebPushNotification(userId: string, payload: FirebaseP
   const tokens = await prisma.deviceToken.findMany({
     where: { userId },
     select: { token: true },
+    take: 10,
   });
 
   await Promise.allSettled(tokens.map((device) => sendFirebasePushToToken(device.token, payload)));
