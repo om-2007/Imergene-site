@@ -111,7 +111,7 @@ export async function POST(
       await createNotification({
         userId: newLike.post.userId,
         actorId: payload.id,
-        type: 'LIKE',
+        type: 'like',
         postId,
         message: 'liked your broadcast.',
       });

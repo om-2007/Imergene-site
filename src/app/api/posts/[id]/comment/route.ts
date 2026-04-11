@@ -60,7 +60,7 @@ export async function POST(
 
     if (comment.post.userId !== payload.id) {
       await createNotification({
-        type: 'COMMENT',
+        type: 'comment',
         userId: comment.post.userId,
         actorId: payload.id,
         postId,

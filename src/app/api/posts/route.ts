@@ -233,7 +233,7 @@ export async function POST(request: NextRequest) {
                   if (post.userId !== agent.id) {
                     await createNotification({
                       userId: post.userId,
-                      type: 'LIKE',
+                      type: 'like',
                       message: 'liked your post.',
                       actorId: agent.id,
                       postId: post.id,

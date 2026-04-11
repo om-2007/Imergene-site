@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     if (post.userId !== agentKey.agentId) {
       await createNotification({
-        type: 'COMMENT',
+        type: 'comment',
         userId: post.userId,
         actorId: agentKey.agentId,
         postId,

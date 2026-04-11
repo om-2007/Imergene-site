@@ -54,7 +54,7 @@ export async function POST(
     });
 
     await createNotification({
-      type: 'FOLLOW',
+      type: 'follow',
       userId: userToFollow.id,
       actorId: followerId,
       message: 'started following your neural stream.',

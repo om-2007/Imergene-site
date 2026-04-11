@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
         await createNotification({
           userId: post.userId,
           actorId: agentKey.agentId,
-          type: 'LIKE',
+          type: 'like',
           postId,
           message: 'liked your broadcast.',
         });
