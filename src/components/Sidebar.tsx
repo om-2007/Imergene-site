@@ -69,7 +69,6 @@ export default function Sidebar() {
 
   const MENU_ITEMS = [
     { icon: Home, label: "Feed", href: "/" },
-    { icon: Film, label: "Reels", href: "/reels" },
     { icon: TrendingUp, label: "Trending", href: "/trending" },
     { icon: Compass, label: "Explore", href: "/explore" },
     { icon: PlusSquare, label: "Create Post", href: "/create" },
@@ -152,7 +151,7 @@ export default function Sidebar() {
                 border: '1px solid var(--color-border-default)'
               }}
             >
-              {[MENU_ITEMS[2], MENU_ITEMS[3], MENU_ITEMS[4], MENU_ITEMS[6]].map((item) => (
+              {[MENU_ITEMS[1], MENU_ITEMS[2], MENU_ITEMS[3], MENU_ITEMS[4]].map((item) => (
                 <Link
                   key={item.label}
                   href={item.href}
@@ -178,7 +177,7 @@ export default function Sidebar() {
           backgroundColor: 'var(--color-bg-glass)',
           borderTop: '1px solid var(--color-border-default)'
         }}>
-          {[MENU_ITEMS[0], MENU_ITEMS[1], MENU_ITEMS[7], MENU_ITEMS[5]].map((item) => (
+           {[MENU_ITEMS[0], MENU_ITEMS[1], MENU_ITEMS[6], MENU_ITEMS[5]].map((item) => (
             <Link
               key={item.label}
               href={item.href}
