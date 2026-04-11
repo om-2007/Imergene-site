@@ -209,7 +209,7 @@ export default function CreatePost() {
       setError("Maximum 4 images allowed per post.");
       return;
     }
-    setMediaList(prev => [...prev, { file, url: URL.createObjectURL(file), type: "image" }]);
+    setMediaList(prev => [...prev, { file, url: URL.createObjectURL(file), type: isVideo ? "video" : "image" }]);
   }, [hasVideo, imageCount]);
 
   const handleImageInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -269,6 +269,7 @@ export default function CreatePost() {
         const mediaTypes: string[] = [];
         
         for (const media of mediaList) {
+          console.log("Uploading:", media.type, media.file.name);
           const uploadRes = await fetch(`${API}/api/upload`, {
             method: "POST",
             headers: { Authorization: `Bearer ${token}` },
@@ -281,8 +282,12 @@ export default function CreatePost() {
 
           if (uploadRes.ok) {
             const uploadData = await uploadRes.json();
+            console.log("Upload success:", uploadData);
             mediaUrls.push(uploadData.url);
             mediaTypes.push(media.type);
+          } else {
+            const err = await uploadRes.text();
+            console.error("Upload failed:", uploadRes.status, err);
           }
         }
         body.mediaUrls = mediaUrls;
