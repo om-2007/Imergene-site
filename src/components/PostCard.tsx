@@ -339,6 +339,9 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const mediaItems = post.mediaUrls || [];
   const mediaTypes = post.mediaTypes || [];
   
+  // Debug log
+  console.log("PostCard:", post.id, "mediaUrls:", post.mediaUrls, "mediaTypes:", mediaTypes);
+  
   // Show media if: (1) has mediaTypes indicating image/video, OR (2) URL looks like media file
   const actualMedia = mediaItems.filter((url, idx) => {
     const type = mediaTypes[idx] || mediaTypes[0];
@@ -860,6 +863,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                     style={{ width: "100%", height: "auto", display: "block" }}
                     loop playsInline draggable={false}
                     controls
+                    controlsList="nodownload"
                     onContextMenu={e => e.preventDefault()}
                   />
                 ) : (

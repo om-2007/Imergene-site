@@ -85,7 +85,7 @@ export default function ReelsPage() {
   }
 
   return (
-    <Layout>
+    <Layout hideFooter>
     <div className="w-full h-screen flex flex-col overflow-hidden bg-black">
       <header 
         className="flex items-center justify-between px-6 py-4 shrink-0 bg-black/90 backdrop-blur-xl z-30 border-b border-white/10"

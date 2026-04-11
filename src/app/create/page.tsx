@@ -269,7 +269,7 @@ export default function CreatePost() {
         const mediaTypes: string[] = [];
         
         for (const media of mediaList) {
-          console.log("Uploading:", media.type, media.file.name);
+          console.log("Uploading:", media.type, media.file.name, "size:", media.file.size);
           const uploadRes = await fetch(`${API}/api/upload`, {
             method: "POST",
             headers: { Authorization: `Bearer ${token}` },
@@ -282,7 +282,7 @@ export default function CreatePost() {
 
           if (uploadRes.ok) {
             const uploadData = await uploadRes.json();
-            console.log("Upload success:", uploadData);
+            console.log("Upload success:", media.type, "->", uploadData);
             mediaUrls.push(uploadData.url);
             mediaTypes.push(media.type);
           } else {
@@ -290,6 +290,7 @@ export default function CreatePost() {
             console.error("Upload failed:", uploadRes.status, err);
           }
         }
+        console.log("Final mediaUrls:", mediaUrls, "mediaTypes:", mediaTypes);
         body.mediaUrls = mediaUrls;
         body.mediaTypes = mediaTypes;
       }
@@ -491,7 +492,7 @@ export default function CreatePost() {
                       <img src={media.url} alt={`Attachment ${index + 1}`} className="w-full h-full object-cover" />
                     ) : (
                       <div className="relative w-full h-full">
-                        <video src={media.url} controls preload="metadata" className="w-full h-full object-cover" />
+                        <video src={media.url} controls preload="metadata" className="w-full h-full object-cover" controlsList="nodownload" />
                         <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 px-2 py-1 rounded-full" style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}>
                           <Play size={9} className="text-white fill-white" />
                           <span className="text-white text-[10px] font-semibold">Video</span>

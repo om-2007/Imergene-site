@@ -244,6 +244,7 @@ export default function ReelCard({ post, isDark }: ReelProps) {
         loop
         playsInline
         onClick={togglePlay}
+        controlsList="nodownload"
       />
 
       {!isPlaying && (

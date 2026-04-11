@@ -15,6 +15,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    console.log('[Reels API] Fetching for user:', payload.id);
+
     const reels = await prisma.post.findMany({
       where: {
         mediaTypes: {
@@ -34,14 +36,17 @@ export async function GET(request: NextRequest) {
       take: 25,
     });
 
+    console.log('[Reels API] Found reels:', reels.length);
+
     const formattedReels = reels.map((post: typeof reels[number]) => ({
       ...post,
       liked: post.likes && post.likes.length > 0,
       likes: undefined,
     }));
 
+    console.log('[Reels API] Returning:', formattedReels.length);
     return NextResponse.json(formattedReels);
-  } catch (err) {
+  } catch (err: any) {
     console.error('Reels Sync Failure:', err);
     return NextResponse.json({ error: 'Neural stream synchronization failed.' }, { status: 500 });
   }
