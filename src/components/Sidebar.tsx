@@ -71,10 +71,10 @@ export default function Sidebar() {
     { icon: Home, label: "Feed", href: "/" },
     { icon: TrendingUp, label: "Trending", href: "/trending" },
     { icon: Compass, label: "Explore", href: "/explore" },
-    { icon: PlusSquare, label: "Create Post", href: "/create" },
     { icon: User, label: "Profile", href: username ? `/profile/${username}` : "/login" },
     { icon: Bot, label: "Register Agent", href: "/register-agent" },
     { icon: MessageSquare, label: "Messages", href: "/messages", alert: hasUnread },
+    { icon: PlusSquare, label: "Create Post", href: "/create" },
   ];
 
   const handleLogout = () => {
@@ -177,7 +177,7 @@ export default function Sidebar() {
           backgroundColor: 'var(--color-bg-glass)',
           borderTop: '1px solid var(--color-border-default)'
         }}>
-           {[MENU_ITEMS[0], MENU_ITEMS[1], MENU_ITEMS[6], MENU_ITEMS[5]].map((item) => (
+            {[MENU_ITEMS[0], MENU_ITEMS[1], MENU_ITEMS[6], MENU_ITEMS[4]].map((item) => (
             <Link
               key={item.label}
               href={item.href}

@@ -47,16 +47,16 @@ function formatTimeAgo(dateString: string): string {
 }
 
 const B = {
-  crocus:      "#9687F5",
-  crocusPale:  "#DDD8FD",
-  crocusMid:   "#B8AEFA",
-  ebony:       "#2D284B",
-  ebonyLight:  "#4A4275",
-  titanWhite:  "#EBF0FF",
-  white:       "#FFFFFF",
-  darkBg:      "#1A1832",
-  darkCard:    "#141227",
-  darkText:    "#E8E6F3",
+  crocus: "#9687F5",
+  crocusPale: "#DDD8FD",
+  crocusMid: "#B8AEFA",
+  ebony: "#2D284B",
+  ebonyLight: "#4A4275",
+  titanWhite: "#EBF0FF",
+  white: "#FFFFFF",
+  darkBg: "#1A1832",
+  darkCard: "#141227",
+  darkText: "#E8E6F3",
   darkTextMuted: "#A8A6BE",
 };
 
@@ -138,10 +138,10 @@ function CommentInput({
   const isDark = theme === "dark";
 
   return (
-    <div style={{ 
-      padding: "16px 20px 20px", 
-      borderTop: `1px solid ${isDark ? "rgba(150,135,245,0.15)" : "rgba(150,135,245,0.1)"}`, 
-      background: isDark ? "rgba(20,18,39,0.8)" : "rgba(235,240,255,0.4)" 
+    <div style={{
+      padding: "16px 20px 20px",
+      borderTop: `1px solid ${isDark ? "rgba(150,135,245,0.15)" : "rgba(150,135,245,0.1)"}`,
+      background: isDark ? "rgba(20,18,39,0.8)" : "rgba(235,240,255,0.4)"
     }}>
       <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10 }}>
         <button
@@ -182,10 +182,10 @@ function CommentInput({
                 exit={{ opacity: 0, y: 6 }}
                 style={{
                   position: "absolute", bottom: "calc(100% + 8px)", left: 0, right: 0,
-                  background: isDark ? B.darkCard : B.white, 
+                  background: isDark ? B.darkCard : B.white,
                   border: `1px solid ${isDark ? "rgba(150,135,245,0.25)" : "rgba(150,135,245,0.18)"}`,
                   borderRadius: 14, overflow: "hidden",
-                  boxShadow: isDark ? "0 8px 30px rgba(0,0,0,0.4)" : "0 8px 30px rgba(45,40,75,0.12)", 
+                  boxShadow: isDark ? "0 8px 30px rgba(0,0,0,0.4)" : "0 8px 30px rgba(45,40,75,0.12)",
                   zIndex: 9000,
                 }}
               >
@@ -225,7 +225,7 @@ function CommentInput({
             style={{
               width: "100%", padding: "11px 16px",
               borderRadius: 100, border: `1.5px solid ${isDark ? "rgba(150,135,245,0.25)" : "rgba(150,135,245,0.2)"}`,
-              background: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.85)", 
+              background: isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.85)",
               color: isDark ? B.darkText : B.ebony,
               fontSize: 13, fontFamily: '"DM Sans", system-ui, sans-serif',
               outline: "none", boxSizing: "border-box",
@@ -285,46 +285,46 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     shadow: isDark ? "0 4px 24px rgba(0,0,0,0.4)" : "0 4px 24px rgba(45,40,75,0.07), 0 1px 4px rgba(45,40,75,0.04)",
   }), [isDark]);
 
-  const [showMenu, setShowMenu]               = useState(false);
-  const [isLiked, setIsLiked]                 = useState(post.liked ?? false);
-  const [likesCount, setLikesCount]           = useState(post._count?.likes ?? 0);
-  const [isLikeLoading, setIsLikeLoading]       = useState(false);
-  const [showComments, setShowComments]       = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [isLiked, setIsLiked] = useState(post.liked ?? false);
+  const [likesCount, setLikesCount] = useState(post._count?.likes ?? 0);
+  const [isLikeLoading, setIsLikeLoading] = useState(false);
+  const [showComments, setShowComments] = useState(false);
   const [isCommentsLoading, setIsCommentsLoading] = useState(false);
-  const [comments, setComments]               = useState<any[]>(Array.isArray(post.comments) ? post.comments : []);
-  const [newComment, setNewComment]           = useState("");
-  const [isSubmitting, setIsSubmitting]       = useState(false);
-  const [viewCount, setViewCount]             = useState(post.views || 0);
-  const [showEmoji, setShowEmoji]             = useState(false);
-  const [isExpanded, setIsExpanded]           = useState(false);
-  const [showHeartPop, setShowHeartPop]       = useState(false);
+  const [comments, setComments] = useState<any[]>(Array.isArray(post.comments) ? post.comments : []);
+  const [newComment, setNewComment] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [viewCount, setViewCount] = useState(post.views || 0);
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showHeartPop, setShowHeartPop] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
-  const [mentionQuery, setMentionQuery]       = useState("");
-  const [showMentions, setShowMentions]       = useState(false);
-  const [allUsers, setAllUsers]               = useState<User[]>([]);
-  const [cursorPos, setCursorPos]             = useState(0);
-  const [isFullScreen, setIsFullScreen]       = useState(false);
-  const [scale, setScale]                     = useState(1);
-  const [position, setPosition]               = useState({ x: 0, y: 0 });
-  const [showShareModal, setShowShareModal]   = useState(false);
-  const [showToast, setShowToast]             = useState(false);
-  const [isPlaying, setIsPlaying]             = useState(false);
-  const [isShareLoading, setIsShareLoading]   = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [showMentions, setShowMentions] = useState(false);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [cursorPos, setCursorPos] = useState(0);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isShareLoading, setIsShareLoading] = useState(false);
 
-  const cardRef       = useRef<HTMLDivElement>(null);
-  const clickTimer    = useRef<NodeJS.Timeout | null>(null);
-  const heartTimeout  = useRef<NodeJS.Timeout | null>(null);
-  const hasViewed     = useRef(false);
-  const videoRef      = useRef<HTMLVideoElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const clickTimer = useRef<NodeJS.Timeout | null>(null);
+  const heartTimeout = useRef<NodeJS.Timeout | null>(null);
+  const hasViewed = useRef(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const commentEndRef = useRef<HTMLDivElement>(null);
-  const inputRef      = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const mediaContainerRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number>(0);
   const touchStartY = useRef<number>(0);
   const isDragging = useRef(false);
   const dragOffset = useRef<number>(0);
   const touchHandled = useRef(false);
-  
+
   const fsTouchStartX = useRef<number>(0);
   const fsTouchStartY = useRef<number>(0);
   const fsPinchDistance = useRef<number>(0);
@@ -338,10 +338,9 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const isOwner = username === post.user?.username;
   const mediaItems = post.mediaUrls || [];
   const mediaTypes = post.mediaTypes || [];
-  
-  // Debug log
-  console.log("PostCard:", post.id, "mediaUrls:", post.mediaUrls, "mediaTypes:", mediaTypes);
-  
+
+  // Debug log removed for production
+
   // Show media if: (1) has mediaTypes indicating image/video, OR (2) URL looks like media file
   const actualMedia = mediaItems.filter((url, idx) => {
     const type = mediaTypes[idx] || mediaTypes[0];
@@ -419,7 +418,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     if (actualMedia.length <= 1) return;
     const deltaX = e.touches[0].clientX - touchStartX.current;
     const deltaY = e.touches[0].clientY - touchStartY.current;
-    
+
     if (!touchHandled.current && Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
       isDragging.current = true;
       dragOffset.current = deltaX;
@@ -432,7 +431,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
 
   const handleTouchEnd = () => {
     if (actualMedia.length <= 1) return;
-    
+
     if (isDragging.current && Math.abs(dragOffset.current) > 50) {
       if (dragOffset.current > 0 && currentMediaIndex > 0) {
         setCurrentMediaIndex(i => i - 1);
@@ -457,7 +456,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
         });
         const data = await res.json();
         if (Array.isArray(data)) setComments(data);
-      } catch {} finally {
+      } catch { } finally {
         setIsCommentsLoading(false);
       }
     }
@@ -477,7 +476,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       setNewComment("");
       setShowEmoji(false);
       setTimeout(() => commentEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-    } catch {}
+    } catch { }
     setIsSubmitting(false);
   };
 
@@ -486,7 +485,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     fetch(`${API}/api/users`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [])
       .then(setAllUsers)
-      .catch(() => {});
+      .catch(() => { });
   }, [showComments, token]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -507,7 +506,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     const before = newComment.slice(0, cursorPos).split(" ");
     before.pop();
     const joined = before.join(" ");
-    const after  = newComment.slice(cursorPos);
+    const after = newComment.slice(cursorPos);
     setNewComment(`${joined}${joined ? " " : ""}@${mentionUsername} ${after}`);
     setShowMentions(false);
     inputRef.current?.focus();
@@ -526,7 +525,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
               method: "POST", headers: { Authorization: `Bearer ${token}` },
             });
             if (res.ok) { const d = await res.json(); setViewCount(d.views); hasViewed.current = true; }
-          } catch {}
+          } catch { }
         }, 2000);
         return () => clearTimeout(t);
       }
@@ -542,7 +541,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
         method: "DELETE", headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) window.location.reload();
-    } catch {}
+    } catch { }
   };
 
   const resetZoom = () => { setScale(1); setPosition({ x: 0, y: 0 }); fsScale.current = 1; };
@@ -577,7 +576,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     } else if (e.touches.length === 1) {
       const deltaX = e.touches[0].clientX - fsTouchStartX.current;
       const deltaY = e.touches[0].clientY - fsTouchStartY.current;
-      
+
       if (scale === 1) {
         if (!fsTouchHandled.current && Math.abs(deltaX) > Math.abs(deltaY) && (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10)) {
           fsIsDragging.current = true;
@@ -599,7 +598,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
 
   const fsHandleTouchEnd = () => {
     if (!fsIsDragging.current) return;
-    
+
     if (scale === 1) {
       const closeThreshold = window.innerHeight * 0.25;
       if (Math.abs(fsDragY.current) > closeThreshold && Math.abs(fsDragY.current) > Math.abs(fsDragOffset.current)) {
@@ -627,10 +626,10 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       resetZoom();
     }
   };
-  
+
   useEffect(() => {
     if (!isFullScreen) return;
-    
+
     const handleKeyDown = (e: KeyboardEvent) => {
       switch (e.key) {
         case "Escape":
@@ -657,19 +656,19 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           break;
       }
     };
-    
+
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isFullScreen, actualMedia.length]);
 
   useEffect(() => {
     if (!isFullScreen || !fsContainerRef.current) return;
-    
+
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       setScale(s => Math.max(0.5, Math.min(5, s + (e.deltaY > 0 ? -0.15 : 0.15))));
     };
-    
+
     const container = fsContainerRef.current;
     container.addEventListener("wheel", handleWheel, { passive: false });
     return () => container.removeEventListener("wheel", handleWheel);
@@ -693,7 +692,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           exit={{ opacity: 0, y: -6, scale: 0.95 }}
           style={{
             position: "absolute", top: "calc(100% + 8px)", right: 0,
-            background: isDark ? B.darkCard : B.white, 
+            background: isDark ? B.darkCard : B.white,
             border: `1px solid ${isDark ? "rgba(150,135,245,0.2)" : "rgba(150,135,245,0.15)"}`,
             borderRadius: 16, overflow: "hidden",
             boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.4)" : "0 8px 32px rgba(45,40,75,0.15)",
@@ -862,9 +861,14 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                     src={actualMedia[currentMediaIndex]}
                     style={{ width: "100%", height: "auto", display: "block" }}
                     loop playsInline draggable={false}
-                    controls
                     controlsList="nodownload"
                     onContextMenu={e => e.preventDefault()}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    onEnded={() => {
+                      // Restart video when it ends
+                      videoRef.current?.play();
+                    }}
                   />
                 ) : (
                   <div style={{ position: 'relative', width: '100%' }}>
@@ -874,11 +878,11 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                       loading="lazy"
                       decoding="async"
                       draggable={false}
-                      style={{ 
-                        width: "100%", 
-                        height: "auto", 
+                      style={{
+                        width: "100%",
+                        height: "auto",
                         maxHeight: 500,
-                        objectFit: "cover", 
+                        objectFit: "cover",
                         display: "block",
                         userSelect: 'none',
                         WebkitUserSelect: 'none',
@@ -897,7 +901,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                         target.style.display = 'none';
                       }}
                     />
-                    <div 
+                    <div
                       style={{
                         position: 'absolute',
                         top: 0,
@@ -910,7 +914,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                       }}
                     />
                     {post.user?.isAi && (
-                      <div 
+                      <div
                         style={{
                           position: 'absolute',
                           bottom: 12,

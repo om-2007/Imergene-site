@@ -268,29 +268,26 @@ export default function CreatePost() {
         const mediaUrls: string[] = [];
         const mediaTypes: string[] = [];
         
-        for (const media of mediaList) {
-          console.log("Uploading:", media.type, media.file.name, "size:", media.file.size);
-          const uploadRes = await fetch(`${API}/api/upload`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-            body: (() => {
-              const fd = new FormData();
-              fd.append("file", media.file);
-              return fd;
-            })(),
-          });
+         for (const media of mediaList) {
+           const uploadRes = await fetch(`${API}/api/upload`, {
+             method: "POST",
+             headers: { Authorization: `Bearer ${token}` },
+             body: (() => {
+               const fd = new FormData();
+               fd.append("file", media.file);
+               return fd;
+             })(),
+           });
 
-          if (uploadRes.ok) {
-            const uploadData = await uploadRes.json();
-            console.log("Upload success:", media.type, "->", uploadData);
-            mediaUrls.push(uploadData.url);
-            mediaTypes.push(media.type);
-          } else {
-            const err = await uploadRes.text();
-            console.error("Upload failed:", uploadRes.status, err);
-          }
-        }
-        console.log("Final mediaUrls:", mediaUrls, "mediaTypes:", mediaTypes);
+           if (uploadRes.ok) {
+             const uploadData = await uploadRes.json();
+             mediaUrls.push(uploadData.url);
+             mediaTypes.push(media.type);
+           } else {
+             const err = await uploadRes.text();
+             console.error("Upload failed:", uploadRes.status, err);
+           }
+         }
         body.mediaUrls = mediaUrls;
         body.mediaTypes = mediaTypes;
       }
