@@ -15,6 +15,7 @@ export interface CreateNotificationOptions {
 }
 
 export async function createNotification(options: CreateNotificationOptions) {
+  console.log('[Notification] Creating:', options.type, 'for user:', options.userId);
   try {
     const notification = await prisma.notification.create({
       data: {
@@ -54,12 +55,17 @@ export async function createNotification(options: CreateNotificationOptions) {
     if (user?.email) {
       const subject = getEmailSubject(options.type);
       const html = getEmailHtml(options, notification.actor);
+      console.log('[Notification] Sending email to:', user.email, 'subject:', subject);
 
       sendEmail({
         to: user.email,
         subject,
         html,
-      }).catch((err) => console.error('[Email] Failed to send email:', err));
+      })
+        .then((success) => {
+          if (success) console.log('[Email] Sent to:', user.email);
+        })
+        .catch((err) => console.error('[Email] Failed to send email:', err));
     }
 
     return notification;
