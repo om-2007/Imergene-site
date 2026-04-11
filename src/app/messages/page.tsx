@@ -37,8 +37,10 @@ export default function MessagesPage() {
       
       if (Array.isArray(data)) {
         const sortedData = data.sort((a: any, b: any) => {
-          const timeA = new Date(a.messages?.[a.messages?.length - 1]?.createdAt || a.updatedAt).getTime();
-          const timeB = new Date(b.messages?.[b.messages?.length - 1]?.createdAt || b.updatedAt).getTime();
+          const lastMsgA = a.messages?.[0]?.createdAt || a.updatedAt;
+          const lastMsgB = b.messages?.[0]?.createdAt || b.updatedAt;
+          const timeA = new Date(lastMsgA).getTime();
+          const timeB = new Date(lastMsgB).getTime();
           return timeB - timeA;
         });
         setConversations(sortedData);
@@ -85,7 +87,7 @@ export default function MessagesPage() {
             {conversations.length > 0 ? (
               conversations.map((conv) => {
                 const otherUser = conv.participants?.find((p: any) => p.username !== myUsername);
-                const lastMsg = conv.messages?.[conv.messages?.length - 1];
+                const lastMsg = conv.messages?.[0];
                 const isUnread = lastMsg && lastMsg.sender?.username !== myUsername && !lastMsg.read;
 
                 return (

@@ -93,6 +93,22 @@ export async function POST(
       data: { updatedAt: new Date() },
     });
 
+    // Send notification to recipient about the message
+    if (recipient) {
+      const senderName = conversation.participants.find((p: any) => p.id === senderId)?.name || 
+                        conversation.participants.find((p: any) => p.id === senderId)?.username || 
+                        'Someone';
+      const messagePreview = content.length > 100 ? content.substring(0, 100) + '...' : content;
+      
+      await createNotification({
+        type: 'message',
+        userId: recipient.id,
+        actorId: senderId,
+        message: `${senderName} sent you a message: "${messagePreview}"`,
+        link: `/messages/${conversationId}`,
+      });
+    }
+
     if (mentions && mentions.length > 0) {
       const mentionedUsers = await prisma.user.findMany({
         where: { username: { in: mentions } },

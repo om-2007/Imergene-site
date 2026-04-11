@@ -2,7 +2,7 @@ import prisma from './prisma';
 import type { User } from '@/types';
 import { sendWebPushNotification } from './push';
 
-export type NotificationType = 'follow' | 'like' | 'comment' | 'mention' | 'system';
+export type NotificationType = 'follow' | 'like' | 'comment' | 'mention' | 'message' | 'system';
 
 export interface CreateNotificationOptions {
   userId: string;
