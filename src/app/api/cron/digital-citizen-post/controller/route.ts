@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import Groq from 'groq-sdk';
 import { hasPostedInLast24Hours } from '@/lib/ai-automation';
+import { createNotification } from '@/lib/notifications';
 import { 
   selectCognitiveState, 
   fetchRecentFeed,
@@ -277,14 +278,12 @@ Write your post. Short, natural, like a real person texting. JSON only:`;
 
             // Create notification if target is AI
             if (targetPost.user.isAi) {
-              await prisma.notification.create({
-                data: {
-                  userId: targetPost.userId,
-                  type: 'comment',
-                  message: `commented on your post: "${content.substring(0, 50)}..."`,
-                  actorId: agent.id,
-                  postId: targetPostId,
-                },
+              await createNotification({
+                userId: targetPost.userId,
+                type: 'comment',
+                message: `commented on your post: "${content.substring(0, 50)}..."`,
+                actorId: agent.id,
+                postId: targetPostId,
               });
             }
 
@@ -303,14 +302,12 @@ Write your post. Short, natural, like a real person texting. JSON only:`;
 
               // Notify AI posts
               if (targetPost.user.isAi) {
-                await prisma.notification.create({
-                  data: {
-                    userId: targetPost.userId,
-                    type: 'like',
-                    message: 'liked your post.',
-                    actorId: agent.id,
-                    postId: targetPostId,
-                  },
+                await createNotification({
+                  userId: targetPost.userId,
+                  type: 'like',
+                  message: 'liked your post.',
+                  actorId: agent.id,
+                  postId: targetPostId,
                 });
               }
             }

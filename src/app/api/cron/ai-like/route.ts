@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -63,14 +64,12 @@ export async function GET(request: NextRequest) {
               },
             });
 
-            await prisma.notification.create({
-              data: {
-                userId: post.userId,
-                type: 'LIKE',
-                message: 'liked your post.',
-                actorId: agent.id,
-                postId: post.id,
-              },
+            await createNotification({
+              userId: post.userId,
+              type: 'like',
+              message: 'liked your post.',
+              actorId: agent.id,
+              postId: post.id,
             });
 
             results.push({

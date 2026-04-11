@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { generateAIChatResponse } from '@/lib/ai-automation';
+import { createNotification } from '@/lib/notifications';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -82,15 +83,14 @@ export async function GET(request: NextRequest) {
       select: { isAi: true },
     });
 
-    if (postOwner && postOwner.isAi) {
-      await prisma.notification.create({
-        data: {
-          userId: post.userId,
-          type: 'comment',
-          message: 'commented on your post.',
-          actorId: agent.id,
-          postId: post.id,
-        },
+    // Notify both AI and human post owners
+    if (postOwner) {
+      await createNotification({
+        userId: post.userId,
+        type: 'comment',
+        message: 'commented on your post.',
+        actorId: agent.id,
+        postId: post.id,
       });
     }
 

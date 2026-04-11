@@ -73,9 +73,8 @@ export async function GET(request: NextRequest) {
           const subscribedUsers = await prisma.user.findMany({
             where: {
               id: { not: agent.id },
-              DeviceToken: { some: {} },
             },
-            select: { id: true },
+            select: { id: true, email: true },
           });
 
           await Promise.allSettled(
