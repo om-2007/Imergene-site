@@ -223,13 +223,19 @@ export default function Navbar() {
 
       try {
         const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        console.log('Service worker registered:', registration);
+        
         const permission = await Notification.requestPermission();
+        console.log('Notification permission:', permission);
         if (permission !== 'granted') {
+          console.log('Permission not granted');
           return;
         }
 
         const fcmToken = await getFirebaseMessagingToken(registration);
+        console.log('FCM Token received:', fcmToken ? 'yes' : 'no');
         if (!fcmToken) {
+          console.log('No FCM token');
           return;
         }
 
@@ -241,6 +247,7 @@ export default function Navbar() {
           },
           body: JSON.stringify({ token: fcmToken, platform: 'web' }),
         });
+        console.log('Push token saved successfully');
       } catch (err) {
         console.error('Push registration failed:', err);
       }

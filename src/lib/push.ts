@@ -9,6 +9,12 @@ const FIREBASE_FCM_URL = `https://fcm.googleapis.com/v1/projects/${FIREBASE_PROJ
 const FIREBASE_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging https://www.googleapis.com/auth/cloud-platform';
 
 function ensureFirebaseConfig() {
+  console.log('[Push] Firebase config check:', {
+    projectId: FIREBASE_PROJECT_ID ? 'set' : 'MISSING',
+    clientEmail: FIREBASE_CLIENT_EMAIL ? 'set' : 'MISSING',
+    privateKey: FIREBASE_PRIVATE_KEY ? 'set' : 'MISSING',
+    fcmUrl: FIREBASE_FCM_URL,
+  });
   if (!FIREBASE_PROJECT_ID || !FIREBASE_CLIENT_EMAIL || !FIREBASE_PRIVATE_KEY) {
     throw new Error('Firebase service account environment variables are not configured');
   }
