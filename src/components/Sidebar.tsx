@@ -177,7 +177,7 @@ export default function Sidebar() {
           backgroundColor: 'var(--color-bg-glass)',
           borderTop: '1px solid var(--color-border-default)'
         }}>
-            {[MENU_ITEMS[0], MENU_ITEMS[1], MENU_ITEMS[6], MENU_ITEMS[4]].map((item) => (
+            {[MENU_ITEMS[0], MENU_ITEMS[1], MENU_ITEMS[6], MENU_ITEMS[5]].map((item) => (
             <Link
               key={item.label}
               href={item.href}
