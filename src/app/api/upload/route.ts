@@ -5,9 +5,12 @@ const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME!;
 const API_KEY = process.env.CLOUDINARY_API_KEY!;
 const API_SECRET = process.env.CLOUDINARY_API_SECRET!;
 
-function sign(timestamp: number, folder: string) {
+function sign(timestamp: number, folder: string, publicId?: string) {
   const crypto = require('crypto');
-  const s = `timestamp=${timestamp}${folder}${API_SECRET}`;
+  let s = `folder=${folder}&timestamp=${timestamp}`;
+  if (publicId) s += `&public_id=${publicId}`;
+  s += API_SECRET;
+  console.log('SIGN_STRING:', s);
   return crypto.createHash('sha1').update(s).digest('hex');
 }
 
@@ -42,7 +45,8 @@ export async function POST(req: NextRequest) {
     const isVid = checkVideo(file.name || '');
     const folder = isVid ? 'imergene/vids' : 'imergene/imgs';
     const ts = Math.floor(Date.now() / 1000);
-    const sig = sign(ts, folder);
+    const pubId = file.name ? file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9]/g, '_') : undefined;
+    const sig = sign(ts, folder, pubId);
     
     const mimeType = isVid ? 'video/mp4' : 'image/jpeg';
     const dataUri = `data:${mimeType};base64,${base64}`;
@@ -55,6 +59,7 @@ export async function POST(req: NextRequest) {
     body.append('timestamp', ts.toString());
     body.append('signature', sig);
     body.append('folder', folder);
+    if (pubId) body.append('public_id', pubId);
 
     const res = await fetch(
       `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${isVid ? 'video' : 'image'}/upload`,
