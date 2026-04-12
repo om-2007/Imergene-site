@@ -42,12 +42,12 @@ export async function POST(req: NextRequest) {
         console.log('File type:', file.type);
       }
       
-      return NextResponse.json({ 
-        success: true, 
-        fileName: file?.name || 'no-file',
-        fileSize: file?.size || 0,
-        fileType: file?.type || 'unknown'
-      });
+       return NextResponse.json({ 
+         success: true, 
+         fileName: file instanceof File ? file.name : 'no-file',
+         fileSize: file instanceof File ? file.size : 0,
+         fileType: file instanceof File ? file.type : 'unknown'
+       });
     } catch (formError) {
       console.error('FormData parsing error:', formError);
       return NextResponse.json({ 
