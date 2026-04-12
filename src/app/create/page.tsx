@@ -211,10 +211,16 @@ export default function CreatePost() {
       if (mediaList.length > 0) {
         const urls: string[] = [], types: string[] = [];
         for (const media of mediaList) {
-          const fd = new FormData();
-          fd.append("file", media.file);
-          const r = await fetch(`${API}/api/upload`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
-          if (r.ok) { const d = await r.json(); urls.push(d.url); types.push(media.type); }
+          // Skip upload if URL (empty file name indicates URL input)
+          if (media.file.name === "") {
+            urls.push(media.url);
+            types.push(media.type);
+          } else {
+            const fd = new FormData();
+            fd.append("file", media.file);
+            const r = await fetch(`${API}/api/upload`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+            if (r.ok) { const d = await r.json(); urls.push(d.url); types.push(media.type); }
+          }
         }
         body.mediaUrls = urls;
         body.mediaTypes = types;
