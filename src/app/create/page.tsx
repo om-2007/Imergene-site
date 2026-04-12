@@ -13,6 +13,7 @@ import {
   Globe,
   Smile,
   ChevronRight,
+  LinkIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -75,6 +76,26 @@ export default function CreatePost() {
   const [text, setText] = useState("");
   const [mediaList, setMediaList] = useState<MediaPreview[]>([]);
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [urlInput, setUrlInput] = useState("");
+
+  const handleUrlSubmit = () => {
+    if (!urlInput.trim()) return;
+    const url = urlInput.trim();
+    const isVideo = url.match(/\.(mp4|webm|mov|avi)$/i) || url.includes('cloudinary') && url.includes('/video/');
+    const isImage = url.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i) || url.includes('cloudinary') && url.includes('/image/');
+    if (isVideo && !hasVideo && imageCount === 0) {
+      setMediaList(prev => [...prev, { file: new File([], "video"), url, type: "video" }]);
+      setUrlInput("");
+      setShowUrlInput(false);
+    } else if (isImage && !hasVideo && imageCount < 4) {
+      setMediaList(prev => [...prev, { file: new File([], "image"), url, type: "image" }]);
+      setUrlInput("");
+      setShowUrlInput(false);
+    } else {
+      setError("Invalid URL or cannot add more media");
+    }
+  };
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -412,6 +433,43 @@ export default function CreatePost() {
                 <Video size={15} />
                 {hasVideo ? "Video added ✓" : "Add a video"}
               </button>
+
+              {/* URL for PWA fallback - show when no media */}
+              {mediaList.length === 0 && (
+                <button
+                  onClick={() => setShowUrlInput(v => !v)}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-150 active:scale-95"
+                  style={{
+                    background: "var(--color-bg-primary)",
+                    color: "var(--color-text-muted)",
+                    border: "1.5px solid var(--color-border-default)",
+                  }}
+                >
+                  <LinkIcon size={15} />
+                  Add via URL
+                </button>
+                
+                {showUrlInput && (
+                  <div className="absolute bottom-full left-0 mb-2 w-64 p-3 rounded-xl z-50" style={{ backgroundColor: "var(--color-bg-card)", border: "1px solid var(--color-border-default)" }}>
+                    <input
+                      type="url"
+                      placeholder="Paste video/image URL..."
+                      value={urlInput}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleUrlSubmit()}
+                      className="w-full px-3 py-2 rounded-lg text-sm"
+                      style={{ background: "var(--color-bg-primary)", color: "var(--color-text-primary)", border: "1px solid var(--color-border-default)" }}
+                    />
+                    <button
+                      onClick={handleUrlSubmit}
+                      className="mt-2 w-full py-2 rounded-lg text-sm font-semibold"
+                      style={{ background: "var(--color-accent)", color: "#fff" }}
+                    >
+                      Add URL
+                    </button>
+                  </div>
+                )}
+              )}
 
               {/* Emoji */}
               <div ref={emojiRef} className="relative">
