@@ -49,31 +49,51 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // Log file details for debugging
-    console.log('Upload file details:', {
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      lastModified: file.lastModified
-    });
+     // Log file details for debugging
+     console.log('Upload file details:', {
+       name: file.name,
+       size: file.size,
+       type: file.type,
+       lastModified: file.lastModified
+     });
+     
+     // Additional mobile-specific debugging
+     console.log('File instance checks:', {
+       isFile: file instanceof File,
+       isBlob: file instanceof Blob,
+       typeof: typeof file
+     });
+     
+     // Check if we can access file properties that might be problematic on mobile
+     try {
+       console.log('File accessibility test:', {
+         nameAccessible: !!file.name,
+         sizeAccessible: typeof file.size === 'number',
+         typeAccessible: !!file.type
+       });
+     } catch (e) {
+       console.error('File accessibility error:', e);
+     }
 
-    // More mobile-compatible way to get file buffer
-    let buffer: Buffer;
-    try {
-      // Try arrayBuffer first (modern browsers)
-      const arrayBuffer = await file.arrayBuffer();
-      buffer = Buffer.from(arrayBuffer);
-    } catch (arrayBufferError) {
-      console.warn('arrayBuffer failed, trying stream:', arrayBufferError);
-      // Fallback for older/mobile browsers
-      const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as ArrayBuffer);
-        reader.onerror = () => reject(reader.error);
-        reader.readAsArrayBuffer(file);
-      });
-      buffer = Buffer.from(arrayBuffer);
-    }
+     // More mobile-compatible way to get file buffer
+     let buffer: Buffer;
+     try {
+       // Try arrayBuffer first (modern browsers)
+       const arrayBuffer = await file.arrayBuffer();
+       buffer = Buffer.from(arrayBuffer);
+       console.log('Used arrayBuffer method for file, size:', buffer.length);
+     } catch (arrayBufferError) {
+       console.warn('arrayBuffer failed, trying FileReader:', arrayBufferError);
+       // Fallback for older/mobile browsers
+       const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+         const reader = new FileReader();
+         reader.onload = () => resolve(reader.result as ArrayBuffer);
+         reader.onerror = () => reject(reader.error);
+         reader.readAsArrayBuffer(file);
+       });
+       buffer = Buffer.from(arrayBuffer);
+       console.log('Used FileReader fallback for file, size:', buffer.length);
+     }
 
     const fileName = (file.name || '').toLowerCase();
     const isVid = isVideo(fileName);
@@ -82,47 +102,71 @@ export async function POST(req: NextRequest) {
     const folder = isVid ? 'imergene/videos' : 'imergene/posts';
     const publicId = fileName.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9]/g, '_') || undefined;
     
-    // Build signature params - Cloudinary requires these specific params for signature
-    const signatureParams: Record<string, string> = {
-      folder,
-      timestamp: timestamp.toString()
-    };
-    if (publicId) signatureParams.public_id = publicId;
+     // Build signature params - Cloudinary requires these specific params for signature
+     const signatureParams: Record<string, string> = {
+       folder,
+       timestamp: timestamp.toString()
+     };
+     if (publicId) signatureParams.public_id = publicId;
+     
+     console.log('Signature params:', signatureParams);
+     const signature = buildSignature(signatureParams);
+     console.log('Generated signature:', signature);
     
-    const signature = buildSignature(signatureParams);
-    
-    // Prepare form data for Cloudinary upload
-    const form = new FormData();
-    form.append('file', file);
-    form.append('api_key', API_KEY);
-    form.append('timestamp', timestamp.toString());
-    form.append('signature', signature);
-    form.append('folder', folder);
-    if (publicId) form.append('public_id', publicId);
-    // Critical: resource_type tells Cloudinary how to process the file
-    form.append('resource_type', isVid ? 'video' : 'image');
+     // Prepare form data for Cloudinary upload
+     const form = new FormData();
+     form.append('file', file);
+     form.append('api_key', API_KEY);
+     form.append('timestamp', timestamp.toString());
+     form.append('signature', signature);
+     form.append('folder', folder);
+     if (publicId) form.append('public_id', publicId);
+     // Critical: resource_type tells Cloudinary how to process the file
+     form.append('resource_type', isVid ? 'video' : 'image');
+     
+     // Log FormData contents for debugging
+     console.log('FormData contents:');
+     for (const [key, value] of form.entries()) {
+       if (key === 'file') {
+         console.log(`${key}: File object (${value.name}, ${value.size} bytes, ${value.type})`);
+       } else if (key === 'signature') {
+         console.log(`${key}: [HIDDEN]`);
+       } else {
+         console.log(`${key}: ${value}`);
+       }
+     }
 
-    console.log('Uploading to Cloudinary:', {
-      folder,
-      isVid,
-      fileName,
-      size: file.size
-    });
+     console.log('Uploading to Cloudinary:', {
+       folder,
+       isVid,
+       fileName,
+       size: file.size
+     });
+     console.log('Cloudinary URL:', `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${isVid ? 'video' : 'image'}/upload`);
 
-    const cloudRes = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${isVid ? 'video' : 'image'}/upload`,
-      {
-        method: 'POST',
-        body: form,
-        // Don't set Content-Type header - let browser set it for FormData
-      }
-    );
+     const cloudRes = await fetch(
+       `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${isVid ? 'video' : 'image'}/upload`,
+       {
+         method: 'POST',
+         body: form,
+         // Don't set Content-Type header - let browser set it for FormData
+       }
+     );
 
-    if (!cloudRes.ok) {
-      const errorText = await cloudRes.text();
-      console.error('Cloudinary error:', cloudRes.status, errorText);
-      return NextResponse.json({ error: 'Upload failed: ' + errorText }, { status: 500 });
-    }
+     // Log response details for debugging mobile issues
+     console.log('Cloudinary response status:', cloudRes.status);
+     console.log('Cloudinary response headers:', Object.fromEntries(cloudRes.headers));
+
+     if (!cloudRes.ok) {
+       const errorText = await cloudRes.text();
+       console.error('Cloudinary error:', cloudRes.status, errorText);
+       // Include more specific error info for mobile debugging
+       return NextResponse.json({ 
+         error: 'Upload failed: ' + errorText,
+         status: cloudRes.status,
+         mobileHint: 'Check if mobile browser is blocking the request or if there are CORS issues'
+       }, { status: 500 });
+     }
 
     const result = await cloudRes.json();
     console.log('Cloudinary upload successful:', result);
@@ -133,8 +177,12 @@ export async function POST(req: NextRequest) {
       type: isVid ? 'video' : 'image'
     });
     
-  } catch (error: any) {
-    console.error('Upload error:', error);
-    return NextResponse.json({ error: 'Internal server error', details: error.message }, { status: 500 });
-  }
+   } catch (error: any) {
+     console.error('Upload error:', error);
+     // Log stack trace for debugging
+     if (error.stack) {
+       console.error('Upload error stack:', error.stack);
+     }
+     return NextResponse.json({ error: 'Internal server error', details: error.message }, { status: 500 });
+   }
 }

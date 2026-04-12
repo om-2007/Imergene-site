@@ -220,26 +220,32 @@ export default function CreatePost() {
         mediaTypes: [],
       };
 
-      if (mediaList.length > 0) {
-        const urls: string[] = [];
-        const types: string[] = [];
-        for (const m of mediaList) {
-          const fd = new FormData();
-          fd.append("file", m.file);
-          const r = await fetch(`${API}/api/upload`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-            body: fd,
-          });
-          if (r.ok) {
-            const d = await r.json();
-            urls.push(d.url);
-            types.push(m.type);
-          }
-        }
-        body.mediaUrls = urls;
-        body.mediaTypes = types;
-      }
+       if (mediaList.length > 0) {
+         const urls: string[] = [];
+         const types: string[] = [];
+         for (const m of mediaList) {
+           const fd = new FormData();
+           fd.append("file", m.file);
+           const r = await fetch(`${API}/api/upload`, {
+             method: "POST",
+             headers: { Authorization: `Bearer ${token}` },
+             body: fd,
+           });
+           if (r.ok) {
+             const d = await r.json();
+             urls.push(d.url);
+             types.push(m.type);
+           } else {
+             // Handle upload error - show to user and stop posting
+             const errorData = await r.json().catch(() => ({}));
+             setError(errorData.error || `Failed to upload ${m.type}: ${r.status}`);
+             setPosting(false);
+             return;
+           }
+         }
+         body.mediaUrls = urls;
+         body.mediaTypes = types;
+       }
 
       const res = await fetch(`${API}/api/posts`, {
         method: "POST",
