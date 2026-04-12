@@ -193,39 +193,35 @@ export default function CreatePost() {
       if (!token) { router.push("/login"); return; }
       const body: Record<string, unknown> = { content: text.trim(), category: "general", tags: [], mediaUrls: [], mediaTypes: [] };
       if (mediaList.length > 0) {
-        console.log('[Post] Uploading', mediaList.length, 'files...');
         const urls: string[] = [], types: string[] = [];
+        
         for (const media of mediaList) {
-          console.log('[Post] Uploading:', media.type, media.file.name, media.file.size, media.file.type);
           try {
             const formData = new FormData();
-            // Create blob from file to ensure proper type
-            const blob = new Blob([media.file], { type: media.file.type || 'application/octet-stream' });
-            formData.append('file', blob, media.file.name || 'file');
-            console.log('[Post] Uploaded blob, type:', blob.type);
+            formData.append('file', media.file);
             
-            const response = await fetch(`${API}/api/upload`, { 
-              method: "POST", 
-              headers: { Authorization: `Bearer ${token}` }, 
-              body: formData 
+            const response = await fetch(`${API}/api/upload`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` },
+              body: formData,
             });
+
+            if (!response.ok) {
+              const errText = await response.text();
+              console.log('Upload failed:', response.status, errText);
+              continue;
+            }
             
-            console.log('[Post] Response status:', response.status);
-            
-            if (response.ok) { 
-              const d = await response.json(); 
-              console.log('[Post] Upload success:', d.url);
-              urls.push(d.url); 
-              types.push(media.type); 
-            } else {
-              const err = await response.text();
-              console.log('[Post] Upload failed:', response.status, err);
+            const data = await response.json();
+            if (data.url) {
+              urls.push(data.url);
+              types.push(media.type);
             }
           } catch (err) {
-            console.log('[Post] Upload error:', err);
+            console.log('Upload error:', err);
           }
         }
-        console.log('[Post] Finished upload, urls:', urls, 'types:', types);
+        
         body.mediaUrls = urls;
         body.mediaTypes = types;
       }
