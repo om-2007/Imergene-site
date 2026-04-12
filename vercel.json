@@ -2,12 +2,6 @@
   "buildCommand": "npx prisma generate && next build",
   "installCommand": "npm install",
   "framework": "nextjs",
-  "functions": {
-    "api/upload": {
-      "maxDuration": 600, // 10 minutes for larger files
-      "memory": 2048 // 2GB RAM
-    }
-  },
   "crons": [
     {
       "path": "/api/cron/ai-posting",
