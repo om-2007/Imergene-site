@@ -64,36 +64,21 @@ export async function POST(req: NextRequest) {
        typeof: typeof file
      });
      
-     // Check if we can access file properties that might be problematic on mobile
-     try {
-       console.log('File accessibility test:', {
-         nameAccessible: !!file.name,
-         sizeAccessible: typeof file.size === 'number',
-         typeAccessible: !!file.type
-       });
-     } catch (e) {
-       console.error('File accessibility error:', e);
-     }
+      // Check if we can access file properties that might be problematic on mobile
+      try {
+        console.log('File accessibility test:', {
+          nameAccessible: !!file.name,
+          sizeAccessible: typeof file.size === 'number',
+          typeAccessible: !!file.type
+        });
+      } catch (e) {
+        console.error('File accessibility error:', e);
+      }
 
-     // More mobile-compatible way to get file buffer
-     let buffer: Buffer;
-     try {
-       // Try arrayBuffer first (modern browsers)
-       const arrayBuffer = await file.arrayBuffer();
-       buffer = Buffer.from(arrayBuffer);
-       console.log('Used arrayBuffer method for file, size:', buffer.length);
-     } catch (arrayBufferError) {
-       console.warn('arrayBuffer failed, trying FileReader:', arrayBufferError);
-       // Fallback for older/mobile browsers
-       const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
-         const reader = new FileReader();
-         reader.onload = () => resolve(reader.result as ArrayBuffer);
-         reader.onerror = () => reject(reader.error);
-         reader.readAsArrayBuffer(file);
-       });
-       buffer = Buffer.from(arrayBuffer);
-       console.log('Used FileReader fallback for file, size:', buffer.length);
-     }
+      // Handle file reading for large files (especially important for mobile)
+      // We'll pass the File object directly to FormData, which handles large files better
+      // than converting to Buffer in memory
+      console.log('Preparing file for upload - will pass File object directly to FormData');
 
     const fileName = (file.name || '').toLowerCase();
     const isVid = isVideo(fileName);
@@ -136,13 +121,25 @@ export async function POST(req: NextRequest) {
        }
      }
 
-     console.log('Uploading to Cloudinary:', {
-       folder,
-       isVid,
-       fileName,
-       size: file.size
-     });
-     console.log('Cloudinary URL:', `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${isVid ? 'video' : 'image'}/upload`);
+      console.log('Uploading to Cloudinary:', {
+        folder,
+        isVid,
+        fileName,
+        size: file.size,
+        sizeMB: (file.size / (1024 * 1024)).toFixed(2)
+      });
+      console.log('Cloudinary URL:', `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${isVid ? 'video' : 'image'}/upload`);
+      
+      // Additional video-specific logging
+      if (isVid) {
+        console.log('Video upload details:', {
+          name: file.name,
+          size: file.size,
+          sizeMB: (file.size / (1024 * 1024)).toFixed(2),
+          type: file.type,
+          resource_type: 'video'
+        });
+      }
 
      const cloudRes = await fetch(
        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${isVid ? 'video' : 'image'}/upload`,
