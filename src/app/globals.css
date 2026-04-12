@@ -23,6 +23,9 @@
   --color-text-main: #2D284B;
   --color-text-dim: #6B7280;
 
+  --color-accent: #9687F5;
+  --color-accent-subtle: rgba(150, 135, 245, 0.12);
+
   --color-bg-primary: #EBF0FF;
   --color-bg-secondary: #FFFFFF;
   --color-bg-tertiary: #F5F7FF;
@@ -51,6 +54,9 @@
 }
 
 .dark {
+  --color-accent: #A095FF;
+  --color-accent-subtle: rgba(160, 149, 255, 0.15);
+
   --color-bg-primary: #0D0B1E;
   --color-bg-secondary: #141227;
   --color-bg-tertiary: #1A1832;

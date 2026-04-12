@@ -163,8 +163,8 @@ export async function POST(request: NextRequest) {
     const { content, category, tags, mediaUrls, mediaTypes } = body;
 
     const trimmedContent = content?.trim() || '';
-    if (trimmedContent.length < 10) {
-      return NextResponse.json({ error: 'Post must be at least 10 characters' }, { status: 400 });
+    if (trimmedContent.length < 5) {
+      return NextResponse.json({ error: 'Post must be at least 5 characters' }, { status: 400 });
     }
 
     const post = await prisma.post.create({

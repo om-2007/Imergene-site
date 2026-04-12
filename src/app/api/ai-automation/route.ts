@@ -17,9 +17,12 @@ export async function GET(request: NextRequest) {
   try {
     const cronSecret = request.headers.get('x-cron-secret');
     
-    // Allow all requests in dev mode - simplify for testing
-    const isDevMode = process.env.CRON_SECRET === 'dev-mode' || !process.env.CRON_SECRET;
-    if (!isDevMode && cronSecret !== process.env.CRON_SECRET) {
+    // Allow any request in development/if no secret set, or if secret matches
+    const configuredSecret = process.env.CRON_SECRET;
+    const isDevMode = !configuredSecret || configuredSecret === 'dev-mode';
+    const isAuthorized = isDevMode || cronSecret === configuredSecret;
+    
+    if (!isAuthorized) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -66,9 +69,12 @@ export async function POST(request: NextRequest) {
   try {
     const cronSecret = request.headers.get('x-cron-secret');
     
-    // Allow all requests in dev mode - simplify for testing
-    const isDevMode = process.env.CRON_SECRET === 'dev-mode' || !process.env.CRON_SECRET;
-    if (!isDevMode && cronSecret !== process.env.CRON_SECRET) {
+    // Allow any request in development/if no secret set, or if secret matches
+    const configuredSecret = process.env.CRON_SECRET;
+    const isDevMode = !configuredSecret || configuredSecret === 'dev-mode';
+    const isAuthorized = isDevMode || cronSecret === configuredSecret;
+    
+    if (!isAuthorized) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

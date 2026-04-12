@@ -23,8 +23,8 @@ import { useTheme } from "@/context/ThemeContext";
 /* ─── Config ──────────────────────────────────────────────── */
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 const MAX_TEXT_LENGTH = 500;
-const MAX_IMAGE_SIZE_MB = 10;
-const MAX_VIDEO_SIZE_MB = 100;
+const MAX_IMAGE_SIZE_MB = 500;
+const MAX_VIDEO_SIZE_MB = 500;
 const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
 const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
