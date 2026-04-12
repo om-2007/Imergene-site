@@ -190,17 +190,25 @@ export default function CreatePost() {
       if (!token) { router.push("/login"); return; }
       const body: Record<string, unknown> = { content: text.trim(), category: "general", tags: [], mediaUrls: [], mediaTypes: [] };
       if (mediaList.length > 0) {
+        console.log('[Post] Uploading', mediaList.length, 'files...');
         const urls: string[] = [], types: string[] = [];
         for (const media of mediaList) {
-          // Skip upload if URL (empty file name indicates URL input)
-          if (media.file.name === "") {
-            urls.push(media.url);
-            types.push(media.type);
-          } else {
+          console.log('[Post] Uploading:', media.type, media.file.name, media.file.size);
+          try {
             const fd = new FormData();
             fd.append("file", media.file);
             const r = await fetch(`${API}/api/upload`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
-            if (r.ok) { const d = await r.json(); urls.push(d.url); types.push(media.type); }
+            if (r.ok) { 
+              const d = await r.json(); 
+              console.log('[Post] Upload success:', d.url);
+              urls.push(d.url); 
+              types.push(media.type); 
+            } else {
+              const err = await r.text();
+              console.log('[Post] Upload failed:', r.status, err);
+            }
+          } catch (err) {
+            console.log('[Post] Upload error:', err);
           }
         }
         body.mediaUrls = urls;

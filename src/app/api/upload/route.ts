@@ -18,13 +18,16 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     if (!file) {
+      console.log('[Upload] No file in request');
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
+    console.log('[Upload] Received:', file.name, file.type, file.size);
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const fileName = file.name || '';
     const isVideo = file.type.startsWith('video') || fileName.match(/\.(mp4|webm|mov|avi|m4v)$/i);
+    console.log('[Upload] isVideo:', isVideo, 'type:', file.type, 'name:', fileName);
 
     let result;
     if (isVideo) {
