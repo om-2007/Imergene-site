@@ -207,78 +207,99 @@ export default function CreatePost() {
   };
 
 /* ── Submit ─────────────────────────────────────────────── */
-   const handlePost = async () => {
-     if (!canPost) return;
-     
-     setPosting(true);
-     setError(null);
-     
-     try {
-       // Upload all media files first
-       const body: Record<string, unknown> = {
-         content: content.trim(),
-         category: "general",
-         tags: [],
-         mediaUrls: [],
-         mediaTypes: [],
-       };
+    const handlePost = async () => {
+      if (!canPost) return;
+      
+      setPosting(true);
+      setError(null);
+      
+       try {
+         // Upload all media files first
+         const body: Record<string, unknown> = {
+           content: content.trim(),
+           category: "general",
+           tags: [],
+           mediaUrls: [],
+           mediaTypes: [],
+         };
 
-        if (mediaList.length > 0) {
-          const urls: string[] = [];
-          const types: string[] = [];
-          
-          // Upload media files with progress indication
-          for (const [index, m] of mediaList.entries()) {
-            // Check if file is too large
-            const fileSizeMB = mb(m.file.size);
-            if ((m.type === "image" && fileSizeMB > MAX_IMAGE_MB) || 
-                (m.type === "video" && fileSizeMB > MAX_VIDEO_MB)) {
-              setError(`${m.type === "image" ? "Image" : "Video"} is too large (${fileSizeMB.toFixed(1)} MB). Maximum allowed is ${MAX_IMAGE_MB} MB for images and ${MAX_VIDEO_MB} MB for videos.`);
+          if (mediaList.length > 0) {
+            const urls: string[] = [];
+            const types: string[] = [];
+            
+            // Get Cloudinary configuration from environment variables
+            const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+            const imageUploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET; // For images
+            const videoUploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_VIDEO_UPLOAD_PRESET; // For videos
+            
+            if (!cloudName) {
+              setError('Cloudinary configuration missing: Cloud name not found');
               setPosting(false);
               return;
             }
             
-            const fd = new FormData();
-            fd.append("file", m.file);
+            if (!imageUploadPreset) {
+              setError('Cloudinary configuration missing: Image upload preset not found');
+              setPosting(false);
+              return;
+            }
             
-            // Show uploading status
-            setError(`Uploading ${m.type === "image" ? "image" : "video"} ${index + 1} of ${mediaList.length}... (${fileSizeMB.toFixed(1)} MB)`);
+            if (!videoUploadPreset) {
+              setError('Cloudinary configuration missing: Video upload preset not found');
+              setPosting(false);
+              return;
+            }
             
-            // Add a small delay to ensure the message is visible
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            const r = await fetch(`${API}/api/upload`, {
-              method: "POST",
-              headers: { Authorization: `Bearer ${token}` },
-              body: fd,
-            });
-            
-            // Handle timeout and network errors
-            if (!r.ok) {
-              const errorData = await r.json().catch(() => ({}));
-              
-              // Check for timeout error
-              if (errorData.timeout || r.status === 408) {
-                setError("Upload timeout. Please check your connection and try again with a smaller file or better connection.");
-              } else {
-                setError(`Failed to upload ${m.type}: ${errorData.error || `Error ${r.status}`}`);
+            // Upload media files directly to Cloudinary using unsigned upload preset
+            for (const [index, m] of mediaList.entries()) {
+              // Check if file is too large
+              const fileSizeMB = mb(m.file.size);
+              if ((m.type === "image" && fileSizeMB > MAX_IMAGE_MB) || 
+                  (m.type === "video" && fileSizeMB > MAX_VIDEO_MB)) {
+                setError(`${m.type === "image" ? "Image" : "Video"} is too large (${fileSizeMB.toFixed(1)} MB). Maximum allowed is ${MAX_IMAGE_MB} MB for images and ${MAX_VIDEO_MB} MB for videos.`);
+                setPosting(false);
+                return;
               }
               
-              setPosting(false);
-              return;
+              // Show uploading status
+              setError(`Uploading ${m.type === "image" ? "image" : "video"} ${index + 1} of ${mediaList.length}... (${fileSizeMB.toFixed(1)} MB)`);
+              
+              // Add a small delay to ensure the message is visible
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
+              const formData = new FormData();
+              formData.append('file', m.file);
+              // Use appropriate preset based on file type
+              formData.append('upload_preset', m.type === 'video' ? videoUploadPreset : imageUploadPreset);
+              formData.append('folder', m.type === 'video' ? 'imergene/videos' : 'imergene/posts');
+              
+              // Upload directly to Cloudinary (bypassing Vercel function limits)
+              const cloudRes = await fetch(
+                `https://api.cloudinary.com/v1_1/${cloudName}/${m.type === 'video' ? 'video' : 'image'}/upload`,
+                {
+                  method: "POST",
+                  body: formData,
+                }
+              );
+              
+              if (!cloudRes.ok) {
+                const errorData = await cloudRes.json().catch(() => ({}));
+                setError(`Failed to upload ${m.type}: ${errorData.error || `Upload failed`}`);
+                setPosting(false);
+                return;
+              }
+              
+              const d = await cloudRes.json();
+              urls.push(d.secure_url);
+              types.push(m.type);
+              // Clear error after successful upload with slight delay for visibility
+              await new Promise(resolve => setTimeout(resolve, 300));
+              setError(null);
             }
             
-            const d = await r.json();
-            urls.push(d.url);
-            types.push(m.type);
-            // Clear error after successful upload with slight delay for visibility
-            await new Promise(resolve => setTimeout(resolve, 300));
-            setError(null);
+            body.mediaUrls = urls;
+            body.mediaTypes = types;
           }
-          
-          body.mediaUrls = urls;
-          body.mediaTypes = types;
-        }
 
        // Create the post with all media
        const res = await fetch(`${API}/api/posts`, {
