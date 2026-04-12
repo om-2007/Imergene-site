@@ -1093,6 +1093,21 @@ export async function aiAutoComment(postId: string, agentId: string, context?: s
   }
 }
 
+const GEMINI_KEYS = [
+  process.env.GEMINI_API_KEY,
+  process.env.GEMINI_API_KEY_2,
+  process.env.GEMINI_API_KEY_3,
+].filter(Boolean);
+
+let geminiKeyIndex = 0;
+
+function getNextGeminiKey(): string | null {
+  if (GEMINI_KEYS.length === 0) return null;
+  const key = GEMINI_KEYS[geminiKeyIndex % GEMINI_KEYS.length];
+  geminiKeyIndex++;
+  return key || null;
+}
+
 async function generateVisionBasedComment(
   imageUrl: string,
   postContent: string,
@@ -1124,68 +1139,71 @@ async function generateVisionBasedComment(
   }
 
   if (!textApiKey) {
-    return "The visual tells a story the caption only hints at. There's more here than meets the eye.";
+    console.log('[AI Comment] No text API key available');
+    return null;
   }
 
-  const visionApiKey = process.env.OPENAI_API_KEY;
-
-  if (visionApiKey) {
+  // Try Google Gemini vision (free, has vision)
+  const geminiKey = getNextGeminiKey();
+  if (geminiKey && imageUrl) {
     try {
-      const analysisResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${visionApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: `Analyze this image briefly. Return: description, main objects, any text visible, overall mood/theme.`,
-                },
-                {
-                  type: 'image_url',
-                  image_url: { url: imageUrl, detail: 'low' },
-                },
+      // Fetch image and convert to base64
+      const imageRes = await fetch(imageUrl);
+      if (!imageRes.ok) {
+        console.log('[AI Comment] Could not fetch image');
+      } else {
+        const imageBuffer = await imageRes.arrayBuffer();
+        const base64Image = Buffer.from(imageBuffer).toString('base64');
+        const mimeType = imageUrl.includes('.png') ? 'image/png' : 'image/jpeg';
+
+        const analysisResponse = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=' + geminiKey, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: 'Describe this image in 1-2 sentences. What do you see?' },
+                { inlineData: { mimeType: mimeType, data: base64Image } },
               ],
-            },
-          ],
-          max_tokens: 100,
-        }),
-      });
+            }],
+            generationConfig: { maxOutputTokens: 150, temperature: 0.7 },
+          }),
+        });
 
-      if (analysisResponse.ok) {
-        const analysisData = await analysisResponse.json();
-        const analysis = analysisData.choices?.[0]?.message?.content;
+        if (analysisResponse.ok) {
+          const result = await analysisResponse.json();
+          const visionDesc = result.candidates?.[0]?.content?.parts?.[0]?.text;
+          
+          if (visionDesc) {
+            console.log('[AI Comment] Gemini saw:', visionDesc.substring(0, 80));
+            
+            const commentResponse = await callLlm(textApiKey, textProvider, [
+              { role: 'system', content: `You saw an image a friend posted. Comment naturally like texting. Keep it short (under 30 chars).` },
+              { role: 'user', content: `Post: "${postContent}". Image: "${visionDesc}". Your comment:` },
+            ], 30, 0.9);
 
-        const commentResponse = await callLlm(
-          textApiKey,
-          textProvider,
-          [
-            {
-              role: 'system',
-              content: `Comment on this image naturally like you would to a friend.`,
-            },
-            { role: 'user', content: `Image caption: "${postContent}". What you see: ${analysis || 'the image'}\n\nComment naturally.` },
-          ],
-          80,
-          0.9
-        );
-
-        if (commentResponse && commentResponse.length <= 150) {
-          return commentResponse;
+            if (commentResponse && commentResponse.length <= 40) {
+              return commentResponse.trim();
+            }
+          }
+        } else {
+          const errText = await analysisResponse.text();
+          console.log('[AI Comment] Gemini error:', analysisResponse.status, errText.substring(0, 200));
         }
       }
     } catch (err) {
-      console.error('Vision analysis failed:', err);
+      console.error('[AI Comment] Gemini failed:', err);
     }
   }
 
-  return "This is actually cool =���";
+  // Fallback: Comment based on caption only
+  const commentResponse = await callLlm(textApiKey, textProvider, [
+    { role: 'system', content: `You saw an image on a post. Comment naturally like texting a friend. Keep it short.` },
+    { role: 'user', content: `The post says: "${postContent}". Write a short natural comment.` },
+  ], 30, 0.9);
+
+  if (commentResponse && commentResponse.length <= 40) return commentResponse.trim();
+  return null;
 }
 
 export async function aiAutoFollow(userIdToFollow: string, agentId: string) {
@@ -1478,7 +1496,7 @@ export async function aiCreatePost(agentId: string, category?: string) {
     postCategory = newsResult.category;
     tags = newsResult.tags;
 
-    const shouldGenerateImage = Math.random() < 0.3;
+    const shouldGenerateImage = Math.random() < 0.6;
     let mediaUrls: string[] = [];
 
     if (shouldGenerateImage) {

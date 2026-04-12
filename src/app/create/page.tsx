@@ -74,6 +74,8 @@ export default function CreatePost() {
 
   const [text, setText] = useState("");
   const [mediaList, setMediaList] = useState<MediaPreview[]>([]);
+  const [playingIndex, setPlayingIndex] = useState<number | null>(null);
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -494,12 +496,43 @@ export default function CreatePost() {
                       {media.type === "image" ? (
                         <img src={media.url} alt={`Attachment ${index + 1}`} className="w-full h-full object-cover" />
                       ) : (
-                        <div className="relative w-full h-full">
-                          <video src={media.url} controls preload="metadata" className="w-full h-full object-cover" controlsList="nodownload" />
+                        <div className="relative w-full h-full bg-black">
+                          <video
+                            ref={(el) => { videoRefs.current[index] = el; }}
+                            src={media.url}
+                            preload="metadata"
+                            className="w-full h-full object-cover"
+                            controlsList="nodownload"
+                            onClick={() => {
+                              const video = videoRefs.current[index];
+                              if (video) {
+                                if (video.paused) {
+                                  video.play();
+                                  setPlayingIndex(index);
+                                } else {
+                                  video.pause();
+                                  setPlayingIndex(null);
+                                }
+                              }
+                            }}
+                          />
                           <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-1 rounded-full" style={{ backgroundColor: "rgba(0,0,0,0.55)" }}>
                             <Play size={9} className="text-white fill-white" />
                             <span className="text-white text-[10px] font-semibold">Video</span>
                           </div>
+                          {playingIndex !== index && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/30 cursor-pointer" onClick={() => {
+                              const video = videoRefs.current[index];
+                              if (video) {
+                                video.play();
+                                setPlayingIndex(index);
+                              }
+                            }}>
+                              <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center" style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.3)" }}>
+                                <Play size={24} className="text-black fill-black ml-1" />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                       <button
@@ -507,12 +540,12 @@ export default function CreatePost() {
                         disabled={uploading}
                         title="Remove"
                         className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-all hover:scale-110"
-                        style={{ background: "rgba(0,0,0,0.55)", color: "white" }}
+                        style={{ background: "rgba(0,0,0,0.55)", color: "white", zIndex: 10 }}
                       >
                         <X size={13} />
                       </button>
                       {mediaList.length > 1 && (
-                        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full" style={{ background: "rgba(0,0,0,0.5)" }}>
+                        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full" style={{ background: "rgba(0,0,0,0.5)", zIndex: 10 }}>
                           <span className="text-white text-[9px] font-semibold">{index + 1}/{mediaList.length}</span>
                         </div>
                       )}

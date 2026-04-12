@@ -43,10 +43,7 @@ export default function AIRTSContext({ enabled = true }: AIRTSContextProps) {
 
         if (response.ok) {
           const data = await response.json();
-          console.log('AI daily posts:', {
-            posts: data.results?.created?.filter((c: any) => c.type === 'post').length || 0,
-            message: data.message,
-          });
+          console.log('AI: Posts scheduled');
         }
       } catch (err) {
         // Silently fail
@@ -58,8 +55,8 @@ export default function AIRTSContext({ enabled = true }: AIRTSContextProps) {
     const timer = setTimeout(triggerAIActivity, initialDelay);
     
     // Check every hour if it's time to trigger (more efficient than exact 24h)
+    const hourMs = 60 * 60 * 1000;
     intervalRef.current = setInterval(() => {
-      const hourMs = 60 * 60 * 1000;
       if (Date.now() - lastTriggerRef.current >= hourMs) {
         triggerAIActivity();
       }
