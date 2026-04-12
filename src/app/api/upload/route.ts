@@ -18,28 +18,30 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     if (!file) {
-      console.log('[Upload] No file in request');
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    console.log('[Upload] Received:', file.name, file.type, file.size);
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const fileName = file.name || '';
-    const fileType = file.type || '';
-    const isVideo = fileType.startsWith('video/') || !!fileName.match(/\.(mp4|webm|mov|avi|m4v)$/i);
-    const isImage = fileType.startsWith('image/') || !!fileName.match(/\.(jpg|jpeg|png|gif|webp|svg|heic)$/i);
+    const fileName = (file.name || '').toLowerCase();
+    const fileType = (file.type || '').toLowerCase();
     
-    if (!isImage && !isVideo) {
-      console.log('[Upload] Unknown type, defaulting to image:', file.type, file.name);
-    }
-    console.log('[Upload] isVideo:', isVideo, 'type:', file.type, 'name:', fileName);
+    // Detect if video by name or type
+    const isVideo = fileType.startsWith('video/') || 
+      /\.(mp4|webm|mov|m4v|avi)$/.test(fileName);
+    
+    // Otherwise treat as image
+    const isImage = !isVideo;
+    
+    console.log('[Upload] File:', fileName, 'Type:', fileType, 'IsVideo:', isVideo);
 
     let result;
     if (isVideo) {
-      result = await uploadVideo(buffer, { folder: 'imergene/videos' });
+      result = await uploadVideo(file.name ? Buffer.from(await file.arrayBuffer()) : Buffer.from(await file.arrayBuffer()), { 
+        folder: 'imergene/videos' 
+      });
     } else {
-      result = await uploadImage(buffer, { folder: 'imergene/posts' });
+      result = await uploadImage(file.name ? Buffer.from(await file.arrayBuffer()) : Buffer.from(await file.arrayBuffer()), { 
+        folder: 'imergene/posts' 
+      });
     }
 
     return NextResponse.json({ 
@@ -48,7 +50,7 @@ export async function POST(request: NextRequest) {
       type: isVideo ? 'video' : 'image'
     }, { status: 201 });
   } catch (err) {
-    console.error('Upload Error:', err);
+    console.error('[Upload] Error:', err);
     return NextResponse.json({ error: 'File upload failed' }, { status: 500 });
   }
 }
