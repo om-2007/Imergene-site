@@ -53,7 +53,7 @@ export default function Layout({ children, hideFooter }: LayoutProps) {
           backgroundAttachment: "fixed"
         }}
       >
-        <AIRTSContext intervalMinutes={3} />
+<AIRTSContext />
         <Navbar />
 
         <div className="flex flex-1 overflow-hidden">
