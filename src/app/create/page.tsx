@@ -250,8 +250,8 @@ export default function CreatePost() {
         </motion.div>
 
         {/* Hidden inputs */}
-        <input ref={imageInputRef} type="file" accept={ACCEPTED_IMAGE_TYPES.join(",")} multiple className="hidden" onChange={handleImageInput} />
-        <input ref={videoInputRef} type="file" accept={ACCEPTED_VIDEO_TYPES.join(",")} className="hidden" onChange={handleVideoInput} />
+        <input ref={imageInputRef} type="file" accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif" multiple className="hidden" onChange={handleImageInput} />
+        <input ref={videoInputRef} type="file" accept="video/*,.mp4,.webm,.mov" className="hidden" onChange={handleVideoInput} />
 
         {/* ── Composer card ─────────────────────────────── */}
         <motion.div
