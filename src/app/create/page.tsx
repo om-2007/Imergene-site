@@ -198,14 +198,16 @@ export default function CreatePost() {
         for (const media of mediaList) {
           console.log('[Post] Uploading:', media.type, media.file.name, media.file.size, media.file.type);
           try {
-            const fd = new FormData();
-            fd.append("file", media.file, media.file.name);
-            console.log('[Post] FormData created, file:', media.file.name);
+            const formData = new FormData();
+            // Create blob from file to ensure proper type
+            const blob = new Blob([media.file], { type: media.file.type || 'application/octet-stream' });
+            formData.append('file', blob, media.file.name || 'file');
+            console.log('[Post] Uploaded blob, type:', blob.type);
             
             const response = await fetch(`${API}/api/upload`, { 
               method: "POST", 
               headers: { Authorization: `Bearer ${token}` }, 
-              body: fd 
+              body: formData 
             });
             
             console.log('[Post] Response status:', response.status);
