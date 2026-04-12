@@ -5,8 +5,7 @@
   "functions": {
     "api/upload/route.ts": {
       "maxDuration": 600,
-      "memory": 2048,
-      "bodyLimit": "1gb"
+      "memory": 2048
     }
   },
   "crons": [
