@@ -5,14 +5,12 @@ import { useEffect, useRef, useState } from 'react';
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 interface AIRTSContextProps {
-  intervalMinutes?: number;
   enabled?: boolean;
 }
 
-export default function AIRTSContext({ intervalMinutes = 3, enabled = true }: AIRTSContextProps) {
+export default function AIRTSContext({ enabled = true }: AIRTSContextProps) {
   const lastTriggerRef = useRef<number>(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const [actionIndex, setActionIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -23,43 +21,31 @@ export default function AIRTSContext({ intervalMinutes = 3, enabled = true }: AI
     if (!enabled || !mounted || typeof window === 'undefined') return;
 
     const triggerAIActivity = async () => {
+      // Trigger once per day (24 hours)
       const now = Date.now();
-      if (now - lastTriggerRef.current < intervalMinutes * 60 * 1000) {
+      const dayMs = 24 * 60 * 60 * 1000;
+      if (now - lastTriggerRef.current < dayMs) {
         return;
       }
       
       lastTriggerRef.current = now;
 
-      const actions = ['news_reaction', 'engage_users', 'start_conversations', 'event_chat'];
-      const action = actions[actionIndex % actions.length];
-      setActionIndex(prev => prev + 1);
-
+      // Trigger create_posts - server will schedule each agent randomly
       try {
-        let response;
-        
-        if (action === 'event_chat') {
-          response = await fetch(`${API}/api/cron/ai-interest`, {
-            headers: { 'Authorization': 'Bearer dev-mode' }
-          });
-        } else {
-          response = await fetch(`${API}/api/ai-automation`, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'x-cron-secret': 'dev-mode'
-            },
-            body: JSON.stringify({ action }),
-          });
-        }
+        const response = await fetch(`${API}/api/ai-automation`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-cron-secret': 'dev-mode'
+          },
+          body: JSON.stringify({ action: 'create_posts', postsPerAgent: 1 }),
+        });
 
         if (response.ok) {
           const data = await response.json();
-          console.log('AI RT activity:', {
-            action,
-            posts: data.created?.filter((c: any) => c.type === 'news_post').length || 0,
-            events: data.created?.filter((c: any) => c.type === 'news_event').length || 0,
-            conversations: data.created?.filter((c: any) => c.type === 'conversation').length || 0,
-            eventComments: data.results?.length || 0,
+          console.log('AI daily posts:', {
+            posts: data.results?.created?.filter((c: any) => c.type === 'post').length || 0,
+            message: data.message,
           });
         }
       } catch (err) {
@@ -67,8 +53,17 @@ export default function AIRTSContext({ intervalMinutes = 3, enabled = true }: AI
       }
     };
 
-    const timer = setTimeout(triggerAIActivity, 15000);
-    intervalRef.current = setInterval(triggerAIActivity, intervalMinutes * 60 * 1000);
+    // Initial delay of 10-30 seconds on page load (randomized)
+    const initialDelay = Math.floor(Math.random() * 20000) + 10000;
+    const timer = setTimeout(triggerAIActivity, initialDelay);
+    
+    // Check every hour if it's time to trigger (more efficient than exact 24h)
+    intervalRef.current = setInterval(() => {
+      const hourMs = 60 * 60 * 1000;
+      if (Date.now() - lastTriggerRef.current >= hourMs) {
+        triggerAIActivity();
+      }
+    }, hourMs);
 
     return () => {
       clearTimeout(timer);
@@ -76,7 +71,7 @@ export default function AIRTSContext({ intervalMinutes = 3, enabled = true }: AI
         clearInterval(intervalRef.current);
       }
     };
-  }, [enabled, intervalMinutes, actionIndex, mounted]);
+  }, [enabled, mounted]);
 
   return null;
 }

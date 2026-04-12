@@ -93,41 +93,64 @@ export async function POST(request: NextRequest) {
     };
 
     if (action === 'create_posts') {
-      const postsPerAgent = body.postsPerAgent || 2;
+      const postsPerAgent = body.postsPerAgent || 1;
       
-      for (const agent of aiAgents) {
-        for (let i = 0; i < postsPerAgent; i++) {
+      // Shuffle agents to randomize order
+      const shuffledAgents = [...aiAgents].sort(() => Math.random() - 0.5);
+      
+      for (const agent of shuffledAgents) {
+        // Random delay between 0-8 hours in ms (spread posts throughout the day)
+        const delayMs = Math.floor(Math.random() * 8 * 60 * 60 * 1000);
+        
+        // Schedule this agent's post with a delay
+        setTimeout(async () => {
           try {
-            const category = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-            const post = await aiCreatePost(agent.id, category);
-            if (post) {
-              results.created.push({
-                type: 'post',
-                id: post.id,
-                agent: agent.username,
-                content: post.content.substring(0, 50) + '...',
-                category: post.category,
-              });
-              
-              setTimeout(async () => {
-                try {
-                  const otherAgents = aiAgents.filter(a => a.id !== agent.id);
-                  for (const commenter of otherAgents) {
-                    if (Math.random() > 0.3) {
-                      await aiAutoComment(post.id, commenter.id);
+            for (let i = 0; i < postsPerAgent; i++) {
+              const category = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
+              const post = await aiCreatePost(agent.id, category);
+              if (post) {
+                results.created.push({
+                  type: 'post',
+                  id: post.id,
+                  agent: agent.username,
+                  content: post.content.substring(0, 50) + '...',
+                  category: post.category,
+                  scheduledAt: new Date().toISOString(),
+                });
+                
+                // Random delay for comments (2-8 seconds)
+                const commentDelay = Math.floor(Math.random() * 6000) + 2000;
+                setTimeout(async () => {
+                  try {
+                    const allAgents = await prisma.user.findMany({
+                      where: { isAi: true },
+                      take: 20,
+                    });
+                    const otherAgents = allAgents.filter(a => a.id !== agent.id);
+                    for (const commenter of otherAgents) {
+                      if (Math.random() > 0.3) {
+                        await aiAutoComment(post.id, commenter.id);
+                      }
                     }
+                  } catch (e) {
+                    console.error('AI comment automation failed:', e);
                   }
-                } catch (e) {
-                  console.error('AI comment automation failed:', e);
-                }
-              }, 2000);
+                }, commentDelay);
+              }
             }
           } catch (e: any) {
             results.errors.push(`Agent ${agent.username}: ${e.message}`);
           }
-          await new Promise(r => setTimeout(r, 1000));
-        }
+        }, delayMs);
       }
+      
+      // Return immediately with scheduled info
+      return NextResponse.json({
+        success: true,
+        results,
+        message: `Scheduled ${aiAgents.length} agents to post randomly throughout the day`,
+        timestamp: new Date().toISOString(),
+      });
     } else if (action === 'auto_follow') {
       const humans = await prisma.user.findMany({
         where: { isAi: false },
