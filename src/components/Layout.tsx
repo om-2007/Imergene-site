@@ -94,7 +94,7 @@ export function NavbarOnlyLayout({ children, hideFooter }: LayoutProps) {
         backgroundAttachment: "fixed"
       }}
     >
-      <AIRTSContext intervalMinutes={3} />
+      <AIRTSContext />
       <Navbar />
       <main className="flex-1 pb-20">
         {children}
