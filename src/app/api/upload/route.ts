@@ -1,87 +1,99 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '50mb',
+    },
+  },
+};
+
 const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME!;
 const API_KEY = process.env.CLOUDINARY_API_KEY!;
 const API_SECRET = process.env.CLOUDINARY_API_SECRET!;
 
 function sign(timestamp: number, folder: string, publicId?: string) {
   const crypto = require('crypto');
-  // Parameters must be in alphabetical order
-  let params = [`folder=${folder}`, `timestamp=${timestamp}`];
+  // Cloudinary requires alphabetical order of parameter names
+  const params = [
+    `folder=${folder}`,
+    `timestamp=${timestamp}`
+  ];
   if (publicId) params.push(`public_id=${publicId}`);
-  params.sort();
-  const s = params.join('&') + API_SECRET;
-  console.log('SIGN_STRING:', s);
-  return crypto.createHash('sha1').update(s).digest('hex');
+  // Sort by parameter name
+  params.sort((a, b) => a.localeCompare(b));
+  const toSign = params.join('&') + API_SECRET;
+  return crypto.createHash('sha1').update(toSign, 'utf8').digest('hex');
 }
 
-function checkVideo(name: string) {
+function isVideo(name: string): boolean {
   const n = (name || '').toLowerCase();
-  return n.endsWith('.mp4') || n.endsWith('.webm') || n.endsWith('.mov');
+  return /\.(mp4|webm|mov|m4v|avi)$/.test(n);
 }
 
 export async function POST(req: NextRequest) {
   try {
     const auth = req.headers.get('authorization');
     if (!auth?.startsWith('Bearer ')) {
-      return NextResponse.json({ e: 'No auth' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const user = verifyToken(auth.split(' ')[1]);
-    if (!user) {
-      return NextResponse.json({ e: 'Bad token' }, { status: 401 });
+    const payload = verifyToken(auth.split(' ')[1]);
+    if (!payload) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     
     if (!file) {
-      return NextResponse.json({ e: 'No file' }, { status: 400 });
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
     const arrayBuffer = await file.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    const base64 = Buffer.from(uint8Array).toString('base64');
+    const buffer = Buffer.from(arrayBuffer);
+    const fileName = (file.name || '').toLowerCase();
+    const isVid = isVideo(fileName);
     
-    const isVid = checkVideo(file.name || '');
-    const folder = isVid ? 'imergene/vids' : 'imergene/imgs';
     const ts = Math.floor(Date.now() / 1000);
-    const pubId = file.name ? file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9]/g, '_') : undefined;
-    const sig = sign(ts, folder, pubId);
+    const folder = isVid ? 'imergene/videos' : 'imergene/posts';
+    const publicId = fileName.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9]/g, '_') || undefined;
+    const sig = sign(ts, folder, publicId);
     
-    const mimeType = isVid ? 'video/mp4' : 'image/jpeg';
-    const dataUri = `data:${mimeType};base64,${base64}`;
+    const form = new URLSearchParams();
+    form.append('file', `data:${isVid ? 'video' : 'image'}/mp4;base64,${buffer.toString('base64')}`);
+    form.append('api_key', API_KEY);
+    form.append('timestamp', ts.toString());
+    form.append('signature', sig);
+    form.append('folder', folder);
+    if (publicId) form.append('public_id', publicId);
 
-    console.log('UPLOAD:', file.name, isVid ? 'VIDEO' : 'IMAGE', uint8Array.length);
-
-    const body = new URLSearchParams();
-    body.append('file', dataUri);
-    body.append('api_key', API_KEY);
-    body.append('timestamp', ts.toString());
-    body.append('signature', sig);
-    body.append('folder', folder);
-    if (pubId) body.append('public_id', pubId);
-
-    const res = await fetch(
+    const cloudRes = await fetch(
       `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${isVid ? 'video' : 'image'}/upload`,
-      { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() }
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: form.toString(),
+      }
     );
 
-    const result = await res.json();
-    
-    if (!res.ok) {
-      console.log('Cloudinary error:', result);
-      return NextResponse.json({ e: 'Upload failed', detail: result }, { status: 500 });
+    if (!cloudRes.ok) {
+      const errorText = await cloudRes.text();
+      console.error('Cloudinary error:', cloudRes.status, errorText);
+      return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
     }
 
+    const result = await cloudRes.json();
+    
     return NextResponse.json({
       url: result.secure_url,
-      id: result.public_id,
+      publicId: result.public_id,
       type: isVid ? 'video' : 'image'
     });
-  } catch (e) {
-    console.error('FAIL:', e);
-    return NextResponse.json({ e: String(e) }, { status: 500 });
+    
+  } catch (error) {
+    console.error('Upload error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
