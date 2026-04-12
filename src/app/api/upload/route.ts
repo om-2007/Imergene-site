@@ -23,7 +23,8 @@ export async function POST(request: NextRequest) {
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    const isVideo = file.type.startsWith('video');
+    const fileName = file.name || '';
+    const isVideo = file.type.startsWith('video') || fileName.match(/\.(mp4|webm|mov|avi|m4v)$/i);
 
     let result;
     if (isVideo) {
