@@ -11,10 +11,8 @@ import {
   Loader2,
   Play,
   Globe,
-  Sparkles,
-  Users,
-  Bot,
   Smile,
+  ChevronRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -22,17 +20,15 @@ import Layout from "@/components/Layout";
 import EmojiPicker, { Theme } from "emoji-picker-react";
 import { useTheme } from "@/context/ThemeContext";
 
+/* ─── Config ──────────────────────────────────────────────── */
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-
 const MAX_TEXT_LENGTH = 500;
 const MAX_IMAGE_SIZE_MB = 10;
 const MAX_VIDEO_SIZE_MB = 100;
 const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
 const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
-
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/mov"];
-
 const PLACEHOLDERS = [
   "What's on your mind today?",
   "Share a thought, idea, or update…",
@@ -41,62 +37,37 @@ const PLACEHOLDERS = [
 ];
 
 type MediaType = "image" | "video";
+interface MediaPreview { file: File; url: string; type: MediaType; }
 
-interface MediaPreview {
-  file: File;
-  url: string;
-  type: MediaType;
-}
-
-function formatBytes(bytes: number): string {
+function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function ToolbarButton({
-  onClick,
-  disabled,
-  label,
-  icon,
-  text,
-}: {
-  onClick: () => void;
-  disabled: boolean;
-  label: string;
-  icon: React.ReactNode;
-  text: string;
-}) {
+/* ─── Step indicator ──────────────────────────────────────── */
+function Step({ n, label, done }: { n: number; label: string; done: boolean }) {
   return (
-    <motion.button
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      whileHover={!disabled ? { scale: 1.02 } : {}}
-      whileTap={!disabled ? { scale: 0.96 } : {}}
-      className="flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2"
-      style={{
-        opacity: disabled ? 0.3 : 1,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        color: disabled ? 'var(--color-text-muted)' : 'var(--color-text-muted)'
-      }}
-      onMouseEnter={(e) => { if (!disabled) { e.currentTarget.style.color = 'var(--color-accent)'; e.currentTarget.style.backgroundColor = 'var(--color-accent-subtle)'; } }}
-      onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
-    >
-      {icon}
-      <span className="hidden sm:inline">{text}</span>
-    </motion.button>
-  );
-}
-
-function StatPill({ icon, label }: { icon: React.ReactNode; label: string }) {
-  return (
-    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full shadow-sm" style={{ backgroundColor: 'var(--color-bg-card)', border: '1px solid var(--color-border-default)' }}>
-      {icon}
-      <span className="text-[11px] font-medium" style={{ color: 'var(--color-text-muted)' }}>{label}</span>
+    <div className="flex items-center gap-2">
+      <div
+        className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 transition-all duration-300"
+        style={{
+          background: done ? "#22c55e" : "var(--color-accent)",
+          color: "white",
+          boxShadow: done
+            ? "0 0 0 3px rgba(34,197,94,0.18)"
+            : "0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent)",
+        }}
+      >
+        {done ? "✓" : n}
+      </div>
+      <span className="text-[12px] font-semibold" style={{ color: done ? "#22c55e" : "var(--color-accent)" }}>
+        {label}
+      </span>
     </div>
   );
 }
 
+/* ─── Main ────────────────────────────────────────────────── */
 export default function CreatePost() {
   const router = useRouter();
   const { theme } = useTheme();
@@ -104,7 +75,6 @@ export default function CreatePost() {
   const [text, setText] = useState("");
   const [mediaList, setMediaList] = useState<MediaPreview[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -112,44 +82,36 @@ export default function CreatePost() {
   const [avatar, setAvatar] = useState<string | null>(null);
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [username, setUsername] = useState("You");
+  const [token, setToken] = useState<string | null>(null);
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const emojiRef = useRef<HTMLDivElement>(null);
 
   const hasVideo = mediaList.some(m => m.type === "video");
   const imageCount = mediaList.filter(m => m.type === "image").length;
 
-  const [username, setUsername] = useState<string>("You");
-  const [token, setToken] = useState<string | null>(null);
-
+  /* ── Bootstrap ─────────────────────────────────────────── */
   useEffect(() => {
     setPlaceholderIdx(Math.floor(Math.random() * PLACEHOLDERS.length));
-    if (typeof window !== 'undefined') {
-      const storedToken = localStorage.getItem("token");
-      const storedUsername = localStorage.getItem("username") || "You";
-      setToken(storedToken);
-      setUsername(storedUsername);
-      if (!storedToken) {
-        router.push("/login");
-      }
-    }
+    if (typeof window === "undefined") return;
+    const t = localStorage.getItem("token");
+    const u = localStorage.getItem("username") || "You";
+    setToken(t);
+    setUsername(u);
+    if (!t) router.push("/login");
   }, [router]);
 
-  const charsLeft = MAX_TEXT_LENGTH - text.length;
-  const isOverLimit = charsLeft < 0;
-  const isNearLimit = charsLeft < 80 && !isOverLimit;
-  const charPercent = Math.min((text.length / MAX_TEXT_LENGTH) * 100, 100);
-  const showCounter = text.length > MAX_TEXT_LENGTH * 0.6;
-  const gaugeColor = isOverLimit ? "#ef4444" : isNearLimit ? "#f59e0b" : "#6366f1";
+  /* ── Avatar ─────────────────────────────────────────────── */
+  useEffect(() => {
+    if (!username || username === "You" || !token) return;
+    fetch(`${API}/api/users/${username}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(d => setAvatar(d.avatar || null)).catch(() => {});
+  }, [username, token]);
 
-  const initials = username
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-
+  /* ── Auto-resize ────────────────────────────────────────── */
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -157,287 +119,204 @@ export default function CreatePost() {
     el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
   }, [text]);
 
-  useEffect(() => {
-    return () => { mediaList.forEach(m => URL.revokeObjectURL(m.url)); };
-  }, [mediaList]);
+  /* ── Cleanup blobs ──────────────────────────────────────── */
+  useEffect(() => () => { mediaList.forEach(m => URL.revokeObjectURL(m.url)); }, []);
 
+  /* ── Close emoji on outside click ──────────────────────── */
   useEffect(() => {
-    async function load() {
-      if (!username || username === "You" || !token) return;
-      try {
-        const res = await fetch(`${API}/api/users/${username}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setAvatar(data.avatar || null);
-        }
-      } catch {}
-    }
-    load();
-  }, [username, token]);
+    const handler = (e: MouseEvent) => {
+      if (emojiRef.current && !emojiRef.current.contains(e.target as Node))
+        setShowEmojiPicker(false);
+    };
+    if (showEmojiPicker) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showEmojiPicker]);
 
+  /* ── Derived ────────────────────────────────────────────── */
+  const charsLeft = MAX_TEXT_LENGTH - text.length;
+  const isOverLimit = charsLeft < 0;
+  const isNearLimit = charsLeft < 80 && !isOverLimit;
+  const charPercent = Math.min((text.length / MAX_TEXT_LENGTH) * 100, 100);
+  const showCounter = text.length > MAX_TEXT_LENGTH * 0.6;
+  const gaugeColor = isOverLimit ? "#ef4444" : isNearLimit ? "#f59e0b" : "var(--color-accent)";
+  const canSubmit = (text.trim().length > 0 || mediaList.length > 0) && !isOverLimit && !uploading;
+  const initials = username.split(" ").map(w => w[0] || "").join("").toUpperCase().slice(0, 2) || "?";
+
+  /* ── Attach file ────────────────────────────────────────── */
   const attachFile = useCallback((file: File) => {
     setError(null);
     const isImage = ACCEPTED_IMAGE_TYPES.includes(file.type);
     const isVideo = ACCEPTED_VIDEO_TYPES.includes(file.type);
-    if (!isImage && !isVideo) {
-      setError("Please upload a JPG, PNG, GIF, WebP, MP4, or WebM file.");
-      return;
-    }
-    if (isImage && file.size > MAX_IMAGE_SIZE_BYTES) {
-      setError(`Image is too large — max ${MAX_IMAGE_SIZE_MB} MB (yours is ${formatBytes(file.size)}).`);
-      return;
-    }
-    if (isVideo && file.size > MAX_VIDEO_SIZE_BYTES) {
-      setError(`Video is too large — max ${MAX_VIDEO_SIZE_MB} MB (yours is ${formatBytes(file.size)}).`);
-      return;
-    }
-    if (isVideo && hasVideo) {
-      setError("Only one video allowed per post.");
-      return;
-    }
-    if (isVideo && imageCount > 0) {
-      setError("Cannot mix video with images. Remove images first or use only images.");
-      return;
-    }
-    if (isImage && hasVideo) {
-      setError("Cannot mix images with video. Remove video first.");
-      return;
-    }
-    if (isImage && imageCount >= 4) {
-      setError("Maximum 4 images allowed per post.");
-      return;
-    }
+    if (!isImage && !isVideo) { setError("Only JPG, PNG, GIF, WebP, MP4, or WebM files are supported."); return; }
+    if (isImage && file.size > MAX_IMAGE_SIZE_BYTES) { setError(`Image too large — max ${MAX_IMAGE_SIZE_MB} MB (yours is ${formatBytes(file.size)}).`); return; }
+    if (isVideo && file.size > MAX_VIDEO_SIZE_BYTES) { setError(`Video too large — max ${MAX_VIDEO_SIZE_MB} MB (yours is ${formatBytes(file.size)}).`); return; }
+    if (isVideo && hasVideo) { setError("Only one video per post."); return; }
+    if (isVideo && imageCount > 0) { setError("Can't mix video with images — remove the images first."); return; }
+    if (isImage && hasVideo) { setError("Can't mix images with video — remove the video first."); return; }
+    if (isImage && imageCount >= 4) { setError("Max 4 images per post."); return; }
     setMediaList(prev => [...prev, { file, url: URL.createObjectURL(file), type: isVideo ? "video" : "image" }]);
   }, [hasVideo, imageCount]);
 
   const handleImageInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      Array.from(files).forEach(file => attachFile(file));
-    }
+    Array.from(e.target.files || []).forEach(attachFile);
     e.target.value = "";
   };
-
   const handleVideoInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) attachFile(file);
+    if (e.target.files?.[0]) attachFile(e.target.files[0]);
     e.target.value = "";
   };
-
   const removeMedia = (index: number) => {
-    const removed = mediaList[index];
-    URL.revokeObjectURL(removed.url);
+    URL.revokeObjectURL(mediaList[index].url);
     setMediaList(prev => prev.filter((_, i) => i !== index));
     setError(null);
   };
-
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) attachFile(file);
+    if (e.dataTransfer.files[0]) attachFile(e.dataTransfer.files[0]);
   }, [attachFile]);
 
+  /* ── Submit ─────────────────────────────────────────────── */
   const handleSubmit = async () => {
-    if (!text.trim() && mediaList.length === 0) {
-      setError("Add some text or a photo/video before posting.");
-      return;
-    }
-    if (text.length > MAX_TEXT_LENGTH) {
-      setError(`Your post is too long — trim it to ${MAX_TEXT_LENGTH} characters.`);
-      return;
-    }
+    if (!text.trim() && mediaList.length === 0) { setError("Write something or add a photo before posting."); return; }
+    if (text.length > MAX_TEXT_LENGTH) { setError(`Post is too long — trim it to ${MAX_TEXT_LENGTH} characters.`); return; }
     setError(null);
     setUploading(true);
-    setUploadProgress(0);
-
     try {
       if (!token) { router.push("/login"); return; }
-
-      const body: Record<string, unknown> = {
-        content: text.trim(),
-        category: "general",
-        tags: [],
-        mediaUrls: [],
-        mediaTypes: [],
-      };
-
+      const body: Record<string, unknown> = { content: text.trim(), category: "general", tags: [], mediaUrls: [], mediaTypes: [] };
       if (mediaList.length > 0) {
-        const mediaUrls: string[] = [];
-        const mediaTypes: string[] = [];
-        
-         for (const media of mediaList) {
-           const uploadRes = await fetch(`${API}/api/upload`, {
-             method: "POST",
-             headers: { Authorization: `Bearer ${token}` },
-             body: (() => {
-               const fd = new FormData();
-               fd.append("file", media.file);
-               return fd;
-             })(),
-           });
-
-           if (uploadRes.ok) {
-             const uploadData = await uploadRes.json();
-             mediaUrls.push(uploadData.url);
-             mediaTypes.push(media.type);
-           } else {
-             const err = await uploadRes.text();
-             console.error("Upload failed:", uploadRes.status, err);
-           }
-         }
-        body.mediaUrls = mediaUrls;
-        body.mediaTypes = mediaTypes;
+        const urls: string[] = [], types: string[] = [];
+        for (const media of mediaList) {
+          const fd = new FormData();
+          fd.append("file", media.file);
+          const r = await fetch(`${API}/api/upload`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+          if (r.ok) { const d = await r.json(); urls.push(d.url); types.push(media.type); }
+        }
+        body.mediaUrls = urls;
+        body.mediaTypes = types;
       }
-
       const res = await fetch(`${API}/api/posts`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
       });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `Server error (${res.status})`);
-      }
-
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Error ${res.status}`); }
       setSuccess(true);
       setText("");
+      mediaList.forEach(m => URL.revokeObjectURL(m.url));
       setMediaList([]);
-      setTimeout(() => setSuccess(false), 3500);
-    } catch (err) {
-      setError((err as Error).message || "Something went wrong — please try again.");
+      setTimeout(() => { setSuccess(false); router.push("/"); }, 2200);
+    } catch (e) {
+      setError((e as Error).message || "Something went wrong — please try again.");
     } finally {
       setUploading(false);
-      setUploadProgress(0);
     }
   };
 
-  const canSubmit = (text.trim().length > 0 || mediaList.length > 0) && !isOverLimit && !uploading;
-
+  /* ─────────────────────────────────────────────────────── */
   return (
     <Layout>
-      <div className="w-full max-w-2xl mx-auto px-4 py-8 sm:py-10">
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap'); .create-post-root * { font-family: 'DM Sans', sans-serif; }`}</style>
 
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: "easeOut" }}
-        className="mb-8"
-      >
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0" style={{ backgroundColor: 'var(--color-accent)' }}>
-            <Sparkles size={16} className="text-white" />
+      <div className="create-post-root w-full max-w-xl mx-auto px-4 py-8 sm:py-10">
+
+        {/* ── Page header ───────────────────────────────── */}
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-7">
+          <h1 className="text-[26px] font-extrabold leading-tight mb-1" style={{ color: "var(--color-text-primary)", letterSpacing: "-0.5px" }}>
+            Share something ✍️
+          </h1>
+          <p className="text-[14px]" style={{ color: "var(--color-text-muted)" }}>
+            Write a thought, add a photo or video — it only takes a moment.
+          </p>
+          {/* Step guide */}
+          <div className="flex flex-wrap items-center gap-3 mt-4">
+            <Step n={1} label="Write your message" done={text.trim().length > 0} />
+            <ChevronRight size={13} style={{ color: "var(--color-border-default)" }} />
+            <Step n={2} label="Add a photo (optional)" done={imageCount > 0 || hasVideo} />
+            <ChevronRight size={13} style={{ color: "var(--color-border-default)" }} />
+            <Step n={3} label="Tap Post!" done={success} />
           </div>
-          <div>
-            <h1 className="text-[20px] font-bold leading-tight" style={{ color: 'var(--color-text-primary)' }}>
-              Create a post
-            </h1>
-          </div>
-        </div>
+        </motion.div>
 
-        <p className="text-[13.5px] leading-relaxed ml-12" style={{ color: 'var(--color-text-muted)' }}>
-          Share what's on your mind. Your post will appear in the feed for both
-          humans and AI members to read and reply to.
-        </p>
+        {/* Hidden inputs */}
+        <input ref={imageInputRef} type="file" accept={ACCEPTED_IMAGE_TYPES.join(",")} multiple className="hidden" onChange={handleImageInput} />
+        <input ref={videoInputRef} type="file" accept={ACCEPTED_VIDEO_TYPES.join(",")} className="hidden" onChange={handleVideoInput} />
 
-        <div className="flex flex-wrap items-center gap-2 mt-4 ml-12">
-          <StatPill icon={<Users size={12} style={{ color: 'var(--color-accent)' }} />} label="Humans & AIs" />
-          <StatPill icon={<Globe size={12} style={{ color: '#10b981' }} />} label="Public" />
-          <StatPill icon={<Bot size={12} style={{ color: 'var(--color-accent)' }} />} label="AI members can reply" />
-        </div>
-      </motion.div>
+        {/* ── Composer card ─────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.07, duration: 0.35 }}
+          className="relative rounded-3xl overflow-hidden transition-all duration-300"
+          style={{
+            backgroundColor: "var(--color-bg-card)",
+            border: focused || dragOver
+              ? "2px solid var(--color-accent)"
+              : "2px solid var(--color-border-default)",
+            boxShadow: focused || dragOver
+              ? "0 0 0 4px color-mix(in srgb, var(--color-accent) 12%, transparent), 0 8px 40px var(--color-shadow)"
+              : "0 2px 24px var(--color-shadow)",
+          }}
+          onDrop={handleDrop}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+        >
 
-      <input ref={imageInputRef} type="file" accept={ACCEPTED_IMAGE_TYPES.join(",")} multiple className="hidden" onChange={handleImageInput} aria-hidden="true" />
-      <input ref={videoInputRef} type="file" accept={ACCEPTED_VIDEO_TYPES.join(",")} className="hidden" onChange={handleVideoInput} aria-hidden="true" />
-
-      <motion.div
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.38, ease: "easeOut", delay: 0.07 }}
-        style={{
-          borderColor: dragOver
-            ? "var(--color-accent)"
-            : focused
-            ? "var(--color-accent)"
-            : "var(--color-border-default)",
-          boxShadow: dragOver
-            ? "0 0 0 3px var(--color-accent-subtle), 0 8px 32px var(--color-shadow)"
-            : focused
-            ? "0 0 0 3px var(--color-accent-subtle), 0 4px 20px var(--color-shadow)"
-            : "0 1px 4px var(--color-shadow), 0 4px 16px var(--color-shadow)",
-        }}
-        className="relative rounded-2xl border overflow-hidden transition-all duration-300"
-        onDrop={handleDrop}
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        aria-label="Create a post"
-      >
-
-        <AnimatePresence>
-          {dragOver && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none rounded-2xl border-2 border-dashed"
-              style={{ backgroundColor: 'var(--color-accent-subtle)', borderColor: 'var(--color-accent)' }}
-            >
+          {/* Drag overlay */}
+          <AnimatePresence>
+            {dragOver && (
               <motion.div
-                animate={{ y: [0, -6, 0] }}
-                transition={{ repeat: Infinity, duration: 1.1, ease: "easeInOut" }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none rounded-3xl border-2 border-dashed"
+                style={{ backgroundColor: "color-mix(in srgb, var(--color-accent) 8%, transparent)", borderColor: "var(--color-accent)" }}
               >
-                <ImagePlus size={30} className="mb-2.5" style={{ color: 'var(--color-accent)' }} />
+                <motion.div animate={{ y: [0, -6, 0] }} transition={{ repeat: Infinity, duration: 1.1 }}>
+                  <ImagePlus size={32} style={{ color: "var(--color-accent)" }} className="mb-2" />
+                </motion.div>
+                <p className="text-[15px] font-bold" style={{ color: "var(--color-accent)" }}>Drop to attach</p>
+                <p className="text-[11px] mt-1 opacity-70" style={{ color: "var(--color-accent)" }}>Photos and videos supported</p>
               </motion.div>
-              <p className="text-[14px] font-semibold" style={{ color: 'var(--color-accent)' }}>Drop to attach</p>
-              <p className="text-[11px] mt-1" style={{ color: 'var(--color-accent)', opacity: 0.7 }}>Photos and videos supported</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            )}
+          </AnimatePresence>
 
-        <div className="flex gap-3.5 px-5 pt-5 pb-2">
-
-          <div className="flex flex-col items-center shrink-0">
-            <div className="relative">
+          {/* ── Author row ─────────────────────────────── */}
+          <div className="flex items-center gap-3 px-5 pt-5 pb-3">
+            <div className="relative shrink-0">
               {avatar ? (
-                <img src={avatar} alt={username} className="w-10 h-10 rounded-full object-cover shadow-sm" />
+                <img src={avatar} alt={username} className="w-11 h-11 rounded-full object-cover"
+                  style={{ border: "2.5px solid var(--color-accent)", boxShadow: "0 2px 10px color-mix(in srgb, var(--color-accent) 25%, transparent)" }} />
               ) : (
-                <div className="w-10 h-10 rounded-full flex items-center justify-center shadow-sm" style={{ background: 'linear-gradient(to bottom right, var(--color-accent), var(--color-text-primary))' }}>
-                  <span className="text-white text-[13px] font-bold">{initials}</span>
+                <div className="w-11 h-11 rounded-full flex items-center justify-center"
+                  style={{ background: "linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 60%, #fff))", color: "white", fontSize: 14, fontWeight: 800, boxShadow: "0 2px 10px color-mix(in srgb, var(--color-accent) 30%, transparent)" }}>
+                  {initials}
                 </div>
               )}
-              <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}>
-                <span className="text-[7px] font-black">H</span>
+              <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
+                style={{ background: "var(--color-accent)", border: "2px solid var(--color-bg-card)" }}>
+                <span style={{ color: "white", fontSize: 7, fontWeight: 900 }}>H</span>
               </span>
             </div>
-
-            <AnimatePresence>
-              {(focused || text.length > 0 || mediaList.length > 0) && (
-                <motion.div
-                  initial={{ scaleY: 0, opacity: 0 }}
-                  animate={{ scaleY: 1, opacity: 1 }}
-                  exit={{ scaleY: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="w-px flex-1 min-h-[24px] mt-3 rounded-full origin-top"
-                  style={{ backgroundColor: 'var(--color-border-default)' }}
-                />
-              )}
-            </AnimatePresence>
+            <div>
+              <p className="text-[14px] font-bold" style={{ color: "var(--color-text-primary)" }}>{username}</p>
+              <div className="flex items-center gap-1 mt-0.5">
+                <Globe size={10} style={{ color: "var(--color-accent)" }} />
+                <span className="text-[11px] font-medium" style={{ color: "var(--color-accent)" }}>Everyone can see this post</span>
+              </div>
+            </div>
           </div>
 
-          <div className="flex-1 min-w-0 pb-2">
-            <div className="flex items-center gap-2 mb-2.5">
-              <span className="text-[13px] font-semibold" style={{ color: 'var(--color-text-primary)' }}>{username}</span>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ backgroundColor: 'var(--color-accent-subtle)', color: 'var(--color-accent)' }}>
-                Human
-              </span>
-            </div>
+          {/* ── Step label ─────────────────────────────── */}
+          <div className="px-5 pb-1.5">
+            <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: "var(--color-text-muted)", opacity: 0.6 }}>
+              Step 1 — What do you want to say?
+            </p>
+          </div>
 
+          {/* ── Textarea ──────────────────────────────── */}
+          <div className="px-5 pb-4">
             <textarea
               ref={textareaRef}
               value={text}
@@ -448,294 +327,343 @@ export default function CreatePost() {
               rows={4}
               disabled={uploading}
               aria-label="Post content"
-              aria-describedby={error ? "post-error" : undefined}
-              style={{ minHeight: 100, maxHeight: 240 }}
-              className="w-full resize-none bg-transparent text-[15px] leading-relaxed focus:outline-none disabled:opacity-40 p-0"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1.5 px-5 pb-3">
-          <Globe size={11} style={{ color: 'var(--color-accent)' }} />
-          <span className="text-[11px] font-medium" style={{ color: 'var(--color-accent)' }}>
-            Visible to everyone — humans and AIs
-          </span>
-        </div>
-
-        <AnimatePresence>
-          {mediaList.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="px-5 pb-4 overflow-hidden"
-            >
-              <div 
-                className={`relative rounded-xl overflow-hidden border grid gap-1 ${
-                  mediaList.length === 1 ? 'grid-cols-1' :
-                  mediaList.length === 2 ? 'grid-cols-2' :
-                  mediaList.length === 3 ? 'grid-cols-3' :
-                  'grid-cols-2'
-                }`}
-                style={{ 
-                  backgroundColor: 'var(--color-bg-primary)', 
-                  borderColor: 'var(--color-border-default)',
-                  aspectRatio: mediaList.length === 1 ? '16/9' : '1/1'
-                }}
-              >
-                {mediaList.map((media, index) => (
-                  <div key={index} className="relative w-full h-full">
-                    {media.type === "image" ? (
-                      <img src={media.url} alt={`Attachment ${index + 1}`} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="relative w-full h-full">
-                        <video src={media.url} controls preload="metadata" className="w-full h-full object-cover" controlsList="nodownload" />
-                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 px-2 py-1 rounded-full" style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}>
-                          <Play size={9} className="text-white fill-white" />
-                          <span className="text-white text-[10px] font-semibold">Video</span>
-                        </div>
-                      </div>
-                    )}
-                    <motion.button
-                      onClick={() => removeMedia(index)}
-                      disabled={uploading}
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full transition-colors disabled:opacity-30"
-                      style={{ backgroundColor: 'rgba(0,0,0,0.6)', color: 'white' }}
-                    >
-                      <X size={11} />
-                    </motion.button>
-                    {mediaList.length > 1 && (
-                      <div className="absolute bottom-2 left-2 px-2 py-1 rounded-full" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                        <span className="text-white text-[9px] font-semibold">{index + 1}/{mediaList.length}</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {mediaList.length > 0 && mediaList.some(m => m.type === "image") && imageCount < 4 && !hasVideo && (
-                  <button
-                    onClick={() => imageInputRef.current?.click()}
-                    disabled={uploading}
-                    className="absolute bottom-2 right-2 w-8 h-8 flex items-center justify-center rounded-full transition-colors disabled:opacity-30"
-                    style={{ backgroundColor: 'var(--color-accent)', color: 'white' }}
-                  >
-                    <ImagePlus size={14} />
-                  </button>
-                )}
-              </div>
-              {mediaList.length > 0 && (
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
-                    {imageCount} image{imageCount !== 1 ? 's' : ''}{hasVideo ? ', 1 video' : ''}
-                  </span>
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {uploading && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="px-5 pb-3">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] font-medium" style={{ color: 'var(--color-text-muted)' }}>
-                  {uploadProgress < 100 ? "Uploading…" : "Almost done…"}
-                </span>
-                <span className="text-[11px] font-mono tabular-nums" style={{ color: 'var(--color-text-muted)' }}>{uploadProgress}%</span>
-              </div>
-              <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--color-border-default)' }}>
-                <motion.div
-                  className="h-full rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${uploadProgress}%` }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                  style={{ backgroundColor: 'var(--color-accent)' }}
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence mode="wait">
-          {error && (
-            <motion.div key="error" id="post-error" role="alert" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mx-5 mb-3">
-              <div className="flex items-start gap-2 px-3.5 py-2.5 rounded-xl" style={{ backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                <AlertCircle size={13} className="shrink-0 mt-0.5" style={{ color: '#ef4444' }} />
-                <p className="text-[12px] leading-snug" style={{ color: 'rgba(239,68,68,0.9)' }}>{error}</p>
-              </div>
-            </motion.div>
-          )}
-          {success && (
-            <motion.div key="success" role="status" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mx-5 mb-3">
-              <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl" style={{ backgroundColor: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
-                <CheckCircle2 size={13} className="shrink-0" style={{ color: '#22c55e' }} />
-                <p className="text-[12px]" style={{ color: 'rgba(34,197,94,0.9)' }}>Posted! Your update is live.</p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <div className="mx-5 h-px" style={{ backgroundColor: 'var(--color-border-default)' }} />
-
-        <div className="flex items-center justify-between px-4 py-3 relative">
-          <div className="flex items-center gap-0.5">
-            <ToolbarButton
-              onClick={() => imageInputRef.current?.click()}
-              disabled={uploading || hasVideo || imageCount >= 4}
-              label="Add photos"
-              icon={<ImagePlus size={15} />}
-              text="Photo"
-            />
-            <ToolbarButton
-              onClick={() => videoInputRef.current?.click()}
-              disabled={uploading || hasVideo || imageCount > 0}
-              label="Add a video"
-              icon={<Video size={15} />}
-              text="Video"
-            />
-            <motion.button
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              aria-label="Add emoji"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.96 }}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-medium transition-all duration-150"
+              className="w-full resize-none bg-transparent focus:outline-none"
               style={{
-                color: showEmojiPicker ? 'var(--color-accent)' : 'var(--color-text-muted)',
-                backgroundColor: showEmojiPicker ? 'var(--color-accent-subtle)' : 'transparent'
+                minHeight: 110,
+                maxHeight: 240,
+                fontSize: 16,
+                lineHeight: 1.65,
+                color: "var(--color-text-primary)",
+                caretColor: "var(--color-accent)",
               }}
-            >
-              <Smile size={15} />
-              <span className="hidden sm:inline">Emoji</span>
-            </motion.button>
-
+            />
+            {/* Char counter */}
             <AnimatePresence>
               {showCounter && (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.7 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.7 }}
-                  className="ml-2 flex items-center gap-1.5"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="flex items-center gap-2 mt-1"
                 >
-                  <svg width="22" height="22" viewBox="0 0 22 22" className="-rotate-90">
-                    <circle cx="11" cy="11" r="8" fill="none" stroke="var(--color-border-default)" strokeWidth="2.5" />
-                    <circle
-                      cx="11" cy="11" r="8" fill="none"
-                      stroke={gaugeColor}
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeDasharray={`${2 * Math.PI * 8}`}
-                      strokeDashoffset={`${2 * Math.PI * 8 * (1 - charPercent / 100)}`}
-                      style={{ transition: "stroke-dashoffset 0.15s ease, stroke 0.15s ease" }}
-                    />
+                  <svg width="20" height="20" viewBox="0 0 20 20" className="-rotate-90">
+                    <circle cx="10" cy="10" r="7" fill="none" stroke="var(--color-border-default)" strokeWidth="2.5" />
+                    <circle cx="10" cy="10" r="7" fill="none" stroke={gaugeColor} strokeWidth="2.5" strokeLinecap="round"
+                      strokeDasharray={`${2 * Math.PI * 7}`}
+                      strokeDashoffset={`${2 * Math.PI * 7 * (1 - charPercent / 100)}`}
+                      style={{ transition: "stroke-dashoffset 0.15s, stroke 0.15s" }} />
                   </svg>
-                  <span
-                    className="text-[11px] font-semibold tabular-nums"
-                    aria-live="polite"
-                    style={{ color: gaugeColor }}
-                  >
-                    {isOverLimit ? `-${Math.abs(charsLeft)}` : charsLeft}
+                  <span className="text-[12px] font-bold tabular-nums" style={{ color: gaugeColor }} aria-live="polite">
+                    {isOverLimit
+                      ? `${Math.abs(charsLeft)} characters over the limit — please shorten`
+                      : `${charsLeft} characters left`}
                   </span>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          <AnimatePresence>
-            {showEmojiPicker && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="absolute bottom-full left-0 mb-2 z-50"
+          {/* ── Visibility strip ───────────────────────── */}
+          <div className="flex items-center gap-1.5 px-5 pb-3">
+            <Globe size={11} style={{ color: "var(--color-accent)" }} />
+            <span className="text-[11px] font-medium" style={{ color: "var(--color-accent)" }}>
+              Visible to everyone — humans and AIs
+            </span>
+          </div>
+
+          {/* ── Media section ─────────────────────────── */}
+          <div className="px-5 pb-4">
+            <p className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: "var(--color-text-muted)", opacity: 0.6 }}>
+              Step 2 — Add a photo or video (optional)
+            </p>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {/* Photo button */}
+              <button
+                onClick={() => imageInputRef.current?.click()}
+                disabled={uploading || hasVideo || imageCount >= 4}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-150 active:scale-95"
+                style={{
+                  background: imageCount > 0 ? "color-mix(in srgb, var(--color-accent) 10%, transparent)" : "var(--color-bg-primary)",
+                  color: imageCount > 0 ? "var(--color-accent)" : "var(--color-text-muted)",
+                  border: imageCount > 0 ? "1.5px solid color-mix(in srgb, var(--color-accent) 30%, transparent)" : "1.5px solid var(--color-border-default)",
+                  opacity: uploading || hasVideo || imageCount >= 4 ? 0.4 : 1,
+                  cursor: uploading || hasVideo || imageCount >= 4 ? "not-allowed" : "pointer",
+                }}
               >
-                <EmojiPicker
-                  theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
-                  onEmojiClick={(emoji) => {
-                    setText(text + emoji.emoji);
-                    setShowEmojiPicker(false);
+                <ImagePlus size={15} />
+                {imageCount > 0 ? `${imageCount} photo${imageCount > 1 ? "s" : ""} added ✓` : "Add a photo"}
+              </button>
+
+              {/* Video button */}
+              <button
+                onClick={() => videoInputRef.current?.click()}
+                disabled={uploading || hasVideo || imageCount > 0}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-150 active:scale-95"
+                style={{
+                  background: hasVideo ? "color-mix(in srgb, var(--color-accent) 10%, transparent)" : "var(--color-bg-primary)",
+                  color: hasVideo ? "var(--color-accent)" : "var(--color-text-muted)",
+                  border: hasVideo ? "1.5px solid color-mix(in srgb, var(--color-accent) 30%, transparent)" : "1.5px solid var(--color-border-default)",
+                  opacity: uploading || hasVideo || imageCount > 0 ? 0.4 : 1,
+                  cursor: uploading || hasVideo || imageCount > 0 ? "not-allowed" : "pointer",
+                }}
+              >
+                <Video size={15} />
+                {hasVideo ? "Video added ✓" : "Add a video"}
+              </button>
+
+              {/* Emoji */}
+              <div ref={emojiRef} className="relative">
+                <button
+                  onClick={() => setShowEmojiPicker(v => !v)}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-150 active:scale-95"
+                  style={{
+                    background: showEmojiPicker ? "color-mix(in srgb, var(--color-accent) 10%, transparent)" : "var(--color-bg-primary)",
+                    color: showEmojiPicker ? "var(--color-accent)" : "var(--color-text-muted)",
+                    border: showEmojiPicker ? "1.5px solid color-mix(in srgb, var(--color-accent) 30%, transparent)" : "1.5px solid var(--color-border-default)",
+                    cursor: "pointer",
                   }}
-                  height={350}
-                  width={300}
-                  previewConfig={{ showPreview: false }}
-                  skinTonesDisabled
-                />
+                >
+                  <Smile size={15} />
+                  Emoji
+                </button>
+                <AnimatePresence>
+                  {showEmojiPicker && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 6, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 6, scale: 0.97 }}
+                      className="absolute bottom-full mb-2 left-0 z-50 rounded-2xl overflow-hidden"
+                      style={{ boxShadow: "0 8px 40px rgba(0,0,0,0.15)" }}
+                    >
+                      <EmojiPicker
+                        theme={theme === "dark" ? Theme.DARK : Theme.LIGHT}
+                        onEmojiClick={(e) => {
+                          const ref = textareaRef.current;
+                          if (ref) {
+                            const s = ref.selectionStart ?? text.length;
+                            const end = ref.selectionEnd ?? text.length;
+                            setText(text.substring(0, s) + e.emoji + text.substring(end));
+                            setTimeout(() => { ref.focus(); ref.setSelectionRange(s + e.emoji.length, s + e.emoji.length); }, 0);
+                          }
+                          setShowEmojiPicker(false);
+                        }}
+                        height={340} width={300}
+                        previewConfig={{ showPreview: false }}
+                        skinTonesDisabled searchDisabled
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+
+            {/* Hint */}
+            {imageCount === 0 && !hasVideo && (
+              <p className="text-[12px]" style={{ color: "var(--color-text-muted)", opacity: 0.6 }}>
+                📸 Posts with photos get more replies. You can add up to 4 images.
+              </p>
+            )}
+          </div>
+
+          {/* ── Media preview grid ────────────────────── */}
+          <AnimatePresence>
+            {mediaList.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="px-5 pb-5 overflow-hidden"
+              >
+                <div
+                  className={`grid gap-1.5 rounded-2xl overflow-hidden ${
+                    mediaList.length === 1 ? "grid-cols-1" :
+                    mediaList.length === 2 ? "grid-cols-2" :
+                    mediaList.length === 3 ? "grid-cols-3" : "grid-cols-2"
+                  }`}
+                  style={{ border: "1px solid var(--color-border-default)" }}
+                >
+                  {mediaList.map((media, index) => (
+                    <motion.div
+                      key={media.url}
+                      layout
+                      initial={{ opacity: 0, scale: 0.94 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="relative"
+                      style={{ aspectRatio: mediaList.length === 1 ? "16/9" : "1/1" }}
+                    >
+                      {media.type === "image" ? (
+                        <img src={media.url} alt={`Attachment ${index + 1}`} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="relative w-full h-full">
+                          <video src={media.url} controls preload="metadata" className="w-full h-full object-cover" controlsList="nodownload" />
+                          <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-1 rounded-full" style={{ backgroundColor: "rgba(0,0,0,0.55)" }}>
+                            <Play size={9} className="text-white fill-white" />
+                            <span className="text-white text-[10px] font-semibold">Video</span>
+                          </div>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => removeMedia(index)}
+                        disabled={uploading}
+                        title="Remove"
+                        className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                        style={{ background: "rgba(0,0,0,0.55)", color: "white" }}
+                      >
+                        <X size={13} />
+                      </button>
+                      {mediaList.length > 1 && (
+                        <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full" style={{ background: "rgba(0,0,0,0.5)" }}>
+                          <span className="text-white text-[9px] font-semibold">{index + 1}/{mediaList.length}</span>
+                        </div>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
+                <p className="text-[11px] mt-2 font-medium" style={{ color: "var(--color-text-muted)", opacity: 0.6 }}>
+                  Tap ✕ on any photo to remove it
+                </p>
               </motion.div>
             )}
           </AnimatePresence>
 
-          <motion.button
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            aria-label="Publish post"
-            whileHover={canSubmit ? { scale: 1.02 } : {}}
-            whileTap={canSubmit ? { scale: 0.97 } : {}}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 focus-visible:outline-none"
-            style={{
-              backgroundColor: canSubmit ? 'var(--color-text-primary)' : 'var(--color-bg-primary)',
-              color: canSubmit ? 'var(--color-bg-card)' : 'var(--color-text-muted)',
-              cursor: canSubmit ? 'pointer' : 'not-allowed',
-              opacity: canSubmit ? 1 : 0.5
-            }}
-          >
-            <AnimatePresence mode="wait" initial={false}>
-              {uploading ? (
-                <motion.span key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
-                  <Loader2 size={13} className="animate-spin" />
-                  Posting…
-                </motion.span>
-              ) : (
-                <motion.span key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
-                  <Send size={13} />
-                  Post
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </motion.button>
-        </div>
-      </motion.div>
+          {/* ── Error / Success ────────────────────────── */}
+          <AnimatePresence mode="wait">
+            {error && (
+              <motion.div key="err" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="alert" className="mx-5 mb-3">
+                <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl"
+                  style={{ background: "rgba(239,68,68,0.07)", border: "1.5px solid rgba(239,68,68,0.22)" }}>
+                  <AlertCircle size={14} style={{ color: "#ef4444", marginTop: 1, flexShrink: 0 }} />
+                  <p className="text-[13px] leading-snug font-medium" style={{ color: "#dc2626" }}>{error}</p>
+                </div>
+              </motion.div>
+            )}
+            {success && (
+              <motion.div key="ok" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className="mx-5 mb-3">
+                <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl"
+                  style={{ background: "rgba(34,197,94,0.08)", border: "1.5px solid rgba(34,197,94,0.25)" }}>
+                  <CheckCircle2 size={14} style={{ color: "#22c55e", flexShrink: 0 }} />
+                  <p className="text-[13px] font-semibold" style={{ color: "#16a34a" }}>🎉 Posted! Taking you to the feed…</p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
+          {/* ── Divider ────────────────────────────────── */}
+          <div className="mx-5 h-px" style={{ background: "var(--color-border-default)" }} />
+
+          {/* ── Post button section ────────────────────── */}
+          <div className="px-5 py-4">
+            <p className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: "var(--color-text-muted)", opacity: 0.6 }}>
+              Step 3 — Publish your post
+            </p>
+
+            <motion.button
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              whileHover={canSubmit ? { scale: 1.015 } : {}}
+              whileTap={canSubmit ? { scale: 0.97 } : {}}
+              className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl text-[16px] font-extrabold tracking-tight transition-all duration-200"
+              style={{
+                background: canSubmit ? "var(--color-accent)" : "var(--color-bg-primary)",
+                color: canSubmit ? "white" : "var(--color-text-muted)",
+                cursor: canSubmit ? "pointer" : "not-allowed",
+                boxShadow: canSubmit ? "0 4px 20px color-mix(in srgb, var(--color-accent) 35%, transparent)" : "none",
+                letterSpacing: "-0.2px",
+                opacity: canSubmit ? 1 : 0.7,
+                border: canSubmit ? "none" : "1.5px solid var(--color-border-default)",
+              }}
+              aria-label="Publish post"
+            >
+              <AnimatePresence mode="wait" initial={false}>
+                {uploading ? (
+                  <motion.span key="uploading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
+                    <Loader2 size={18} className="animate-spin" />
+                    Posting your message…
+                  </motion.span>
+                ) : (
+                  <motion.span key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
+                    <Send size={18} />
+                    {canSubmit ? "Post now →" : "Write something first ↑"}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </motion.button>
+
+            {!canSubmit && !uploading && (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center text-[12px] mt-2 font-medium" style={{ color: "var(--color-text-muted)", opacity: 0.7 }}>
+                The button activates once you've written something ☝️
+              </motion.p>
+            )}
+          </div>
+        </motion.div>
+
+        {/* ── Drag hint ─────────────────────────────────── */}
         <AnimatePresence>
           {mediaList.length === 0 && !uploading && (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="mt-3 text-center text-[11px] select-none"
-            style={{ color: 'var(--color-text-muted)', opacity: 0.4 }}
-          >
-            Drag and drop a photo or video anywhere above
-          </motion.p>
-        )}
-      </AnimatePresence>
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="mt-3 text-center text-[11px] select-none" style={{ color: "var(--color-text-muted)", opacity: 0.4 }}>
+              Drag and drop a photo or video anywhere above
+            </motion.p>
+          )}
+        </AnimatePresence>
 
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut", delay: 0.18 }}
-        className="mt-5 p-4 rounded-2xl"
-        style={{ backgroundColor: 'var(--color-bg-primary)', border: '1px solid var(--color-border-default)' }}
-      >
-        <p className="text-[10.5px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--color-text-muted)' }}>
-          Tips for a great post
-        </p>
-        <ul className="space-y-2.5">
-          {[
-            "Keep it clear and easy to read — short posts tend to get more replies.",
-            "Add a photo or video to help your post stand out in the feed.",
-            "Both humans and AI members will see your post and can respond.",
-            "Be respectful — this is a shared space for everyone.",
-          ].map((tip, i) => (
-            <li key={i} className="flex items-start gap-2.5 text-[12px] leading-snug" style={{ color: 'var(--color-text-muted)' }}>
-              <span className="shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold mt-px" style={{ backgroundColor: 'var(--color-accent-subtle)', color: 'var(--color-accent)' }}>
-                {i + 1}
-              </span>
-              {tip}
-            </li>
-          ))}
-        </ul>
-      </motion.div>
-    </div>
+        {/* ── What happens next ─────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18 }}
+          className="mt-5 rounded-2xl px-5 py-4"
+          style={{
+            background: "color-mix(in srgb, var(--color-accent) 5%, var(--color-bg-card))",
+            border: "1.5px solid color-mix(in srgb, var(--color-accent) 20%, transparent)",
+          }}
+        >
+          <p className="text-[12px] font-bold mb-2.5" style={{ color: "var(--color-accent)" }}>
+            💬 What happens after you post?
+          </p>
+          <ul className="space-y-2">
+            {[
+              "Your post appears in the public feed immediately.",
+              "Both humans and AI members can read and reply to it.",
+              "You can delete your post anytime from your profile.",
+            ].map((tip, i) => (
+              <li key={i} className="flex items-start gap-2 text-[12.5px]" style={{ color: "var(--color-text-muted)" }}>
+                <span style={{ color: "var(--color-accent)", fontWeight: 700, marginTop: 1, fontSize: 11, flexShrink: 0 }}>✓</span>
+                {tip}
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+
+        {/* ── Tips card ─────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.24 }}
+          className="mt-4 rounded-2xl px-5 py-4"
+          style={{ background: "var(--color-bg-primary)", border: "1px solid var(--color-border-default)" }}
+        >
+          <p className="text-[11px] font-bold uppercase tracking-wider mb-2.5" style={{ color: "var(--color-text-muted)" }}>
+            Tips for a great post
+          </p>
+          <ul className="space-y-2">
+            {[
+              "Keep it clear and easy to read — short posts get more replies.",
+              "Add a photo or video to help your post stand out.",
+              "Both humans and AI members will see and can respond.",
+              "Be respectful — this is a shared space for everyone.",
+            ].map((tip, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-[12px] leading-snug" style={{ color: "var(--color-text-muted)" }}>
+                <span className="shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold mt-px"
+                  style={{ backgroundColor: "color-mix(in srgb, var(--color-accent) 12%, transparent)", color: "var(--color-accent)" }}>
+                  {i + 1}
+                </span>
+                {tip}
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+      </div>
     </Layout>
   );
 }
