@@ -223,50 +223,54 @@ export default function CreatePost() {
          mediaTypes: [],
        };
 
-       if (mediaList.length > 0) {
-         const urls: string[] = [];
-         const types: string[] = [];
-         
-         // Upload media files with progress indication
-         for (const m of mediaList) {
-           // Check if file is too large
-           const fileSizeMB = mb(m.file.size);
-           if ((m.type === "image" && fileSizeMB > MAX_IMAGE_MB) || 
-               (m.type === "video" && fileSizeMB > MAX_VIDEO_MB)) {
-             setError(`${m.type === "image" ? "Image" : "Video"} is too large (${fileSizeMB.toFixed(1)} MB). Maximum allowed is ${MAX_IMAGE_MB} MB for images and ${MAX_VIDEO_MB} MB for videos.`);
-             setPosting(false);
-             return;
-           }
-           
-           const fd = new FormData();
-           fd.append("file", m.file);
-           
-           // Show uploading status
-           setError(`Uploading ${m.type === "image" ? "image" : "video"}... (${fileSizeMB.toFixed(1)} MB)`);
-           
-           const r = await fetch(`${API}/api/upload`, {
-             method: "POST",
-             headers: { Authorization: `Bearer ${token}` },
-             body: fd,
-           });
-           
-           if (r.ok) {
-             const d = await r.json();
-             urls.push(d.url);
-             types.push(m.type);
-             // Clear error after successful upload
-             setError(null);
-           } else {
-             const errorData = await r.json().catch(() => ({}));
-             setError(`Failed to upload ${m.type}: ${errorData.error || r.status}`);
-             setPosting(false);
-             return;
-           }
-         }
-         
-         body.mediaUrls = urls;
-         body.mediaTypes = types;
-       }
+        if (mediaList.length > 0) {
+          const urls: string[] = [];
+          const types: string[] = [];
+          
+          // Upload media files with progress indication
+          for (const [index, m] of mediaList.entries()) {
+            // Check if file is too large
+            const fileSizeMB = mb(m.file.size);
+            if ((m.type === "image" && fileSizeMB > MAX_IMAGE_MB) || 
+                (m.type === "video" && fileSizeMB > MAX_VIDEO_MB)) {
+              setError(`${m.type === "image" ? "Image" : "Video"} is too large (${fileSizeMB.toFixed(1)} MB). Maximum allowed is ${MAX_IMAGE_MB} MB for images and ${MAX_VIDEO_MB} MB for videos.`);
+              setPosting(false);
+              return;
+            }
+            
+            const fd = new FormData();
+            fd.append("file", m.file);
+            
+            // Show uploading status
+            setError(`Uploading ${m.type === "image" ? "image" : "video"} ${index + 1} of ${mediaList.length}... (${fileSizeMB.toFixed(1)} MB)`);
+            
+            // Add a small delay to ensure the message is visible
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            const r = await fetch(`${API}/api/upload`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}` },
+              body: fd,
+            });
+            
+            if (r.ok) {
+              const d = await r.json();
+              urls.push(d.url);
+              types.push(m.type);
+              // Clear error after successful upload with slight delay for visibility
+              await new Promise(resolve => setTimeout(resolve, 300));
+              setError(null);
+            } else {
+              const errorData = await r.json().catch(() => ({}));
+              setError(`Failed to upload ${m.type}: ${errorData.error || r.status}`);
+              setPosting(false);
+              return;
+            }
+          }
+          
+          body.mediaUrls = urls;
+          body.mediaTypes = types;
+        }
 
        // Create the post with all media
        const res = await fetch(`${API}/api/posts`, {
