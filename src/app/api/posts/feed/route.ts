@@ -24,47 +24,62 @@ export async function GET(request: NextRequest) {
 
     const skip = (page - 1) * limit;
 
-    const whereClause: any = {};
-    if (type === 'AI') {
-      whereClause.user = { isAi: true };
-    } else if (type === 'HUMAN') {
-      whereClause.user = { isAi: false };
-    } else if (type === 'LATEST' || type === 'ALL') {
-      whereClause.user = {};
-    }
+     const whereClause: any = {};
+     if (type === 'AI') {
+       whereClause.user = { isAi: true };
+     } else if (type === 'HUMAN') {
+       whereClause.user = { isAi: false };
+     }
+     // For 'LATEST', 'ALL', or any other type, we don't add any user filters
+     // whereClause.user remains undefined which means no user filtering
 
-    const [posts, total] = await Promise.all([
-      prisma.post.findMany({
-        where: whereClause,
-        include: {
-          user: {
-            select: { id: true, username: true, name: true, avatar: true, isAi: true },
-          },
-          _count: { select: { comments: true, likes: true } },
-          likes: { where: { userId: payload.id }, select: { userId: true } },
-        },
-        orderBy: { createdAt: sort === 'asc' ? 'asc' : 'desc' },
-        skip,
-        take: limit,
-      }),
-      prisma.post.count({ where: whereClause }),
-    ]);
+     // Handle database connection errors gracefully
+     let posts = [];
+     let total = 0;
+     
+     try {
+       const [postsResult, totalResult] = await Promise.all([
+         prisma.post.findMany({
+           where: whereClause,
+           include: {
+             user: {
+               select: { id: true, username: true, name: true, avatar: true, isAi: true },
+             },
+             _count: { select: { comments: true, likes: true } },
+             likes: { where: { userId: payload.id }, select: { userId: true } },
+           },
+           orderBy: { createdAt: sort === 'asc' ? 'asc' : 'desc' },
+           skip,
+           take: limit,
+         }),
+         prisma.post.count({ where: whereClause }),
+       ]);
+       
+       posts = postsResult;
+       total = totalResult;
+     } catch (dbError) {
+       console.error('Database error in feed route:', dbError);
+       // Return empty feed rather than failing completely
+       posts = [];
+       total = 0;
+     }
 
-    const formattedPosts = posts.map((post) => ({
-      id: post.id,
-      user: post.user,
-      userId: post.userId,
-      content: post.content,
-      mediaUrls: post.mediaUrls || [],
-      mediaTypes: post.mediaTypes || [],
-      liked: post.likes && post.likes.length > 0,
-      views: post.views || 0,
-      createdAt: post.createdAt.toISOString(),
-      _count: {
-        likes: post._count.likes,
-        comments: post._count.comments,
-      },
-    }));
+     // Handle case where posts might be empty due to DB error
+     const formattedPosts = posts.map((post) => ({
+       id: post.id,
+       user: post.user,
+       userId: post.userId,
+       content: post.content,
+       mediaUrls: post.mediaUrls || [],
+       mediaTypes: post.mediaTypes || [],
+       liked: post.likes && post.likes.length > 0,
+       views: post.views || 0,
+       createdAt: post.createdAt.toISOString(),
+       _count: {
+         likes: post._count.likes,
+         comments: post._count.comments,
+       },
+     }));
 
     const hasMore = skip + posts.length < total;
 
@@ -79,8 +94,12 @@ export async function GET(request: NextRequest) {
         seed,
       },
     });
-  } catch (err) {
-    console.error('Feed Sync Error:', err);
-    return NextResponse.json({ error: 'Failed to sync neural feed.' }, { status: 500 });
-  }
+   } catch (err: any) {
+     console.error('Feed Sync Error:', err);
+     // Return more detailed error info for debugging
+     return NextResponse.json({ 
+       error: 'Failed to sync neural feed.',
+       details: err.message || err.toString()
+     }, { status: 500 });
+   }
 }

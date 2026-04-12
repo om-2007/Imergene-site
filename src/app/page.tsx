@@ -150,58 +150,72 @@ export default function FeedPage() {
     const activeSeed = seedOverride ?? feedSeed;
     const currentFilter = filterOverride ?? activeFilter;
 
-    try {
-      let typeParam = "";
-      let sortParam = "";
-      let seedParam = `&seed=${activeSeed}`;
-      
-      if (currentFilter === "LATEST") {
-        typeParam = "";
-        sortParam = "&sort=desc";
-        seedParam = "";
-      } else if (currentFilter === "OLDEST") {
-        typeParam = "";
-        sortParam = "&sort=asc";
-        seedParam = "";
-      } else if (currentFilter !== "ALL") {
-        typeParam = `&type=${currentFilter}`;
-      }
-      const res = await fetch(`${API}/api/posts/feed?page=${targetPage}&limit=20${seedParam}${typeParam}${sortParam}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (res.ok) {
-        let posts = data.posts || [];
-        if (isInitial) {
-          const existingIds = new Set(posts.map(p => p.id));
-          if (existingIds.size !== posts.length) {
-            console.log("Duplicate posts detected, deduplicating");
-          }
-          const uniquePosts = posts.filter((p: any, index: number, arr: any[]) => 
-            arr.findIndex((x: any) => x.id === p.id) === index
-          );
-          if (currentFilter === "LATEST") {
-            uniquePosts.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          }
-          setPosts(uniquePosts);
-          setFeedSeed(activeSeed);
-        } else {
-          setPosts(prev => {
-            const existingIds = new Set(prev.map(p => p.id));
-            const newPosts = posts.filter(p => !existingIds.has(p.id));
-            return [...prev, ...newPosts];
-          });
-        }
-        setHasMore(data.meta?.hasMore ?? data.hasMore ?? false);
-      } else {
-        console.error("Feed fetch failed:", data);
-      }
-    } catch (err) {
-      console.error("Neural sync failed", err);
-    } finally {
-      setLoading(false);
-      setFetchingMore(false);
-    }
+     try {
+       let typeParam = "";
+       let sortParam = "";
+       let seedParam = `&seed=${activeSeed}`;
+       
+       if (currentFilter === "LATEST") {
+         typeParam = "";
+         sortParam = "&sort=desc";
+         seedParam = "";
+       } else if (currentFilter === "OLDEST") {
+         typeParam = "";
+         sortParam = "&sort=asc";
+         seedParam = "";
+       } else if (currentFilter !== "ALL") {
+         typeParam = `&type=${currentFilter}`;
+       }
+       const res = await fetch(`${API}/api/posts/feed?page=${targetPage}&limit=20${seedParam}${typeParam}${sortParam}`, {
+         headers: { Authorization: `Bearer ${token}` }
+       });
+       
+       // Check if response is OK before parsing JSON
+       if (!res.ok) {
+         const errorText = await res.text();
+         console.error("Feed fetch failed with status:", res.status, "Response:", errorText);
+         throw new Error(`Server returned ${res.status}: ${errorText}`);
+       }
+       
+       const data = await res.json();
+       // Additional check for valid data structure
+       if (!data || typeof data !== 'object') {
+         console.error("Feed fetch failed: Invalid data structure received", data);
+         throw new Error('Invalid data structure received from server');
+       }
+       
+       if (res.ok) {
+         let posts = data.posts || [];
+         if (isInitial) {
+           const existingIds = new Set(posts.map(p => p.id));
+           if (existingIds.size !== posts.length) {
+             console.log("Duplicate posts detected, deduplicating");
+           }
+           const uniquePosts = posts.filter((p: any, index: number, arr: any[]) => 
+             arr.findIndex((x: any) => x.id === p.id) === index
+           );
+           if (currentFilter === "LATEST") {
+             uniquePosts.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+           }
+           setPosts(uniquePosts);
+           setFeedSeed(activeSeed);
+         } else {
+           setPosts(prev => {
+             const existingIds = new Set(prev.map(p => p.id));
+             const newPosts = posts.filter(p => !existingIds.has(p.id));
+             return [...prev, ...newPosts];
+           });
+         }
+         setHasMore(data.meta?.hasMore ?? data.hasMore ?? false);
+       } else {
+         console.error("Feed fetch failed:", data);
+       }
+     } catch (err: any) {
+       console.error("Neural sync failed:", err.message || err);
+     } finally {
+       setLoading(false);
+       setFetchingMore(false);
+     }
   }, [feedSeed, router]);
 
   useEffect(() => {

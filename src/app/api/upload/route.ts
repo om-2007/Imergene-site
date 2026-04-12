@@ -1,29 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '50mb',
-    },
-  },
-};
-
 const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME!;
 const API_KEY = process.env.CLOUDINARY_API_KEY!;
 const API_SECRET = process.env.CLOUDINARY_API_SECRET!;
 
-function sign(timestamp: number, folder: string, publicId?: string) {
+export const maxDuration = 300; // 5 minutes
+export const revalidate = 0;
+
+// Increase body size limit to 500MB for file uploads
+export const api = {
+  bodyParser: {
+    sizeLimit: '500mb',
+  },
+};
+
+function buildSignature(params: Record<string, string>): string {
+  // Sort keys alphabetically
+  const sortedKeys = Object.keys(params).sort();
+  // Build string: key1=value1&key2=value2...&API_SECRET
+  const queryString = sortedKeys.map(key => `${key}=${params[key]}`).join('&');
+  const toSign = queryString + API_SECRET;
   const crypto = require('crypto');
-  // Cloudinary requires alphabetical order of parameter names
-  const params = [
-    `folder=${folder}`,
-    `timestamp=${timestamp}`
-  ];
-  if (publicId) params.push(`public_id=${publicId}`);
-  // Sort by parameter name
-  params.sort((a, b) => a.localeCompare(b));
-  const toSign = params.join('&') + API_SECRET;
   return crypto.createHash('sha1').update(toSign, 'utf8').digest('hex');
 }
 
@@ -56,32 +54,43 @@ export async function POST(req: NextRequest) {
     const fileName = (file.name || '').toLowerCase();
     const isVid = isVideo(fileName);
     
-    const ts = Math.floor(Date.now() / 1000);
+    const timestamp = Math.floor(Date.now() / 1000);
     const folder = isVid ? 'imergene/videos' : 'imergene/posts';
     const publicId = fileName.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9]/g, '_') || undefined;
-    const sig = sign(ts, folder, publicId);
     
-    const form = new URLSearchParams();
-    form.append('file', `data:${isVid ? 'video' : 'image'}/mp4;base64,${buffer.toString('base64')}`);
+    // Build signature params - Cloudinary requires these specific params for signature
+    const signatureParams: Record<string, string> = {
+      folder,
+      timestamp: timestamp.toString()
+    };
+    if (publicId) signatureParams.public_id = publicId;
+    
+    const signature = buildSignature(signatureParams);
+    
+    // Prepare form data for Cloudinary upload
+    const form = new FormData();
+    form.append('file', file);
     form.append('api_key', API_KEY);
-    form.append('timestamp', ts.toString());
-    form.append('signature', sig);
+    form.append('timestamp', timestamp.toString());
+    form.append('signature', signature);
     form.append('folder', folder);
     if (publicId) form.append('public_id', publicId);
+    // Critical: resource_type tells Cloudinary how to process the file
+    form.append('resource_type', isVid ? 'video' : 'image');
 
     const cloudRes = await fetch(
       `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${isVid ? 'video' : 'image'}/upload`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: form.toString(),
+        body: form,
+        // Don't set Content-Type header - let browser set it for FormData
       }
     );
 
     if (!cloudRes.ok) {
       const errorText = await cloudRes.text();
       console.error('Cloudinary error:', cloudRes.status, errorText);
-      return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+      return NextResponse.json({ error: 'Upload failed: ' + errorText }, { status: 500 });
     }
 
     const result = await cloudRes.json();

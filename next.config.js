@@ -19,6 +19,9 @@ const nextConfig = {
   compress: true,
   poweredByHeader: false,
   reactStrictMode: true,
+  experimental: {
+    proxyClientMaxBodySize: '100mb',
+  },
 };
 
 module.exports = nextConfig;
