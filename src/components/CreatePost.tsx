@@ -253,19 +253,27 @@ export default function CreatePost() {
               body: fd,
             });
             
-            if (r.ok) {
-              const d = await r.json();
-              urls.push(d.url);
-              types.push(m.type);
-              // Clear error after successful upload with slight delay for visibility
-              await new Promise(resolve => setTimeout(resolve, 300));
-              setError(null);
-            } else {
+            // Handle timeout and network errors
+            if (!r.ok) {
               const errorData = await r.json().catch(() => ({}));
-              setError(`Failed to upload ${m.type}: ${errorData.error || r.status}`);
+              
+              // Check for timeout error
+              if (errorData.timeout || r.status === 408) {
+                setError("Upload timeout. Please check your connection and try again with a smaller file or better connection.");
+              } else {
+                setError(`Failed to upload ${m.type}: ${errorData.error || `Error ${r.status}`}`);
+              }
+              
               setPosting(false);
               return;
             }
+            
+            const d = await r.json();
+            urls.push(d.url);
+            types.push(m.type);
+            // Clear error after successful upload with slight delay for visibility
+            await new Promise(resolve => setTimeout(resolve, 300));
+            setError(null);
           }
           
           body.mediaUrls = urls;
