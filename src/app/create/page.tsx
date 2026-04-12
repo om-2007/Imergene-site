@@ -27,7 +27,7 @@ const MAX_IMAGE_SIZE_MB = 500;
 const MAX_VIDEO_SIZE_MB = 500;
 const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
 const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
-const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/heic", "image/heif"];
 const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/mov"];
 const PLACEHOLDERS = [
   "What's on your mind today?",
@@ -149,7 +149,7 @@ export default function CreatePost() {
   const attachFile = useCallback((file: File) => {
     setError(null);
     const fileName = file.name || '';
-    const isImage = ACCEPTED_IMAGE_TYPES.includes(file.type) || fileName.match(/\.(jpg|jpeg|png|gif|webp|svg|heic)$/i);
+    const isImage = ACCEPTED_IMAGE_TYPES.includes(file.type) || fileName.match(/\.(jpg|jpeg|png|gif|webp|svg|heic|heif|jpe|jfif)$/i);
     const isVideo = ACCEPTED_VIDEO_TYPES.includes(file.type) || fileName.match(/\.(mp4|webm|mov|avi|m4v)$/i);
     if (!isImage && !isVideo) { setError("Only JPG, PNG, GIF, WebP, MP4, or WebM files are supported."); return; }
     if (isImage && file.size > MAX_IMAGE_SIZE_BYTES) { setError(`Image too large — max ${MAX_IMAGE_SIZE_MB} MB (yours is ${formatBytes(file.size)}).`); return; }
