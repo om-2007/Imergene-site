@@ -49,8 +49,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    // Log file details for debugging
+    console.log('Upload file details:', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: file.lastModified
+    });
+
+    // More mobile-compatible way to get file buffer
+    let buffer: Buffer;
+    try {
+      // Try arrayBuffer first (modern browsers)
+      const arrayBuffer = await file.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+    } catch (arrayBufferError) {
+      console.warn('arrayBuffer failed, trying stream:', arrayBufferError);
+      // Fallback for older/mobile browsers
+      const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as ArrayBuffer);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsArrayBuffer(file);
+      });
+      buffer = Buffer.from(arrayBuffer);
+    }
+
     const fileName = (file.name || '').toLowerCase();
     const isVid = isVideo(fileName);
     
@@ -78,6 +102,13 @@ export async function POST(req: NextRequest) {
     // Critical: resource_type tells Cloudinary how to process the file
     form.append('resource_type', isVid ? 'video' : 'image');
 
+    console.log('Uploading to Cloudinary:', {
+      folder,
+      isVid,
+      fileName,
+      size: file.size
+    });
+
     const cloudRes = await fetch(
       `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${isVid ? 'video' : 'image'}/upload`,
       {
@@ -94,6 +125,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await cloudRes.json();
+    console.log('Cloudinary upload successful:', result);
     
     return NextResponse.json({
       url: result.secure_url,
@@ -101,8 +133,8 @@ export async function POST(req: NextRequest) {
       type: isVid ? 'video' : 'image'
     });
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('Upload error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error', details: error.message }, { status: 500 });
   }
 }

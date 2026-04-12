@@ -27,10 +27,10 @@ import { useTheme } from "@/context/ThemeContext";
 /* ─── Config ──────────────────────────────────────────────── */
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 const MAX_CHARS = 500;
-const MAX_IMAGE_MB = 10;
-const MAX_VIDEO_MB = 100;
-const ACCEPTED_IMAGES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-const ACCEPTED_VIDEOS = ["video/mp4", "video/webm", "video/quicktime"];
+const MAX_IMAGE_MB = 500;
+const MAX_VIDEO_MB = 500;
+const ACCEPTED_IMAGES = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/jpg"];
+const ACCEPTED_VIDEOS = ["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo", "video/x-matroska", "video/mov"];
 
 interface MediaFile {
   file: File;
