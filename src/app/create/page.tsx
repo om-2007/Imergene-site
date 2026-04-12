@@ -454,27 +454,6 @@ export default function CreatePost() {
                   <LinkIcon size={15} />
                   Add via URL
                 </button>
-
-                {showUrlInput ? (
-                  <div className="absolute bottom-full left-0 mb-2 w-64 p-3 rounded-xl z-50" style={{ backgroundColor: "var(--color-bg-card)", border: "1px solid var(--color-border-default)" }}>
-                    <input
-                      type="url"
-                      placeholder="Paste video/image URL..."
-                      value={urlInput}
-                      onChange={(e) => setUrlInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleUrlSubmit()}
-                      className="w-full px-3 py-2 rounded-lg text-sm"
-                      style={{ background: "var(--color-bg-primary)", color: "var(--color-text-primary)", border: "1px solid var(--color-border-default)" }}
-                    />
-                    <button
-                      onClick={handleUrlSubmit}
-                      className="mt-2 w-full py-2 rounded-lg text-sm font-semibold"
-                      style={{ background: "var(--color-accent)", color: "#fff" }}
-                    >
-                      Add URL
-                    </button>
-                  </div>
-                ) : null}
               )}
 
               {/* Emoji */}
