@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import { join } from 'path';
 
 const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME!;
 const API_KEY = process.env.CLOUDINARY_API_KEY!;
@@ -17,32 +14,6 @@ function sign(timestamp: number, folder: string) {
 function checkVideo(name: string) {
   const n = (name || '').toLowerCase();
   return n.endsWith('.mp4') || n.endsWith('.webm') || n.endsWith('.mov');
-}
-
-async function saveTmp(file: File): Promise<Buffer> {
-  const arr = await file.arrayBuffer();
-  return Buffer.from(arr);
-}
-
-async function upCloud(buffer: Buffer, isVid: boolean, name: string) {
-  const folder = isVid ? 'imergene/vids' : 'imergene/imgs';
-  const ts = Math.floor(Date.now() / 1000);
-  const sig = sign(ts, folder);
-  
-  const body = new URLSearchParams();
-  body.append('file', `data:${isVid ? 'video' : 'image'}/mp4;base64,${buffer.toString('base64')}`);
-  body.append('api_key', API_KEY);
-  body.append('timestamp', ts.toString());
-  body.append('signature', sig);
-  body.append('folder', folder);
-  if (name) body.append('public_id', name.replace(/\.[^.]+$/, ''));
-
-  const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${isVid ? 'video' : 'image'}/upload`,
-    { method: 'POST', body: body.toString() }
-  );
-
-  return res.json();
 }
 
 export async function POST(req: NextRequest) {
@@ -64,12 +35,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ e: 'No file' }, { status: 400 });
     }
 
-    const buffer = await saveTmp(file);
-    const isVid = checkVideo(file.name || '');
+    const arrayBuffer = await file.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    const base64 = Buffer.from(uint8Array).toString('base64');
     
-    console.log('UPLOAD:', file.name, isVid ? 'VIDEO' : 'IMAGE', buffer.length);
+    const isVid = checkVideo(file.name || '');
+    const folder = isVid ? 'imergene/vids' : 'imergene/imgs';
+    const ts = Math.floor(Date.now() / 1000);
+    const sig = sign(ts, folder);
+    
+    const mimeType = isVid ? 'video/mp4' : 'image/jpeg';
+    const dataUri = `data:${mimeType};base64,${base64}`;
 
-    const result = await upCloud(buffer, isVid, file.name || '');
+    console.log('UPLOAD:', file.name, isVid ? 'VIDEO' : 'IMAGE', uint8Array.length);
+
+    const body = new URLSearchParams();
+    body.append('file', dataUri);
+    body.append('api_key', API_KEY);
+    body.append('timestamp', ts.toString());
+    body.append('signature', sig);
+    body.append('folder', folder);
+
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${isVid ? 'video' : 'image'}/upload`,
+      { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() }
+    );
+
+    const result = await res.json();
+    
+    if (!res.ok) {
+      console.log('Cloudinary error:', result);
+      return NextResponse.json({ e: 'Upload failed', detail: result }, { status: 500 });
+    }
 
     return NextResponse.json({
       url: result.secure_url,
