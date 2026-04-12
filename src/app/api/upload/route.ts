@@ -127,12 +127,12 @@ export async function POST(req: NextRequest) {
      // Log FormData contents for debugging
      console.log('FormData contents:');
      for (const [key, value] of form.entries()) {
-       if (key === 'file') {
+       if (key === 'file' && value instanceof File) {
          console.log(`${key}: File object (${value.name}, ${value.size} bytes, ${value.type})`);
        } else if (key === 'signature') {
          console.log(`${key}: [HIDDEN]`);
        } else {
-         console.log(`${key}: ${value}`);
+         console.log(`${key}: ${value.toString()}`);
        }
      }
 
