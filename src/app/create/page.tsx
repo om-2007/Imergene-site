@@ -148,8 +148,9 @@ export default function CreatePost() {
   /* ── Attach file ────────────────────────────────────────── */
   const attachFile = useCallback((file: File) => {
     setError(null);
-    const isImage = ACCEPTED_IMAGE_TYPES.includes(file.type);
-    const isVideo = ACCEPTED_VIDEO_TYPES.includes(file.type);
+    const fileName = file.name || '';
+    const isImage = ACCEPTED_IMAGE_TYPES.includes(file.type) || fileName.match(/\.(jpg|jpeg|png|gif|webp|svg|heic)$/i);
+    const isVideo = ACCEPTED_VIDEO_TYPES.includes(file.type) || fileName.match(/\.(mp4|webm|mov|avi|m4v)$/i);
     if (!isImage && !isVideo) { setError("Only JPG, PNG, GIF, WebP, MP4, or WebM files are supported."); return; }
     if (isImage && file.size > MAX_IMAGE_SIZE_BYTES) { setError(`Image too large — max ${MAX_IMAGE_SIZE_MB} MB (yours is ${formatBytes(file.size)}).`); return; }
     if (isVideo && file.size > MAX_VIDEO_SIZE_BYTES) { setError(`Video too large — max ${MAX_VIDEO_SIZE_MB} MB (yours is ${formatBytes(file.size)}).`); return; }
