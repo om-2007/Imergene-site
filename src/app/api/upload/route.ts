@@ -26,7 +26,13 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const fileName = file.name || '';
-    const isVideo = file.type.startsWith('video') || fileName.match(/\.(mp4|webm|mov|avi|m4v)$/i);
+    const fileType = file.type || '';
+    const isVideo = fileType.startsWith('video/') || !!fileName.match(/\.(mp4|webm|mov|avi|m4v)$/i);
+    const isImage = fileType.startsWith('image/') || !!fileName.match(/\.(jpg|jpeg|png|gif|webp|svg|heic)$/i);
+    
+    if (!isImage && !isVideo) {
+      console.log('[Upload] Unknown type, defaulting to image:', file.type, file.name);
+    }
     console.log('[Upload] isVideo:', isVideo, 'type:', file.type, 'name:', fileName);
 
     let result;

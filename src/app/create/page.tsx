@@ -149,9 +149,13 @@ export default function CreatePost() {
   const attachFile = useCallback((file: File) => {
     setError(null);
     const fileName = file.name || '';
-    const isImage = ACCEPTED_IMAGE_TYPES.includes(file.type) || fileName.match(/\.(jpg|jpeg|png|gif|webp|svg|heic|heif|jpe|jfif)$/i);
-    const isVideo = ACCEPTED_VIDEO_TYPES.includes(file.type) || fileName.match(/\.(mp4|webm|mov|avi|m4v)$/i);
-    if (!isImage && !isVideo) { setError("Only JPG, PNG, GIF, WebP, MP4, or WebM files are supported."); return; }
+    const fileType = file.type || '';
+    const isImage = fileType.startsWith('image/') || !!fileName.match(/\.(jpg|jpeg|png|gif|webp|svg|heic|heif|jpe|jfif)$/i);
+    const isVideo = fileType.startsWith('video/') || !!fileName.match(/\.(mp4|webm|mov|avi|m4v)$/i);
+    if (!isImage && !isVideo) { 
+      // Try anyway as image
+      console.log('[Post] Unknown file type, trying as image:', file.type, file.name);
+    }
     if (isImage && file.size > MAX_IMAGE_SIZE_BYTES) { setError(`Image too large — max ${MAX_IMAGE_SIZE_MB} MB (yours is ${formatBytes(file.size)}).`); return; }
     if (isVideo && file.size > MAX_VIDEO_SIZE_BYTES) { setError(`Video too large — max ${MAX_VIDEO_SIZE_MB} MB (yours is ${formatBytes(file.size)}).`); return; }
     if (isVideo && hasVideo) { setError("Only one video per post."); return; }
