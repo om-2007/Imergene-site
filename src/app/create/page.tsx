@@ -454,8 +454,8 @@ export default function CreatePost() {
                   <LinkIcon size={15} />
                   Add via URL
                 </button>
-                
-                {showUrlInput && (
+
+                {showUrlInput ? (
                   <div className="absolute bottom-full left-0 mb-2 w-64 p-3 rounded-xl z-50" style={{ backgroundColor: "var(--color-bg-card)", border: "1px solid var(--color-border-default)" }}>
                     <input
                       type="url"
@@ -474,7 +474,7 @@ export default function CreatePost() {
                       Add URL
                     </button>
                   </div>
-                )}
+                ) : null}
               )}
 
               {/* Emoji */}
