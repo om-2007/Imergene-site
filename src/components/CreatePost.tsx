@@ -27,8 +27,8 @@ import { useTheme } from "@/context/ThemeContext";
 /* ─── Config ──────────────────────────────────────────────── */
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 const MAX_CHARS = 500;
-const MAX_IMAGE_MB = 500;
-const MAX_VIDEO_MB = 500;
+const MAX_IMAGE_MB = 1024; // 1GB
+const MAX_VIDEO_MB = 1024; // 1GB
 const ACCEPTED_IMAGES = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/jpg"];
 const ACCEPTED_VIDEOS = ["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo", "video/x-matroska", "video/mov"];
 
@@ -206,75 +206,100 @@ export default function CreatePost() {
     setError(null);
   };
 
-  /* ── Submit ─────────────────────────────────────────────── */
-  const handlePost = async () => {
-    if (!canPost) return;
-    setPosting(true);
-    setError(null);
-    try {
-      const body: Record<string, unknown> = {
-        content: content.trim(),
-        category: "general",
-        tags: [],
-        mediaUrls: [],
-        mediaTypes: [],
-      };
+/* ── Submit ─────────────────────────────────────────────── */
+   const handlePost = async () => {
+     if (!canPost) return;
+     
+     setPosting(true);
+     setError(null);
+     
+     try {
+       // Upload all media files first
+       const body: Record<string, unknown> = {
+         content: content.trim(),
+         category: "general",
+         tags: [],
+         mediaUrls: [],
+         mediaTypes: [],
+       };
 
        if (mediaList.length > 0) {
          const urls: string[] = [];
          const types: string[] = [];
+         
+         // Upload media files with progress indication
          for (const m of mediaList) {
+           // Check if file is too large
+           const fileSizeMB = mb(m.file.size);
+           if ((m.type === "image" && fileSizeMB > MAX_IMAGE_MB) || 
+               (m.type === "video" && fileSizeMB > MAX_VIDEO_MB)) {
+             setError(`${m.type === "image" ? "Image" : "Video"} is too large (${fileSizeMB.toFixed(1)} MB). Maximum allowed is ${MAX_IMAGE_MB} MB for images and ${MAX_VIDEO_MB} MB for videos.`);
+             setPosting(false);
+             return;
+           }
+           
            const fd = new FormData();
            fd.append("file", m.file);
+           
+           // Show uploading status
+           setError(`Uploading ${m.type === "image" ? "image" : "video"}... (${fileSizeMB.toFixed(1)} MB)`);
+           
            const r = await fetch(`${API}/api/upload`, {
              method: "POST",
              headers: { Authorization: `Bearer ${token}` },
              body: fd,
            });
+           
            if (r.ok) {
              const d = await r.json();
              urls.push(d.url);
              types.push(m.type);
+             // Clear error after successful upload
+             setError(null);
            } else {
-             // Handle upload error - show to user and stop posting
              const errorData = await r.json().catch(() => ({}));
-             setError(errorData.error || `Failed to upload ${m.type}: ${r.status}`);
+             setError(`Failed to upload ${m.type}: ${errorData.error || r.status}`);
              setPosting(false);
              return;
            }
          }
+         
          body.mediaUrls = urls;
          body.mediaTypes = types;
        }
 
-      const res = await fetch(`${API}/api/posts`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
+       // Create the post with all media
+       const res = await fetch(`${API}/api/posts`, {
+         method: "POST",
+         headers: {
+           "Content-Type": "application/json",
+           Authorization: `Bearer ${token}`,
+         },
+         body: JSON.stringify(body),
+       });
 
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({}));
-        throw new Error(e.error || `Error ${res.status}`);
-      }
+       if (!res.ok) {
+         const e = await res.json().catch(() => ({}));
+         throw new Error(e.error || `Error ${res.status}`);
+       }
 
-      setDone(true);
-      setContent("");
-      mediaList.forEach((m) => URL.revokeObjectURL(m.url));
-      setMediaList([]);
-      setTimeout(() => {
-        setDone(false);
-        router.push("/");
-      }, 2200);
-    } catch (e) {
-      setError((e as Error).message || "Something went wrong. Try again.");
-    } finally {
-      setPosting(false);
-    }
-  };
+       setDone(true);
+       setContent("");
+       // Clean up object URLs
+       mediaList.forEach((m) => URL.revokeObjectURL(m.url));
+       setMediaList([]);
+       
+       // Navigate to feed after brief delay
+       setTimeout(() => {
+         setDone(false);
+         router.push("/");
+       }, 2200);
+     } catch (e) {
+       setError((e as Error).message || "Something went wrong. Try again.");
+     } finally {
+       setPosting(false);
+     }
+   };
 
   /* ── Initials ───────────────────────────────────────────── */
   const initials = username

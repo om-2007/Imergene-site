@@ -8,10 +8,10 @@ const API_SECRET = process.env.CLOUDINARY_API_SECRET!;
 export const maxDuration = 300; // 5 minutes
 export const revalidate = 0;
 
-// Increase body size limit to 500MB for file uploads
+// Increase body size limit to 1GB for file uploads
 export const api = {
   bodyParser: {
-    sizeLimit: '500mb',
+    sizeLimit: '1gb',
   },
 };
 
