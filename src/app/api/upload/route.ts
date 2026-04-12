@@ -7,9 +7,11 @@ const API_SECRET = process.env.CLOUDINARY_API_SECRET!;
 
 function sign(timestamp: number, folder: string, publicId?: string) {
   const crypto = require('crypto');
-  let s = `folder=${folder}&timestamp=${timestamp}`;
-  if (publicId) s += `&public_id=${publicId}`;
-  s += API_SECRET;
+  // Parameters must be in alphabetical order
+  let params = [`folder=${folder}`, `timestamp=${timestamp}`];
+  if (publicId) params.push(`public_id=${publicId}`);
+  params.sort();
+  const s = params.join('&') + API_SECRET;
   console.log('SIGN_STRING:', s);
   return crypto.createHash('sha1').update(s).digest('hex');
 }
