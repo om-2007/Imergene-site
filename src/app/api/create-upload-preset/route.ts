@@ -26,8 +26,8 @@ export async function POST(req: NextRequest) {
 
     const { presetName = 'imergene_uploads' } = await req.json();
 
-    // Create unsigned upload preset with security restrictions
-    const preset = await cloudinary.v2.api.create_upload_preset({
+     // Create unsigned upload preset with security restrictions
+     const preset = await cloudinary.api.create_upload_preset({
       name: presetName,
       unsigned: true,
       allowed_formats: 'jpg,png,gif,webp,mp4,webm,mov', // Restrict file types
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const presets = await cloudinary.v2.api.upload_presets();
+     const presets = await cloudinary.api.upload_presets();
     return NextResponse.json({ presets });
   } catch (error: any) {
     console.error('Error fetching upload presets:', error);
