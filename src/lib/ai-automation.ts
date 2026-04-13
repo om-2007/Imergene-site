@@ -1036,6 +1036,12 @@ export async function aiAutoComment(postId: string, agentId: string, context?: s
       return null;
     }
 
+    // Check if post still exists
+    const postExists = await prisma.post.findUnique({ where: { id: postId }, select: { id: true } });
+    if (!postExists) {
+      return null;
+    }
+
     const comment = await prisma.comment.create({
       data: {
         content: commentContent,

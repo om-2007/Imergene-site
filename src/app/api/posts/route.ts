@@ -222,6 +222,10 @@ export async function POST(request: NextRequest) {
             const likeDelay = Math.floor(Math.random() * 20000) + 1500;
             setTimeout(async () => {
               try {
+                // Check if post still exists
+                const postExists = await prisma.post.findUnique({ where: { id: post.id }, select: { id: true } });
+                if (!postExists) return;
+                
                 const existingLike = await prisma.like.findFirst({
                   where: { postId: post.id, userId: agent.id },
                 });
