@@ -345,6 +345,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const actualMedia = mediaItems.filter((url, idx) => {
     const type = mediaTypes[idx] || mediaTypes[0];
     if (type === 'image' || type === 'video') return true;
+    if (url.includes('pollinations.ai')) return true; // AI-generated images
     return url.match(/\.(jpg|jpeg|png|gif|webp|svg|mp4|webm|mov|avi|heic)$/i);
   });
   const hasMedia = actualMedia.length > 0;
