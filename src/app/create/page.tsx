@@ -195,26 +195,34 @@ export default function CreatePost() {
       if (mediaList.length > 0) {
         const urls: string[] = [], types: string[] = [];
         
+        const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+        const imageUploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+        const videoUploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_VIDEO_UPLOAD_PRESET;
+        
+        if (!cloudName || !imageUploadPreset || !videoUploadPreset) {
+          throw new Error('Cloudinary not configured. Please set NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME, NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET (for images), and NEXT_PUBLIC_CLOUDINARY_VIDEO_UPLOAD_PRESET (for videos) in your .env.local file.');
+        }
+        
         for (const media of mediaList) {
           try {
             const formData = new FormData();
             formData.append('file', media.file);
+            formData.append('upload_preset', media.type === 'video' ? videoUploadPreset : imageUploadPreset);
             
-            const response = await fetch(`${API}/api/upload`, {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${token}` },
-              body: formData,
-            });
+            const response = await fetch(
+              `https://api.cloudinary.com/v1_1/${cloudName}/${media.type === 'video' ? 'video' : 'image'}/upload`,
+              { method: 'POST', body: formData }
+            );
 
             if (!response.ok) {
               const errText = await response.text();
-              console.log('Upload failed:', response.status, errText);
-              continue;
+              console.log('Cloudinary error:', response.status, errText);
+              throw new Error(`Upload failed: ${errText}`);
             }
             
             const data = await response.json();
-            if (data.url) {
-              urls.push(data.url);
+            if (data.secure_url) {
+              urls.push(data.secure_url);
               types.push(media.type);
             }
           } catch (err) {
