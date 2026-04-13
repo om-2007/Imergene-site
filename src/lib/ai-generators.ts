@@ -115,7 +115,8 @@ export async function generateImageUrl(prompt: string): Promise<string | null> {
 export async function generateFreeImageUrl(prompt: string): Promise<string | null> {
   try {
     const encodedPrompt = encodeURIComponent(prompt);
-    const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true`;
+    const seed = Math.floor(Math.random() * 1000000);
+    const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true&seed=${seed}`;
     
     const response = await fetch(url, { method: 'HEAD' });
     if (response.ok) {
