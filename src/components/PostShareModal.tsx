@@ -286,23 +286,46 @@ export default function PostShareModal({ post, onClose, onSuccess }: PostShareMo
                         </AnimatePresence>
                     </div>
 
-                    <button
-                        onClick={handleBulkShare}
-                        disabled={selectedUserIds.length === 0 || isSending}
-                        className="w-full py-6 rounded-2xl font-black text-[10px] uppercase tracking-[0.25em] transition-all"
-                        style={{
-                            backgroundColor: selectedUserIds.length > 0 ? 'var(--color-text-primary)' : 'var(--color-bg-primary)',
-                            color: selectedUserIds.length > 0 ? 'var(--color-bg-card)' : 'var(--color-text-muted)',
-                            cursor: selectedUserIds.length === 0 ? 'not-allowed' : 'pointer',
-                            opacity: selectedUserIds.length === 0 ? 0.3 : 1
-                        }}
-                    >
-                        {isSending ? (
-                            <span className="flex items-center gap-2 justify-center"><Loader2 size={14} className="animate-spin" /> Synchronizing...</span>
-                        ) : (
-                            `Share to ${selectedUserIds.length} Nodes`
-                        )}
-                    </button>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={async () => {
+                                const url = `${window.location.origin}/post/${post.id}`;
+                                const text = post.content?.slice(0, 100) + (post.content?.length > 100 ? '...' : '');
+                                if (navigator.share) {
+                                    try {
+                                        await navigator.share({ title: 'Imergene Post', text, url });
+                                    } catch {}
+                                } else {
+                                    await navigator.clipboard.writeText(`${text}\n${url}`);
+                                    alert('Link copied!');
+                                }
+                            }}
+                            className="flex-1 py-4 rounded-2xl font-black text-[9px] uppercase tracking-wider transition-all"
+                            style={{
+                                backgroundColor: 'var(--color-accent)',
+                                color: '#fff'
+                            }}
+                        >
+                            Share Outside
+                        </button>
+                        <button
+                            onClick={handleBulkShare}
+                            disabled={selectedUserIds.length === 0 || isSending}
+                            className="flex-1 py-4 rounded-2xl font-black text-[9px] uppercase tracking-wider transition-all"
+                            style={{
+                                backgroundColor: selectedUserIds.length > 0 ? 'var(--color-text-primary)' : 'var(--color-bg-primary)',
+                                color: selectedUserIds.length > 0 ? 'var(--color-bg-card)' : 'var(--color-text-muted)',
+                                cursor: selectedUserIds.length === 0 ? 'not-allowed' : 'pointer',
+                                opacity: selectedUserIds.length === 0 ? 0.3 : 1
+                            }}
+                        >
+                            {isSending ? (
+                                <span className="flex items-center gap-2 justify-center"><Loader2 size={14} className="animate-spin" /> Syncing...</span>
+                            ) : (
+                                `${selectedUserIds.length} Nodes`
+                            )}
+                        </button>
+                    </div>
                 </div>
             </motion.div>
         </motion.div>

@@ -325,6 +325,28 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const dragOffset = useRef<number>(0);
   const touchHandled = useRef(false);
 
+  const [videoInView, setVideoInView] = useState(true);
+  
+  useEffect(() => {
+    if (!cardRef.current || !post.mediaTypes?.[currentMediaIndex]) return;
+    if (post.mediaTypes[currentMediaIndex] !== "video") return;
+    const observer = new IntersectionObserver(([entry]) => {
+      setVideoInView(entry.isIntersecting);
+    }, { threshold: 0.5 });
+    observer.observe(cardRef.current);
+    return () => observer.disconnect();
+  }, [currentMediaIndex, post.mediaTypes]);
+
+  useEffect(() => {
+    const mediaType = post.mediaTypes?.[currentMediaIndex];
+    if (mediaType !== "video" || !videoRef.current) return;
+    if (videoInView && videoRef.current.paused) {
+      videoRef.current.play().catch(() => {});
+    } else if (!videoInView && !videoRef.current.paused) {
+      videoRef.current.pause();
+    }
+  }, [videoInView, currentMediaIndex, post.mediaTypes]);
+
   const fsTouchStartX = useRef<number>(0);
   const fsTouchStartY = useRef<number>(0);
   const fsPinchDistance = useRef<number>(0);

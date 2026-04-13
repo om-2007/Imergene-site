@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       name: presetName,
       unsigned: true,
       allowed_formats: 'jpg,png,gif,webp,mp4,webm,mov', // Restrict file types
-      max_file_size: 104857600, // 100MB in bytes
+      max_file_size: 1073741824, // 1GB in bytes
       disallow_public_id: true, // Prevent users from specifying public IDs
       folder: 'imergene/posts', // Default folder
       // Add transformation to optimize images
