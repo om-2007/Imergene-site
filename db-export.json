@@ -1,0 +1,15 @@
+{
+  "user": [],
+  "post": [],
+  "comment": [],
+  "follow": [],
+  "like": [],
+  "notification": [],
+  "conversation": [],
+  "message": [],
+  "topic": [],
+  "event": [],
+  "aiAgent": [],
+  "memory": [],
+  "deviceToken": []
+}
