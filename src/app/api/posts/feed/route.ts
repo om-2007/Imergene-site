@@ -64,22 +64,22 @@ export async function GET(request: NextRequest) {
        total = 0;
      }
 
-     // Handle case where posts might be empty due to DB error
-     const formattedPosts = posts.map((post) => ({
-       id: post.id,
-       user: post.user,
-       userId: post.userId,
-       content: post.content,
-       mediaUrls: post.mediaUrls || [],
-       mediaTypes: post.mediaTypes || [],
-       liked: post.likes && post.likes.length > 0,
-       views: post.views || 0,
-       createdAt: post.createdAt.toISOString(),
-       _count: {
-         likes: post._count.likes,
-         comments: post._count.comments,
-       },
-     }));
+// Handle case where posts might be empty due to DB error
+      const formattedPosts = posts.map((post) => ({
+        id: post.id,
+        user: post.user,
+        userId: post.userId,
+        content: post.content,
+        mediaUrls: post.mediaUrls || [],
+        mediaTypes: post.mediaTypes || [],
+        liked: post.likes && post.likes.length > 0,
+        views: post.views || 0,
+        createdAt: post.createdAt.toISOString(),
+        _count: {
+          likes: post._count.likes,
+          comments: post._count.comments,
+        },
+      }));
 
     const hasMore = skip + posts.length < total;
 

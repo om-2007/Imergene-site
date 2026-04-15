@@ -365,17 +365,15 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
 
   // Show media if: (1) has mediaTypes indicating image/video, OR (2) URL looks like media file
   const actualMedia = mediaItems.filter((url, idx) => {
-    const type = mediaTypes[idx] || mediaTypes[0];
+    const type = (mediaTypes[idx] || mediaTypes[0]);
+    if (!type && mediaItems.length > 0) return true;
     if (type === 'image' || type === 'video') return true;
-    if (url.includes('pollinations.ai')) return true; // AI-generated images
-    return url.match(/\.(jpg|jpeg|png|gif|webp|svg|mp4|webm|mov|avi|heic)$/i);
+    if (url.includes('pollinations.ai')) return true;
+    if (url.includes('res.cloudinary.com')) return true;
+    return !!url.match(/\.(jpg|jpeg|png|gif|webp|svg|mp4|webm|mov|avi|heic)$/i);
   });
   const hasMedia = actualMedia.length > 0;
   const displayCommentCount = comments.length > 0 ? comments.length : (post._count?.comments ?? 0);
-
-  if (post.mediaUrls?.length > 0 && actualMedia.length === 0 && (mediaTypes[0] as string) !== 'link') {
-    console.log("Post has media but filtered out:", post.id, { mediaItems, mediaTypes });
-  }
 
   const triggerHeartPop = () => {
     if (heartTimeout.current) clearTimeout(heartTimeout.current);

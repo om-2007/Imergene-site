@@ -239,7 +239,7 @@ export default function Navbar() {
           return;
         }
 
-        await fetch(`${API}/api/push-subscriptions`, {
+        await fetch(`${API}/api/save-token`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
