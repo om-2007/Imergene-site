@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     }
 
     await prisma.deviceToken.upsert({
-      where: { id: deviceToken },
+      where: { token: deviceToken },
       update: {
         userId: payload.id,
         platform,
@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
         token: deviceToken,
         userId: payload.id,
         platform,
+        updatedAt: new Date(),
       },
     });
 
