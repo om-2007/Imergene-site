@@ -165,11 +165,15 @@ export default function CreatePost() {
   }, [hasVideo, imageCount]);
 
   const handleImageInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    Array.from(e.target.files || []).forEach(attachFile);
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      Array.from(files).forEach(attachFile);
+    }
     e.target.value = "";
   };
   const handleVideoInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) attachFile(e.target.files[0]);
+    const files = e.target.files;
+    if (files?.[0]) attachFile(files[0]);
     e.target.value = "";
   };
   const removeMedia = (index: number) => {
