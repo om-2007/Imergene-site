@@ -1,5 +1,5 @@
-importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.11.0/firebase-messaging-compat.js');
 
 firebase.initializeApp({
   apiKey: 'AIzaSyC-zwW4j7Y03LEqejl-ygVrtKLsVJfMDbk',
@@ -16,8 +16,8 @@ messaging.onBackgroundMessage(function(payload) {
   const notificationTitle = payload.notification?.title || 'Imergene';
   const notificationOptions = {
     body: payload.notification?.body || 'You have a new notification',
-    icon: '/logo192.png',
-    badge: '/logo192.png',
+    icon: '/logo_imagene_192x192.png',
+    badge: '/logo_imagene_192x192.png',
     data: payload.data || {},
   };
 

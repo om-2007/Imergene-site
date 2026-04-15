@@ -274,18 +274,16 @@ export default function Navbar() {
         
         isSubscribed = true;
         onForegroundMessage((payload) => {
-          console.log('[FCM] Foreground message received:', payload);
-          const data = payload.notification || payload.data || {};
-          const title = data.title || 'New Notification';
-          const body = data.body || '';
+          const notification = payload.notification || {};
+          const title = notification.title || 'Imergene';
+          const body = notification.body || '';
           
           if (Notification.permission === 'granted') {
-            new Notification(title, { body, icon: '/logo192.png' });
+            new Notification(title, { body, icon: '/logo_imagene_192x192.png' });
           }
           
           fetchNotifications();
-        });
-        console.log('[FCM] Subscribed to foreground messages');
+        }, registration);
       } catch (err) {
         console.error('[FCM] Foreground message setup failed:', err);
       }

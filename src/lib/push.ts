@@ -9,14 +9,9 @@ const FIREBASE_FCM_URL = `https://fcm.googleapis.com/v1/projects/${FIREBASE_PROJ
 const FIREBASE_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging https://www.googleapis.com/auth/cloud-platform';
 
 function ensureFirebaseConfig() {
-  console.log('[Push] Firebase config check:', {
-    projectId: FIREBASE_PROJECT_ID ? 'set' : 'MISSING',
-    clientEmail: FIREBASE_CLIENT_EMAIL ? 'set' : 'MISSING',
-    privateKey: FIREBASE_PRIVATE_KEY ? 'set' : 'MISSING',
-    fcmUrl: FIREBASE_FCM_URL,
-  });
   if (!FIREBASE_PROJECT_ID || !FIREBASE_CLIENT_EMAIL || !FIREBASE_PRIVATE_KEY) {
-    throw new Error('Firebase service account environment variables are not configured');
+    console.error('[Push] Firebase config missing');
+    throw new Error('Firebase not configured');
   }
 }
 
@@ -67,7 +62,10 @@ export async function sendFirebasePushToToken(token: string, payload: FirebasePu
     return;
   }
 
-  ensureFirebaseConfig();
+  if (!FIREBASE_PROJECT_ID || !FIREBASE_CLIENT_EMAIL || !FIREBASE_PRIVATE_KEY) {
+    console.log('[Push] Firebase not configured - skipping');
+    return;
+  }
 
   const accessToken = await getFirebaseAccessToken();
   const message = {
@@ -106,6 +104,12 @@ export async function sendFirebasePushToToken(token: string, payload: FirebasePu
 }
 
 export async function sendWebPushNotification(userId: string, payload: FirebasePushPayload) {
+  console.log('[Push] sendWebPushNotification called for user:', userId, 'payload:', payload);
+  
+  if (!FIREBASE_PROJECT_ID || !FIREBASE_CLIENT_EMAIL || !FIREBASE_PRIVATE_KEY) {
+    return;
+  }
+
   const tokens = await prisma.deviceToken.findMany({
     where: { userId },
     select: { token: true },
@@ -113,17 +117,14 @@ export async function sendWebPushNotification(userId: string, payload: FirebaseP
   });
 
   if (tokens.length === 0) {
-    console.log(`[Push] No device tokens for user ${userId}`);
     return;
   }
 
-  console.log(`[Push] Sending to ${tokens.length} devices for user ${userId}`);
-
-  const results = await Promise.allSettled(tokens.map((device) => sendFirebasePushToToken(device.token, payload)));
-  
-  results.forEach((result, i) => {
-    if (result.status === 'rejected') {
-      console.error(`[Push] Failed for token ${i}:`, result.reason);
+  for (const device of tokens) {
+    try {
+      await sendFirebasePushToToken(device.token, payload);
+    } catch (error) {
+      console.error('[Push] Failed:', error);
     }
-  });
+  }
 }

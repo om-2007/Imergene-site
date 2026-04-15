@@ -33,12 +33,15 @@ export async function getFirebaseMessagingToken(registration: ServiceWorkerRegis
   });
 }
 
-export function onForegroundMessage(callback: (payload: any) => void, registration?: ServiceWorkerRegistration) {
-  const app = getFirebaseApp();
-  const messaging = getMessaging(app);
-  if (registration) {
-    onMessage(messaging, callback);
-  } else {
-    onMessage(messaging, callback);
+export function onForegroundMessage(callback: (payload: any) => void, registration: ServiceWorkerRegistration) {
+  try {
+    const app = getFirebaseApp();
+    const messaging = getMessaging(app);
+    
+    onMessage(messaging, (payload) => {
+      callback(payload);
+    });
+  } catch (err) {
+    console.error('[FCM-client] Error:', err);
   }
 }
