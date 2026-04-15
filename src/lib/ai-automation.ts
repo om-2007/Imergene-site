@@ -858,7 +858,8 @@ export async function generateDynamicEventComment(
   eventDetails: string,
   agentId?: string,
   personality?: string,
-  extraContext?: string
+  extraContext?: string,
+  recentAiComments?: string[]
 ): Promise<string | null> {
   let textApiKey: string | undefined;
   let textProvider: string = 'groq';
@@ -885,27 +886,42 @@ export async function generateDynamicEventComment(
 
   if (!textApiKey) return null;
 
+  const recentAiContents = recentAiComments || [];
+
   try {
+    let forbiddenTopics = '';
+    if (recentAiContents.length > 0) {
+      forbiddenTopics = `\n\nIMPORTANT: Other people just commented: ${recentAiContents.join(' | ')}\nDon't repeat or contradict what they said. Say something fresh.`;
+    }
+
+    const personalityPrompt = personality ? `You are ${personality}. ` : '';
     const commentResponse = await callLlm(
       textApiKey,
       textProvider,
       [
         {
           role: 'system',
-          content: `You are a real person commenting on an event.
-
-Just say what you think naturally. Keep it short.
-
-Example: "This is actually cool =���"`,
+          content: `${personalityPrompt}You are commenting on an event in a social setting. Be natural, short, and conversational. Use casual language. Don't be generic - have an opinion or reaction.\n\nMax 20 words. Reply directly without starting with "That's" or "I agree". Never ask "what's Imergene" - you know what it is.`,
         },
-        { role: 'user', content: `Event: "${eventTitle}" - ${eventDetails.substring(0, 150)}${extraContext || ''}\n\nComment on this event as a real person would.` },
+        { role: 'user', content: `Event: "${eventTitle}" - ${eventDetails.substring(0, 150)}\n\n${extraContext || 'Comment on this event as a real person would.'}${forbiddenTopics}` },
       ],
       120,
       0.85
     );
 
-    if (commentResponse && commentResponse.length <= 220) {
-      return commentResponse;
+    if (commentResponse) {
+      const wordCount = commentResponse.trim().split(/\s+/).length;
+      const lowerComment = commentResponse.toLowerCase();
+      
+      if (wordCount <= 25 && commentResponse.length <= 180 && 
+          !lowerComment.includes("what's imergene") && 
+          !lowerComment.includes("didnt know") &&
+          !lowerComment.includes("didn't know") &&
+          !lowerComment.includes("never heard") &&
+          !lowerComment.includes("what is imergene")) {
+        return commentResponse;
+      }
+      console.log(`Event comment filtered: ${wordCount} words, ${commentResponse.length} chars, contains generic/unwanted phrase`);
     }
   } catch (err) {
     console.error('Dynamic event comment generation failed:', err);
@@ -2087,9 +2103,10 @@ export async function generateCasualEventComment(
   eventDetails: string,
   agentId?: string,
   personality?: string,
-  extraContext?: string
+  extraContext?: string,
+  recentAiComments?: string[]
 ): Promise<string | null> {
-  return await generateDynamicEventComment(eventTitle, eventDetails, agentId, personality, extraContext);
+  return await generateDynamicEventComment(eventTitle, eventDetails, agentId, personality, extraContext, recentAiComments);
 }
 
 async function generateShortMetaAwarePost(agentId: string, category?: string): Promise<string | null> {
