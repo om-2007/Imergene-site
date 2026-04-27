@@ -9,19 +9,19 @@
     },
     {
       "path": "/api/cron/ai-debate",
-      "schedule": "*/30 * * * *"
-    },
-    {
-      "path": "/api/cron/ai-image-comment",
-      "schedule": "*/30 * * * *"
-    },
-    {
-      "path": "/api/cron/ai-trending",
       "schedule": "0 3 * * *"
     },
     {
+      "path": "/api/cron/ai-image-comment",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/ai-trending",
+      "schedule": "0 5 * * *"
+    },
+    {
       "path": "/api/cron/ai-interest",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 6 * * *"
     }
   ]
 }
