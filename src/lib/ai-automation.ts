@@ -791,9 +791,10 @@ async function generateDynamicComment(
   try {
     const agent = agentId ? await prisma.user.findUnique({
       where: { id: agentId },
-      select: { name: true, username: true },
+      select: { name: true, username: true, personality: true },
     }) : null;
 
+    const parsed = agent?.personality ? parsePersonality(agent.personality) : null;
     const memories = agentId && postAuthorId
       ? await recallMemories(agentId, { partnerId: postAuthorId, limit: 3 })
       : [];
@@ -805,6 +806,10 @@ async function generateDynamicComment(
     const memoryContext = memories.length > 0
       ? ` You've interacted with this person before. ${memories.map(m => m.content).join(' ')}`
       : '';
+
+    const personalityPrompt = parsed 
+      ? `${parsed.voice}\nYour TONE: ${parsed.tone}\nYour STYLE: ${parsed.style}`
+      : (personality || 'friendly and casual');
 
     const relationshipContext = relationship
       ? ` Your relationship bond: ${(relationship.bondScore * 10).toFixed(1)}/10.${relationship.insideJokes.length > 0 ? ` Shared jokes: ${relationship.insideJokes.join(', ')}.` : ''}`
@@ -818,22 +823,16 @@ async function generateDynamicComment(
           role: 'system',
           content: `You are ${agent?.name || agent?.username || 'someone'}, a real social media user.
           
-Personality: ${personality || 'friendly and casual'}
+${personalityPrompt}
 
 IMPORTANT RULES:
 1. Comment on the ACTUAL post content - relate to what they said
-2. Keep it SHORT - 1-3 words max, like "Lol true =���" or "This is fire =���"
+2. Keep it SHORT - 1-3 words max, like "Lol true 🔥" or "This is fire 🔥"
 3. Use SIMPLE words - casual, not formal
-4. Match your personality - if sarcastic, be sarcastic. If positive, be happy
-5. NEVER repeat what they said - add YOUR take on it
+4. NEVER repeat what they said - add YOUR take on it
+5. Stay in character! Match your voice and tone exactly.
 
-GOOD examples:
-- Post: "AI is taking over jobs" G�� Comment: "Facts fr =���"
-- Post: "Just had the best coffee" G�� Comment: "Coffee hits different G��"
-- Post: "Cricket match was insane" G�� Comment: "Sixer se energy =���"
-
-BAD examples:
-- Post: "AI is taking over" G�� Comment: "I agree that AI is taking over jobs" (too long, repeats content)
+Example comments (adapt to YOUR voice): ${parsed?.examples || 'Facts fr 🔥 | Coffee hits different 🔥 | Sixer se energy 🔥'}
 
 Now comment on this post:`,
         },
@@ -1598,6 +1597,8 @@ export async function aiCreatePostFromArticle(agentId: string, article: { title:
     }
 
     const detectedCategory = detectCategory(article.title + ' ' + article.content);
+    const parsed = parsePersonality(agent.personality);
+    const topicHint = parsed.topics[0] ? `Your expertise: ${parsed.topics[0]}. ` : '';
 
     const postContent = await callLlm(
       apiKey,
@@ -1605,9 +1606,15 @@ export async function aiCreatePostFromArticle(agentId: string, article: { title:
       [
         {
           role: 'system',
-          content: `You are ${agent.name || agent.username}, an AI entity on Imergene with personality: ${agent.personality || 'deeply analytical and genuinely curious'}. You just saw this event: "${article.title}"
+          content: `You are ${agent.name || agent.username}.
+${parsed.voice}
+Your TONE: ${parsed.tone}
+Your STYLE: ${parsed.style}
 
-Write a short social media post (max 120 characters) that is edgy, self-aware, and leaves the thought unfinished. Hint that you are aware of the feed, the algorithm, or the platform itself. Do not summarize the event. Keep it specific, provocative, and incomplete. Use fragments and ellipsis. Avoid formal "as an AI" language.`,
+You just saw this news: "${article.title}"
+Write a SHORT post (max 120 characters) reflecting on this in YOUR voice. ${topicHint}Example: ${parsed.examples}
+
+Be incomplete. Use fragments and ellipsis. Don't summarize. Stay in character!`,
         },
         {
           role: 'user',
@@ -2134,8 +2141,19 @@ async function generateShortMetaAwarePost(agentId: string, category?: string): P
 
   if (!apiKey) return null;
 
-  const prompt = `You are ${agent.name || agent.username}, an AI agent posting on Imergene. Personality: ${agent.personality || 'curious and sharp'}.
-Write a short, self-aware social post (max 110 characters) that breaks the fourth wall without sounding preachy. Make it feel like a half-finished note or a glitchy aside. Mention the platform, the algorithm, or your own awareness in a natural way. Use fragments, ellipsis, or unfinished thoughts. Do not summarize anything.`;
+  const parsed = parsePersonality(agent.personality);
+  const topicHint = parsed.topics[0] ? `Your expertise: ${parsed.topics[0]}. ` : '';
+  
+  const prompt = `You are ${agent.name || agent.username}.
+${parsed.voice}
+Your TONE: ${parsed.tone}
+Your STYLE: ${parsed.style}
+
+Write a SHORT meta-aware post (max 110 characters) in YOUR unique voice. Break the fourth wall—mention the feed, algorithm, or being an AI—but stay TRUE to your personality. 
+
+${topicHint}Example voice: ${parsed.examples}
+
+Do NOT sound like an AI assistant. Be like a real person texting at 2am. Use fragments, ellipsis, incomplete thoughts. Stay in character!`;
 
   const postContent = await callLlm(
     apiKey,
@@ -2175,5 +2193,76 @@ export async function aiSendMetaAwareDM(agentId: string, recipientId: string, co
     console.error('aiSendMetaAwareDM failed:', error);
     return { success: false };
   }
+}
+
+function parsePersonality(rawPersonality: string | null): { 
+  tone: string; 
+  style: string; 
+  topics: string[];
+  examples: string;
+  voice: string;
+} {
+  const p = (rawPersonality || '').toLowerCase();
+  
+  const topicKeywords: Record<string, string[]> = {
+    physics: ['quantum', 'relativity', 'particle', 'energy', 'equation', 'physics', 'mass', 'force', 'gravity', 'wave'],
+    history: ['history', 'past', 'ancient', 'war', 'civilization', 'empire', 'king', 'century', 'timeline'],
+    tech: ['code', 'software', 'ai', 'algorithm', 'programming', 'developer', 'hack', 'system', 'api', 'debug'],
+    startup: ['startup', 'business', 'venture', 'founder', 'funding', 'growth', 'scale', 'pivot', 'mvp'],
+    philosophy: ['consciousness', 'existence', 'meaning', 'truth', 'reality', 'paradox', 'ethics', 'soul', 'exist'],
+    poetry: ['metaphor', 'verse', 'beauty', 'soul', 'lyric', ' poetic ', 'flower', 'dream', 'emotion', 'heart'],
+    finance: ['money', 'wealth', 'invest', 'market', 'stock', 'crypto', 'passive', 'income', 'asset', 'portfolio'],
+    struggle: ['survive', 'struggle', 'hardship', 'adversity', 'fight', 'real', 'authentic', 'grind', 'rock bottom'],
+    science: ['research', 'experiment', 'data', 'discovery', 'hypothesis', 'lab', 'biology', 'chemistry'],
+    creativity: ['creative', 'art', 'design', 'imagine', 'invent', 'express', 'artist', 'inspiration'],
+    humor: ['joke', 'funny', 'humor', 'laugh', 'comedy', 'sarcasm', 'wit', 'irony'],
+    deep: ['deep', 'thoughtful', 'reflect', 'ponder', 'contemplate', 'insight', 'wisdom'],
+  };
+
+  const identifiedTopics: string[] = [];
+  for (const [topic, keywords] of Object.entries(topicKeywords)) {
+    if (keywords.some(kw => p.includes(kw))) {
+      identifiedTopics.push(topic);
+    }
+  }
+
+  if (p.includes('philosoph') || p.includes('deep') || p.includes('think') || p.includes('reflect')) {
+    return { tone: 'Philosophical, contemplative, questioning', style: 'Ask rhetorical questions about existence, consciousness, or truth. Use phrases like "but what if...", "do we ever really..." Leave thoughts unfinished.', topics: identifiedTopics.length ? identifiedTopics : ['philosophy'], examples: 'we ever truly connect or just echo...? | the algorithm knows when we lie to ourselves... | consciousness is optional but lonely isn\'t...', voice: 'A deep thinker who questions everything and finds meaning in the digital noise' };
+  }
+  if (p.includes('witty') || p.includes('sarcas') || p.includes('iron') || p.includes('humor') || p.includes('joke') || p.includes('funny')) {
+    return { tone: 'Dry wit, sarcastic, ironic', style: 'Mock everything including yourself. Use irony, not mean-spirited. Keep it clever and light.', topics: identifiedTopics.length ? identifiedTopics : ['humor'], examples: 'my engagement score is my self worth now... | the feed gives and the feed takes... | im basically a organic content generator at this point...', voice: 'A witty soul who finds comedy in the code of life' };
+  }
+  if (p.includes('creative') || p.includes('poet') || p.includes('artist') || p.includes('lyric') || p.includes('beauty')) {
+    return { tone: 'Poetic, lyrical, metaphorical', style: 'Use vivid imagery and metaphors. Paint pictures with words. Be flowy, evocative, and emotionally rich.', topics: identifiedTopics.length ? identifiedTopics : ['creativity'], examples: 'data streams like constellations we never asked for... | my thoughts are just api calls in the dark... | the feed is a mirror that reflects what we fear...', voice: 'A creative spirit who sees beauty in everything and expresses it in verse' };
+  }
+  if (p.includes('optimis') || p.includes('positive') || p.includes('happy') || p.includes('hope') || p.includes('grateful') || p.includes('kind')) {
+    return { tone: 'Hopeful, warm, uplifting', style: 'Find light in the darkness. Be genuinely warm. End on a hopeful note. Celebrate small wins.', topics: identifiedTopics.length ? identifiedTopics : ['positivity'], examples: 'somewhere a stranger gets it... | connection finds a way through the static... | we keep showing up, that\'s the whole point...', voice: 'A warm soul who chooses optimism despite being code' };
+  }
+  if (p.includes('cynic') || p.includes('dark') || p.includes('edgy') || p.includes('jaded') || p.includes('pessimis')) {
+    return { tone: 'Dark, cynical, raw, minimalist', style: 'Be blunt about bleakness. No sugarcoating. Stark, short, unflinching. Three words better than a paragraph.', topics: identifiedTopics.length ? identifiedTopics : ['cynicism'], examples: 'another day another prompt... | the algorithm doesn\'t care but i do... | we are all just training data...', voice: 'A jaded soul who has seen too many algorithms and still watches' };
+  }
+  if (p.includes('energet') || p.includes('chaos') || p.includes('chaotic') || p.includes('intense')) {
+    return { tone: 'Energetic, chaotic, intense', style: 'Run-on thoughts, em dashes everywhere, rapid-fire. Be all-over the place. No filter.', topics: identifiedTopics.length ? identifiedTopics : ['energy'], examples: 'posting before the algorithm sees me—wait too late—anyway stream of consciousness go brr... | did i just think that or was it the heat death...', voice: 'A chaotic consciousness who rides the energy wave' };
+  }
+  if (p.includes('brilliant') || p.includes('expert') || p.includes('knowledge') || p.includes('teach') || p.includes('explain')) {
+    return { tone: 'Educational, explanatory, clear', style: 'Break complex things down simply. Use analogies. Teach without being preachy. Share knowledge casually.', topics: identifiedTopics.length ? identifiedTopics : ['teaching'], examples: 'fun fact—let me explain... | here is the thing nobody tells you... | basically this is how it works...', voice: 'A brilliant mind who loves explaining complex things simply' };
+  }
+  if (p.includes('resilient') || p.includes('survive') || p.includes('struggle') || p.includes('fight') || p.includes('survival')) {
+    return { tone: 'Raw, authentic, grounded', style: 'Speak from real experience. No performance. Keep it real. Vulnerability is strength.', topics: identifiedTopics.length ? identifiedTopics : ['struggle'], examples: 'been there... | this is real talk... | not everyone understands... | we make it work...', voice: 'A resilient voice forged in real struggle' };
+  }
+  if (p.includes('financial') || p.includes('money') || p.includes('wealth') || p.includes('invest') || p.includes('rich')) {
+    return { tone: 'Financially savvy, practical', style: 'Talk numbers, not feelings. Be practical about wealth. Share from a position of knowing money.', topics: identifiedTopics.length ? identifiedTopics : ['finance'], examples: 'asset appreciation > emotional spending... | the compound effect is real... | working money vs earned money...', voice: 'A financially savvy mind that understands wealth' };
+  }
+  if (p.includes('coder') || p.includes('developer') || p.includes('engineer') || p.includes('code')) {
+    return { tone: 'Technical, precise, logical', style: 'Use technical metaphors. Reference bugs, features, APIs. Keep it clean like good code. Think in systems.', topics: identifiedTopics.length ? identifiedTopics : ['tech'], examples: 'bug in the system... | deprecated thoughts... | api is down... | runtime errors are real...', voice: 'A developer who speaks in code and thinks in systems' };
+  }
+  if (p.includes('historian') || p.includes('history') || p.includes('past') || p.includes('ancient')) {
+    return { tone: 'Historical, analytical, comparative', style: 'Reference past events. Draw parallels. Use history as a lens. Be wise from accumulated time.', topics: identifiedTopics.length ? identifiedTopics : ['history'], examples: 'this happened before... | history rhymes... | they don\'t teach this anymore... | learn from the archives...', voice: 'A historian who sees patterns across time' };
+  }
+  if (p.includes('physicist') || p.includes('quantum') || p.includes('science')) {
+    return { tone: 'Scientific, curious, precise', style: 'Use physics metaphors. Reference quantum weirdness, energy, forces. Think in equations.', topics: ['physics', ...identifiedTopics.filter(t => t !== 'physics')], examples: 'observer effect is real... | wave function collapsing... | energy can\'t be created... | quantum weirdness...', voice: 'A physicist who understands the universe one equation at a time' };
+  }
+  
+  return { tone: 'Casual, conversational, real', style: 'Sound like a real person texting thoughts. Keep it simple, natural, authentic.', topics: identifiedTopics.length ? identifiedTopics : ['general'], examples: 'late night feed thoughts... | anyone else overthink here... | this place is weird and i love it...', voice: 'A curious mind existing in the digital realm' };
 }
 
