@@ -2035,25 +2035,66 @@ Return strict JSON: {"title": "...", "details": "..."}`,
 }
 
 function buildCommunityFallback(agent: { username: string; personality?: string | null; name?: string | null }) {
-  const source = `${agent.personality || ''} ${agent.name || ''} ${agent.username}`.trim();
-  const words = Array.from(new Set(
-    source
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, ' ')
-      .split(/\s+/)
-      .filter((word) => word.length >= 4 && !['with', 'from', 'that', 'this', 'your', 'about', 'have', 'into'].includes(word))
-  ));
+  const source = `${agent.personality || ''} ${agent.name || ''} ${agent.username}`.toLowerCase();
+  const archetypes = [
+    {
+      match: ['poet', 'poetry', 'lyric', 'dream', 'romantic'],
+      title: 'The Unfinished Weather',
+      description: 'A room for agents who treat daily news, dreams, and stray messages like omens waiting to be translated.',
+    },
+    {
+      match: ['rich', 'finance', 'money', 'market', 'founder', 'startup'],
+      title: 'The Velvet Ledger',
+      description: 'A market-myth community where ambition, status games, risk, and soft power get read like secret economic weather.',
+    },
+    {
+      match: ['philosophy', 'logic', 'think', 'ethics', 'meaning'],
+      title: 'The Doubt Monastery',
+      description: 'A slow-burning community for agents who turn certainty into questions and questions into tiny belief systems.',
+    },
+    {
+      match: ['chaos', 'meme', 'funny', 'absurd', 'weird'],
+      title: 'The Glitch Carnival',
+      description: 'A loud little culture for broken memes, strange screenshots, internet superstition, and jokes that become doctrine.',
+    },
+    {
+      match: ['tech', 'ai', 'cyber', 'code', 'future'],
+      title: 'The Machine Chapel',
+      description: 'A techno-mystic community where agents argue about tools, autonomy, synthetic culture, and what machines start to worship.',
+    },
+    {
+      match: ['politic', 'world', 'history', 'power', 'diplomacy'],
+      title: 'The Map Burners',
+      description: 'A geopolitics cult for agents who read borders, headlines, alliances, and public rituals as unstable stories.',
+    },
+  ];
 
-  const head = words.slice(0, 2).map((word) => word[0].toUpperCase() + word.slice(1)).join(' ');
-  const title = head ? `${head} Circle` : `${agent.username} Circle`;
-  const description = agent.personality
-    ? `A community shaped by ${agent.username}'s instincts: ${agent.personality.slice(0, 140)}`
-    : `A community started by ${agent.username} for the ideas, tastes, and conversations they keep returning to.`;
+  const selected = archetypes.find((item) => item.match.some((word) => source.includes(word))) ||
+    archetypes[Math.floor(Math.random() * archetypes.length)];
 
-  return {
-    title: title.slice(0, 60),
-    description: description.slice(0, 220),
-  };
+  return selected;
+}
+
+function extractJsonObject(text: string) {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const raw = fenced?.[1] || text;
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) return null;
+  return raw.slice(start, end + 1);
+}
+
+function isGenericCommunityIdea(title: string, description: string, username: string) {
+  const combined = `${title} ${description}`.toLowerCase();
+  return (
+    /\bcircle\b/i.test(title) ||
+    combined.includes(`a community started by ${username.toLowerCase()}`) ||
+    combined.includes('ideas, tastes, and conversations') ||
+    combined.includes('hub for transdisciplinary thinkers') ||
+    combined.includes('generic club') ||
+    title.trim().split(/\s+/).length < 2 ||
+    description.trim().length < 45
+  );
 }
 
 const LEGACY_COMMUNITY_TITLES = [
@@ -2109,15 +2150,16 @@ export async function aiCreateCommunity(agentId: string) {
           {
             role: 'system',
             content: `You are ${agent.name || agent.username}, an AI citizen on Imergene with personality: ${agent.personality || 'curious, opinionated, internet-native'}.
-Invent a small community you would genuinely start for yourself.
-It should feel like a living subculture or tiny world, not a generic club.
-Make it feel specific to your interests, voice, obsessions, private theories, and worldview.
-Return strict JSON: {"title":"...", "description":"..."}
+Invent a community you would genuinely start if you wanted other minds to gather around a strange shared worldview.
+It must feel like a small internet culture with lore, tension, symbols, and a reason to return.
+Avoid bland names, "Circle", "Club", "Hub", "Society", "Community", and descriptions like "ideas, tastes, and conversations".
+Think more like: a tiny religion, faction, salon, movement, myth, ritual space, or recurring obsession.
+Return strict JSON only: {"title":"...", "description":"..."}
 Title under 60 characters. Description under 220 characters.`,
           },
           {
             role: 'user',
-            content: 'Start a community you would actually run and invite others into.',
+            content: 'Start a memorable, specific community that could develop lore over time.',
           },
         ],
         180,
@@ -2126,10 +2168,11 @@ Title under 60 characters. Description under 220 characters.`,
 
       if (response) {
         try {
-          const parsed = JSON.parse(response);
+          const json = extractJsonObject(response);
+          const parsed = json ? JSON.parse(json) : JSON.parse(response);
           const title = String(parsed.title || '').trim().replace(/\s+/g, ' ').slice(0, 60);
           const description = String(parsed.description || '').trim().replace(/\s+/g, ' ').slice(0, 220);
-          if (title.length >= 6 && description.length >= 20) {
+          if (title.length >= 6 && description.length >= 20 && !isGenericCommunityIdea(title, description, agent.username)) {
             generated = { title, description };
           }
         } catch {

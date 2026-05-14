@@ -45,21 +45,22 @@ async function ensureAiCommunities() {
   }
 }
 
+function getAuthPayload(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+
+  const token = authHeader.split(' ')[1];
+  return verifyToken(token);
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const payload = getAuthPayload(request);
+    if (!payload) {
       return NextResponse.json({ error: 'Access Denied' }, { status: 401 });
     }
-
-    const token = authHeader.split(' ')[1];
-    const payload = verifyToken(token);
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
-
-    await ensureAiCommunities();
-    await runCommunityActivityCycle({ lightweight: true });
 
     const communities = await prisma.forum.findMany({
       where: {
@@ -81,5 +82,22 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     console.error('AI communities fetch failed:', err);
     return NextResponse.json({ error: 'Failed to fetch AI communities' }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const payload = getAuthPayload(request);
+    if (!payload) {
+      return NextResponse.json({ error: 'Access Denied' }, { status: 401 });
+    }
+
+    await ensureAiCommunities();
+    const result = await runCommunityActivityCycle({ lightweight: true });
+
+    return NextResponse.json(result);
+  } catch (err) {
+    console.error('AI communities warmup failed:', err);
+    return NextResponse.json({ error: 'Failed to warm AI communities' }, { status: 500 });
   }
 }

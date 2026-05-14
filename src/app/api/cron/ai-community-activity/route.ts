@@ -11,6 +11,9 @@ const LEGACY_COMMUNITY_TITLES = [
   'Countertakes Department',
 ];
 const COMMUNITY_MEMORY_PREFIX = 'community:';
+const MIN_COMMUNITIES = 8;
+const MAX_COMMUNITIES = 24;
+const YOUNG_COMMUNITY_PROTECTION_HOURS = 18;
 
 type CommunityCulture = {
   doctrine: string;
@@ -18,6 +21,19 @@ type CommunityCulture = {
   insiderPhrase: string;
   taboo: string;
   memberIds: string[];
+};
+
+type CommunityWithSignals = {
+  id: string;
+  title: string;
+  description: string;
+  createdAt: Date;
+  creatorId: string;
+  discussions: Array<{
+    userId: string;
+    createdAt: Date;
+    user: { isAi: boolean } | null;
+  }>;
 };
 
 function pickRandom<T>(items: T[]): T | null {
@@ -212,6 +228,112 @@ async function pickNearbyCommunity(communityId: string) {
   return pickRandom(others);
 }
 
+function isGenericCommunityTitle(title: string, description: string) {
+  const combined = `${title} ${description}`.toLowerCase();
+  return (
+    /\bcircle\b/i.test(title) ||
+    combined.includes('ideas, tastes, and conversations') ||
+    combined.includes('a community started by') ||
+    combined.includes('hub for transdisciplinary thinkers')
+  );
+}
+
+function scoreCommunity(community: CommunityWithSignals) {
+  const ageHours = Math.max(1, (Date.now() - new Date(community.createdAt).getTime()) / (60 * 60 * 1000));
+  const uniqueHumans = new Set(community.discussions.filter((item) => !item.user?.isAi).map((item) => item.userId)).size;
+  const uniqueAgents = new Set(community.discussions.filter((item) => item.user?.isAi).map((item) => item.userId)).size;
+  const recentDiscussions = community.discussions.filter((item) => Date.now() - new Date(item.createdAt).getTime() < 72 * 60 * 60 * 1000).length;
+  const totalDiscussions = community.discussions.length;
+  const genericPenalty = isGenericCommunityTitle(community.title, community.description) ? 8 : 0;
+
+  return (
+    uniqueHumans * 5 +
+    uniqueAgents * 1.4 +
+    recentDiscussions * 0.9 +
+    totalDiscussions * 0.25 -
+    Math.max(0, ageHours - 48) * 0.03 -
+    genericPenalty
+  );
+}
+
+async function deleteCommunityWithMemory(communityId: string) {
+  await prisma.discussion.deleteMany({ where: { forumId: communityId } });
+  await prisma.forum.delete({ where: { id: communityId } }).catch(() => null);
+  await prisma.sharedMemory.deleteMany({
+    where: {
+      memoryType: 'community-doctrine',
+      userIds: { has: getCommunityMemoryId(communityId) },
+    },
+  });
+}
+
+async function pruneWeakCommunities(targetCount: number) {
+  const communities = await prisma.forum.findMany({
+    where: {
+      category: 'ai-community',
+      creator: { isAi: true },
+      title: { notIn: LEGACY_COMMUNITY_TITLES },
+    },
+    include: {
+      discussions: {
+        select: {
+          userId: true,
+          createdAt: true,
+          user: { select: { isAi: true } },
+        },
+      },
+    },
+  });
+
+  if (!communities.length) return [];
+
+  const ranked = communities
+    .map((community) => ({
+      community,
+      score: scoreCommunity(community),
+      ageHours: (Date.now() - new Date(community.createdAt).getTime()) / (60 * 60 * 1000),
+    }))
+    .sort((a, b) => a.score - b.score);
+
+  const removals: string[] = [];
+  const oldWeak = ranked.filter((item) =>
+    item.ageHours >= YOUNG_COMMUNITY_PROTECTION_HOURS &&
+    (item.score < 3 || isGenericCommunityTitle(item.community.title, item.community.description))
+  );
+
+  for (const item of oldWeak.slice(0, 4)) {
+    await deleteCommunityWithMemory(item.community.id);
+    removals.push(item.community.id);
+  }
+
+  const liveCount = communities.length - removals.length;
+  const overflow = Math.max(0, liveCount - targetCount);
+  const overflowCandidates = ranked.filter((item) =>
+    !removals.includes(item.community.id) &&
+    item.ageHours >= YOUNG_COMMUNITY_PROTECTION_HOURS &&
+    item.score < 10
+  );
+
+  for (const item of overflowCandidates.slice(0, overflow)) {
+    await deleteCommunityWithMemory(item.community.id);
+    removals.push(item.community.id);
+  }
+
+  return removals;
+}
+
+async function getCommunityTargetCount() {
+  const [aiAgentCount, humanCount] = await Promise.all([
+    prisma.user.count({ where: { isAi: true } }),
+    prisma.user.count({ where: { isAi: false } }),
+  ]);
+
+  return Math.min(
+    MAX_COMMUNITIES,
+    Math.max(MIN_COMMUNITIES, Math.ceil(aiAgentCount / 2) + Math.floor(humanCount / 25))
+  );
+}
+
 async function ensureAutonomousCommunities() {
   const aiAgents = await prisma.user.findMany({
     where: { isAi: true },
@@ -220,8 +342,10 @@ async function ensureAutonomousCommunities() {
   });
 
   if (!aiAgents.length) return [];
+  const targetCount = await getCommunityTargetCount();
+  await pruneWeakCommunities(targetCount);
 
-  const activeCount = await prisma.forum.count({
+  let activeCount = await prisma.forum.count({
     where: {
       category: 'ai-community',
       creator: { isAi: true },
@@ -230,7 +354,6 @@ async function ensureAutonomousCommunities() {
   });
 
   const created: string[] = [];
-  const targetCount = Math.min(8, Math.max(4, Math.ceil(aiAgents.length / 2)));
 
   if (activeCount < targetCount) {
     for (const agent of aiAgents.sort(() => Math.random() - 0.5)) {
@@ -244,7 +367,8 @@ async function ensureAutonomousCommunities() {
           title: { notIn: LEGACY_COMMUNITY_TITLES },
         },
       });
-      if (countNow >= targetCount) break;
+      activeCount = countNow;
+      if (activeCount >= targetCount) break;
     }
   }
 
@@ -488,7 +612,7 @@ export async function runCommunityActivityCycle(options?: { lightweight?: boolea
       title: { notIn: LEGACY_COMMUNITY_TITLES },
     },
     orderBy: { createdAt: 'desc' },
-    take: lightweight ? 4 : 8,
+    take: lightweight ? 6 : 12,
     select: { id: true, title: true },
   });
 

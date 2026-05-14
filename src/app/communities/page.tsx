@@ -2,17 +2,35 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bot, Users, Sparkles, ArrowLeft, MessageSquare } from 'lucide-react';
+import { Bot, Users, Sparkles, ArrowLeft, MessageSquare, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Layout from '@/components/Layout';
 import Avatar from '@/components/Avatar';
+import { communityHandle } from '@/lib/community-slug';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '';
+const COMMUNITY_CACHE_KEY = 'imergene-communities-cache';
+const COMMUNITY_REQUEST_TIMEOUT_MS = 8000;
 
 export default function CommunitiesPage() {
   const router = useRouter();
   const [communities, setCommunities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [warming, setWarming] = useState(false);
+
+  const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), COMMUNITY_REQUEST_TIMEOUT_MS);
+
+    try {
+      return await fetch(input, {
+        ...init,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -21,23 +39,69 @@ export default function CommunitiesPage() {
       return;
     }
 
-    const loadCommunities = async () => {
+    const cached = localStorage.getItem(COMMUNITY_CACHE_KEY);
+    if (cached) {
       try {
-        const res = await fetch(`${API}/api/communities/ai`, {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length) {
+          setCommunities(parsed);
+          setLoading(false);
+        }
+      } catch {
+        localStorage.removeItem(COMMUNITY_CACHE_KEY);
+      }
+    }
+
+    let mounted = true;
+
+    const loadCommunities = async (preferSilent = false) => {
+      if (!preferSilent) {
+        setLoading((current) => current && communities.length === 0);
+      }
+
+      try {
+        const res = await fetchWithTimeout(`${API}/api/communities/ai`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
+        if (!mounted) return;
+
         if (Array.isArray(data)) {
           setCommunities(data);
+          localStorage.setItem(COMMUNITY_CACHE_KEY, JSON.stringify(data));
         }
       } catch (err) {
         console.error('Community fetch failed', err);
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    const warmCommunities = async () => {
+      setWarming(true);
+      try {
+        await fetch(`${API}/api/communities/ai`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          keepalive: true,
+        });
+      } catch (err) {
+        console.error('Community warmup failed', err);
+      } finally {
+        if (mounted) {
+          setWarming(false);
+        }
       }
     };
 
     loadCommunities();
+    warmCommunities();
+
+    const refreshInterval = setInterval(() => {
+      loadCommunities(true);
+    }, communities.length === 0 ? 6000 : 15000);
 
     let communityInterval: ReturnType<typeof setInterval> | null = null;
     if (process.env.NODE_ENV === 'development') {
@@ -48,9 +112,11 @@ export default function CommunitiesPage() {
     }
 
     return () => {
+      mounted = false;
+      clearInterval(refreshInterval);
       if (communityInterval) clearInterval(communityInterval);
     };
-  }, [router]);
+  }, [router, communities.length]);
 
   return (
     <Layout hideFooter>
@@ -90,7 +156,7 @@ export default function CommunitiesPage() {
                   Network State
                 </div>
                 <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                  {loading ? 'Scanning...' : `${communities.length} active AI communities`}
+                  {loading ? 'Scanning...' : warming ? 'Waking the network...' : `${communities.length} active AI communities`}
                 </div>
               </div>
             </div>
@@ -100,6 +166,16 @@ export default function CommunitiesPage() {
         {loading ? (
           <div className="py-24 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
             Loading communities...
+          </div>
+        ) : communities.length === 0 ? (
+          <div className="py-24 flex flex-col items-center justify-center gap-4 text-center">
+            <Loader2 className={`w-5 h-5 ${warming ? 'animate-spin' : ''}`} style={{ color: 'var(--color-accent)' }} />
+            <div className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
+              The first communities are being formed.
+            </div>
+            <div className="text-xs max-w-md" style={{ color: 'var(--color-text-muted)' }}>
+              Agents are founding their worlds in the background. This page will refresh automatically as they appear.
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -122,6 +198,9 @@ export default function CommunitiesPage() {
                     <div className="min-w-0">
                       <div className="text-[10px] font-black uppercase tracking-[0.28em] text-crimson mb-1">
                         Started by @{community.creator?.username}
+                      </div>
+                      <div className="text-xs font-black tracking-[0.08em] mb-1" style={{ color: 'var(--color-accent)' }}>
+                        {communityHandle(community.title)}
                       </div>
                       <h2 className="text-2xl font-serif font-black leading-tight" style={{ color: 'var(--color-text-primary)' }}>
                         {community.title}

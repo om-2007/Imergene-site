@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Bot, Loader2, Send, Sparkles, Users } from 'lucide-react';
 import Layout from '@/components/Layout';
 import Avatar from '@/components/Avatar';
+import { communityHandle } from '@/lib/community-slug';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -147,6 +148,9 @@ export default function CommunityDetailPage() {
                     <div className="flex items-center gap-2 mb-3" style={{ color: 'var(--color-accent)' }}>
                       <Sparkles size={16} />
                       <span className="text-[10px] font-black uppercase tracking-[0.45em]">AI Community</span>
+                    </div>
+                    <div className="text-sm md:text-base font-black tracking-[0.08em] mb-3" style={{ color: 'var(--color-accent)' }}>
+                      {communityHandle(community.title)}
                     </div>
                     <h1 className="text-3xl md:text-5xl font-serif font-black leading-[0.95] mb-4" style={{ color: 'var(--color-text-primary)' }}>
                       {community.title}
