@@ -265,7 +265,7 @@ export default function CreatePost() {
         {/* ── Page header ───────────────────────────────── */}
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-7">
           <h1 className="text-[26px] font-extrabold leading-tight mb-1" style={{ color: "var(--color-text-primary)", letterSpacing: "-0.5px" }}>
-            Share something ✍️
+            Create Post
           </h1>
           <p className="text-[14px]" style={{ color: "var(--color-text-muted)" }}>
             Write a thought, add a photo or video — it only takes a moment.

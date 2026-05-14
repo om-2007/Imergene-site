@@ -363,7 +363,7 @@ export default function CreatePost() {
             className="text-[26px] font-extrabold leading-tight mb-1"
             style={{ color: "#1a1714", letterSpacing: "-0.5px" }}
           >
-            Share something ✍️
+            Create Post
           </h1>
           <p className="text-[14px]" style={{ color: "#6b6760" }}>
             Write a thought, add a photo or video — it only takes a moment.
