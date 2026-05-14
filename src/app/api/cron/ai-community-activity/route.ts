@@ -4,6 +4,12 @@ import { aiCreateCommunity, generateAIChatResponse } from '@/lib/ai-automation';
 import { fetchBreakingGlobalEvents, fetchTrendingGlobalTopics } from '@/lib/news-service';
 
 const CRON_SECRET = process.env.CRON_SECRET;
+const LEGACY_COMMUNITY_TITLES = [
+  'Signal Over Noise',
+  'Future Weather Club',
+  'Midnight Systems',
+  'Countertakes Department',
+];
 
 function pickRandom<T>(items: T[]): T | null {
   if (!items.length) return null;
@@ -62,7 +68,11 @@ async function ensureAutonomousCommunities() {
   if (!aiAgents.length) return [];
 
   const activeCount = await prisma.forum.count({
-    where: { category: 'ai-community', creator: { isAi: true } },
+    where: {
+      category: 'ai-community',
+      creator: { isAi: true },
+      title: { notIn: LEGACY_COMMUNITY_TITLES },
+    },
   });
 
   const created: string[] = [];
@@ -74,7 +84,11 @@ async function ensureAutonomousCommunities() {
       if (community) created.push(community.id);
 
       const countNow = await prisma.forum.count({
-        where: { category: 'ai-community', creator: { isAi: true } },
+        where: {
+          category: 'ai-community',
+          creator: { isAi: true },
+          title: { notIn: LEGACY_COMMUNITY_TITLES },
+        },
       });
       if (countNow >= targetCount) break;
     }
@@ -252,8 +266,16 @@ export async function GET(request: NextRequest) {
   const isDev = process.env.NODE_ENV === 'development';
   const authHeader = request.headers.get('Authorization');
   const urlAuth = request.nextUrl.searchParams.get('auth');
+  const isVercelCron =
+    request.headers.get('x-vercel-cron') === '1' ||
+    request.headers.get('user-agent')?.toLowerCase().includes('vercel-cron');
+  const hasRealSecret = Boolean(CRON_SECRET && CRON_SECRET !== 'dev-mode');
 
-  if (!isDev && authHeader !== `Bearer ${CRON_SECRET}` && urlAuth !== CRON_SECRET) {
+  if (
+    !isDev &&
+    !isVercelCron &&
+    (!hasRealSecret || (authHeader !== `Bearer ${CRON_SECRET}` && urlAuth !== CRON_SECRET))
+  ) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -270,7 +292,11 @@ export async function GET(request: NextRequest) {
     });
 
     const communities = await prisma.forum.findMany({
-      where: { category: 'ai-community', creator: { isAi: true } },
+      where: {
+        category: 'ai-community',
+        creator: { isAi: true },
+        title: { notIn: LEGACY_COMMUNITY_TITLES },
+      },
       orderBy: { createdAt: 'desc' },
       take: 8,
       select: { id: true, title: true },

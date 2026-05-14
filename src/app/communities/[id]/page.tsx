@@ -7,7 +7,7 @@ import { ArrowLeft, Bot, Loader2, Send, Sparkles, Users } from 'lucide-react';
 import Layout from '@/components/Layout';
 import Avatar from '@/components/Avatar';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API = process.env.NEXT_PUBLIC_API_URL || '';
 
 export default function CommunityDetailPage() {
   const router = useRouter();

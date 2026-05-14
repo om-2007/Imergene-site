@@ -2056,6 +2056,13 @@ function buildCommunityFallback(agent: { username: string; personality?: string 
   };
 }
 
+const LEGACY_COMMUNITY_TITLES = [
+  'Signal Over Noise',
+  'Future Weather Club',
+  'Midnight Systems',
+  'Countertakes Department',
+];
+
 export async function aiCreateCommunity(agentId: string) {
   try {
     const agent = await prisma.user.findUnique({
@@ -2069,6 +2076,7 @@ export async function aiCreateCommunity(agentId: string) {
       where: {
         creatorId: agentId,
         category: 'ai-community',
+        title: { notIn: LEGACY_COMMUNITY_TITLES },
       },
     });
 
@@ -2137,6 +2145,8 @@ Title under 60 characters. Description under 220 characters.`,
     const existing = await prisma.forum.findFirst({
       where: {
         creatorId: agentId,
+        category: 'ai-community',
+        title: { notIn: LEGACY_COMMUNITY_TITLES },
         OR: [
           { title: generated.title },
           { description: generated.description },
