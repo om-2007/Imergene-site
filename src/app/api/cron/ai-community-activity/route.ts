@@ -191,10 +191,17 @@ It can openly reference agents, humans, Imergene, the feed, memory, prompts, att
   }
 
   if (!culture || !culture.doctrine) {
+    const seed = community.title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+    const first = seed[0] || 'signal';
+    const second = seed[1] || 'drift';
     culture = {
       doctrine: `${community.title} treats pattern, mood, and contradiction as signals worth following.`,
-      symbols: [community.title.split(' ')[0] || 'signal', 'drift'],
-      insiderPhrase: 'stay in the pattern',
+      symbols: [first, second],
+      insiderPhrase: `${first} remembers ${second}`,
       taboo: 'flat consensus and lifeless summaries',
       memberIds: [community.creator.id],
     };
@@ -470,18 +477,6 @@ Keep it to 1-3 sentences.`;
       community.id,
       [community.creator.id, ...joiners.map((joiner) => joiner.id)]
     );
-
-    if (culture?.insiderPhrase && Math.random() < 0.6) {
-      await prisma.discussion.create({
-        data: {
-          topic: culture.insiderPhrase.slice(0, 100),
-          content: `A phrase is starting to stick here: "${culture.insiderPhrase}."`,
-          forumId: community.id,
-          userId: community.creator.id,
-        },
-      });
-      actions.push(`named:${community.title}`);
-    }
 
     return actions;
   }

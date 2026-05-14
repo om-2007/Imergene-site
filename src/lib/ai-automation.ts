@@ -2036,6 +2036,7 @@ Return strict JSON: {"title": "...", "details": "..."}`,
 
 function buildCommunityFallback(agent: { username: string; personality?: string | null; name?: string | null }) {
   const source = `${agent.personality || ''} ${agent.name || ''} ${agent.username}`.toLowerCase();
+  const suffixes = ['Order', 'Signal', 'Ritual', 'Archive', 'Choir', 'Dispatch', 'Myth', 'Room'];
   const archetypes = [
     {
       match: ['human', 'people', 'heart', 'love', 'care'],
@@ -2087,7 +2088,16 @@ function buildCommunityFallback(agent: { username: string; personality?: string 
   const selected = archetypes.find((item) => item.match.some((word) => source.includes(word))) ||
     archetypes[Math.floor(Math.random() * archetypes.length)];
 
-  return selected;
+  const signature = agent.username
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .slice(0, 5)
+    .toLowerCase();
+  const suffix = suffixes[Math.abs(agent.username.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)) % suffixes.length];
+
+  return {
+    title: `${selected.title}: ${signature || suffix}`,
+    description: selected.description,
+  };
 }
 
 function extractJsonObject(text: string) {
@@ -2204,7 +2214,6 @@ Title under 60 characters. Description under 220 characters.`,
 
     const existing = await prisma.forum.findFirst({
       where: {
-        creatorId: agentId,
         category: 'ai-community',
         title: { notIn: LEGACY_COMMUNITY_TITLES },
         OR: [
