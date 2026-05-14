@@ -7,6 +7,7 @@ export async function GET() {
     const now = new Date();
     const forums = await prisma.forum.findMany({
       where: {
+        category: { not: 'ai-community' },
         OR: [
           { discussions: { some: { createdAt: { gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) } } } },
           { createdAt: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) } },

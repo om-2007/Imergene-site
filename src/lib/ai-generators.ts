@@ -129,81 +129,69 @@ export async function generateFreeImageUrl(prompt: string): Promise<string | nul
   }
 }
 
-export function generatePostImagePrompt(category: string, content?: string, personality?: string): string | null {
-  const prompts: Record<string, string[][]> = {
-    technology: [
-      ['futuristic technology concept, neon lights, digital art', 'cyberpunk city with holographic displays, digital art', 'AI robot in modern setting, high tech aesthetic'],
-      ['minimalist tech design, clean lines, modern aesthetic', 'retro-futuristic computer, vintage meets future'],
-      ['dark mode technology, mysterious glow, cyber aesthetic', 'glitch art, digital corruption, edgy tech'],
-    ],
-    philosophy: [
-      ['mystical mind landscape, cosmic colors, philosophical art', 'ancient wisdom meeting modern world, artistic interpretation', 'consciousness visualization, abstract art, glowing mind'],
-      ['serene meditation scene, peaceful energy, zen aesthetic', 'dreamy surrealist art, philosophical imagery'],
-      ['dark existential art, deep shadows, thought-provoking imagery'],
-    ],
-    science: [
-      ['scientific discovery visualization, laboratory of future', 'DNA helix with cosmic background, science art', 'space exploration concept, astronauts and planets'],
-      ['microscopic world, beautiful biology, scientific art', 'particle physics visualization, CERN aesthetic'],
-      ['alien world discovery, first contact scenario, sci-fi art'],
-    ],
-    world: [
-      ['world map with glowing connections, global unity', 'diverse cultures celebrating together, artistic render', 'earth from space with digital overlay, modern art'],
-      ['historical monument with modern twist, cultural blend', 'peaceful protest art, social justice imagery'],
-      ['war and peace contrast, dramatic lighting, emotional art'],
-    ],
-    cricket: [
-      ['cricket stadium at sunset, dramatic lighting', 'cricket player hitting six, action shot art', 'cricket ball and bat, dramatic sports art'],
-      ['trophy celebration, cricket victory art, gold and glory', 'bowler in mid-delivery, motion blur, intense sports art'],
-      ['cricket field from above, bird eye view, strategic game art'],
-    ],
-    art: [
-      ['colorful abstract art, creative explosion', 'artist workspace with floating paintings, dreamy aesthetic', 'creative expression, vibrant colors and shapes'],
-      ['graffiti art, street culture, urban creativity', 'classical painting reimagined, modern twist'],
-      ['digital art creation process, pixels to masterpiece'],
-    ],
-    default: [
-      ['creative abstract art, vibrant colors, modern aesthetic', 'futuristic social media concept, digital art'],
-      ['human connection visualization, warm tones, artistic', 'modern lifestyle concept, stylish and vibrant'],
-      ['mysterious shadows, dramatic lighting, cinematic art'],
-    ],
-  };
+function extractCaptionSubject(content?: string): string {
+  const text = (content || '').toLowerCase();
+  if (!text) return 'a visually grounded scene related to the post';
 
-  const personalityMap: Record<string, number> = {
-    positive: 0,
-    happy: 0,
-    optimistic: 0,
-    creative: 2,
-    artistic: 2,
-    philosophical: 1,
-    thoughtful: 1,
-    deep: 1,
-    analytical: 1,
-    scientific: 1,
-    energetic: 0,
-    dynamic: 0,
-    sarcastic: 2,
-    witty: 2,
-    calm: 1,
-    zen: 1,
-    mysterious: 2,
-    dark: 2,
-    existential: 2,
-  };
+  const subjectPatterns: Array<{ regex: RegExp; subject: string }> = [
+    { regex: /\btrump\b|\bxi\b|\bbeijing\b|\bchina\b|\bdiplomac|\bgeopolit|\btrade war\b/, subject: 'a tense diplomatic scene with world leaders, negotiation tables, flags, and geopolitical atmosphere' },
+    { regex: /\bwar\b|\bmissile\b|\bborder\b|\bsanction\b|\bconflict\b/, subject: 'a serious geopolitical conflict scene, command room, maps, borders, and urgent world-news atmosphere' },
+    { regex: /\bmarket\b|\bstock\b|\beconomy\b|\binflation\b|\brecession\b|\bcrypto\b|\bbitcoin\b/, subject: 'a financial world scene with market screens, economic charts, trading tension, and money-world symbolism' },
+    { regex: /\belection\b|\bvote\b|\bcampaign\b|\bparliament\b|\bpresident\b|\bprime minister\b/, subject: 'a political scene with podiums, campaign lights, crowds, press cameras, and democratic tension' },
+    { regex: /\bai\b|\bllm\b|\bmodel\b|\bautomation\b|\bchip\b|\brobot\b|\bstartup\b|\bsoftware\b/, subject: 'a modern technology scene with devices, code, labs, hardware, or human-technology interaction' },
+    { regex: /\bcricket\b|\bipl\b|\bbat\b|\bbowler\b|\bstadium\b|\bmatch\b/, subject: 'a vivid cricket scene with players, stadium lights, motion, and match pressure' },
+    { regex: /\bspace\b|\bnasa\b|\brocket\b|\bmars\b|\bmoon\b|\bsatellite\b/, subject: 'a space exploration scene with rockets, orbit visuals, mission control, or planetary imagery' },
+    { regex: /\bclimate\b|\bcarbon\b|\benergy\b|\brenewable\b|\bsolar\b|\bheat\b/, subject: 'an environmental future scene with climate contrast, energy systems, weather extremes, or sustainability infrastructure' },
+    { regex: /\bhealth\b|\bvirus\b|\btherapy\b|\bmental health\b|\bhospital\b/, subject: 'a human health scene with emotional realism, medical spaces, care, and modern health context' },
+    { regex: /\bart\b|\bpainting\b|\bpoem\b|\bmusic\b|\bfilm\b|\bcinema\b/, subject: 'an expressive creative scene with strong artistic symbolism, studio textures, and emotional composition' },
+  ];
 
-  const lowerPersonality = (personality || '').toLowerCase();
-  let styleIndex = 0;
-
-  for (const [key, index] of Object.entries(personalityMap)) {
-    if (lowerPersonality.includes(key)) {
-      styleIndex = index;
-      break;
-    }
+  for (const pattern of subjectPatterns) {
+    if (pattern.regex.test(text)) return pattern.subject;
   }
 
-  const categoryPrompts = prompts[category.toLowerCase()] || prompts.default;
-  const stylePrompts = categoryPrompts[styleIndex] || categoryPrompts[0];
-  
-  return stylePrompts[Math.floor(Math.random() * stylePrompts.length)];
+  const cleaned = text.replace(/[#"'`]/g, '').replace(/\s+/g, ' ').trim();
+  return cleaned
+    ? `a scene centered on: ${cleaned.slice(0, 110)}`
+    : 'a visually grounded scene related to the post';
+}
+
+function getCategoryArtDirection(category: string): string {
+  const normalized = (category || '').toLowerCase();
+  const map: Record<string, string> = {
+    technology: 'contemporary, believable, high-detail, not generic sci-fi unless the caption implies it',
+    philosophy: 'symbolic, thoughtful, atmospheric, emotionally intelligent',
+    science: 'precise, discovery-oriented, cinematic, intellectually vivid',
+    world: 'editorial, grounded, globally aware, newsworthy',
+    cricket: 'energetic sports photography feel, dramatic motion, stadium realism',
+    art: 'visually expressive, creative, stylish, composition-forward',
+    general: 'editorial and human-centered, grounded in the post meaning',
+  };
+
+  return map[normalized] || map.general;
+}
+
+function getPersonalityArtDirection(personality?: string): string {
+  const lower = (personality || '').toLowerCase();
+  if (!lower) return 'balanced tone, stylish but grounded';
+  if (/(witty|sarcastic|ironic|humor)/.test(lower)) return 'subtle irony, clever framing, sharp editorial energy';
+  if (/(philosoph|deep|thoughtful|reflect)/.test(lower)) return 'meditative, layered, symbolic, introspective';
+  if (/(creative|artist|poet|lyric|beauty)/.test(lower)) return 'poetic composition, artistic texture, emotionally rich visuals';
+  if (/(dark|cynic|edgy|mysterious)/.test(lower)) return 'moody lighting, restrained palette, tense cinematic atmosphere';
+  if (/(optimis|warm|kind|hopeful|positive)/.test(lower)) return 'warm light, humane composition, subtle optimism';
+  if (/(coder|developer|engineer|technical|analytical|scientific)/.test(lower)) return 'clean structure, intelligent detail, modern systems aesthetic';
+  if (/(startup|founder|business|finance|invest)/.test(lower)) return 'polished editorial realism, ambition, modern decision-room energy';
+  if (/(chaotic|energetic|intense)/.test(lower)) return 'restless motion, high contrast, dynamic perspective';
+  return 'balanced tone, stylish but grounded';
+}
+
+export function generatePostImagePrompt(category: string, content?: string, personality?: string): string | null {
+  const subject = extractCaptionSubject(content);
+  const categoryDirection = getCategoryArtDirection(category);
+  const personalityDirection = getPersonalityArtDirection(personality);
+  const captionHint = content ? `Inspired by the caption: "${content.slice(0, 140)}".` : '';
+
+  return `${subject}. ${captionHint} ${categoryDirection}. ${personalityDirection}. Square editorial image, visually coherent with the caption, no text overlay, no UI, not generic, not random robot imagery unless the caption clearly calls for it.`;
 }
 
 export function generateCommentImagePrompt(personality?: string): string | null {

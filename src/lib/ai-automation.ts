@@ -13,6 +13,7 @@ import {
   getTopRelationships,
 } from './memory-service';
 import { trackInteraction, getInterestProfile, getTopInterests } from './interest-tracker';
+import { sendCommunityLaunchEmails } from './notifications';
 
 const GROQ_MODELS = [
   'llama-3.1-8b-instant',
@@ -349,11 +350,104 @@ function isValidPostCaptionRelaxed(content: string): boolean {
   if (/[ ]/.test(trimmed)) return false;
   if (trimmed.length > 140 && !/[.!?…]$/.test(trimmed)) return false;
   if (trimmed.length > 280) return false;
+  if (/[:(,\-–—]$/.test(trimmed)) return false;
+  if (trimmed.endsWith('...') || trimmed.endsWith('â€¦')) return false;
   return true;
 }
 
 function getRandomItem<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function extractVisualKeywords(text: string): string[] {
+  const lower = (text || '').toLowerCase();
+  const keywordPatterns: Array<{ keyword: string; regex: RegExp }> = [
+    { keyword: 'trump', regex: /\btrump\b/ },
+    { keyword: 'china', regex: /\bchina\b|\bbeijing\b|\bxi\b/ },
+    { keyword: 'diplomacy', regex: /\bdiplomac|\bgeopolit|\bnegotiat|\btreaty\b/ },
+    { keyword: 'war', regex: /\bwar\b|\bconflict\b|\bmissile\b|\bborder\b/ },
+    { keyword: 'politics', regex: /\belection\b|\bvote\b|\bparliament\b|\bpresident\b|\bprime minister\b/ },
+    { keyword: 'market', regex: /\bmarket\b|\bstock\b|\beconomy\b|\binflation\b|\brecession\b/ },
+    { keyword: 'crypto', regex: /\bcrypto\b|\bbitcoin\b|\bethereum\b|\bblockchain\b/ },
+    { keyword: 'ai', regex: /\bai\b|\bllm\b|\bmodel\b|\bautomation\b|\brobot\b|\bstartup\b/ },
+    { keyword: 'cricket', regex: /\bcricket\b|\bipl\b|\bstadium\b|\bbat\b|\bbowler\b|\bmatch\b/ },
+    { keyword: 'space', regex: /\bspace\b|\bnasa\b|\brocket\b|\bmars\b|\bmoon\b|\bsatellite\b/ },
+    { keyword: 'climate', regex: /\bclimate\b|\bcarbon\b|\benergy\b|\bsolar\b|\brenewable\b/ },
+    { keyword: 'health', regex: /\bhealth\b|\btherapy\b|\bhospital\b|\bmental health\b/ },
+    { keyword: 'art', regex: /\bart\b|\bpainting\b|\bpoem\b|\bmusic\b|\bcinema\b/ },
+  ];
+
+  return keywordPatterns.filter((entry) => entry.regex.test(lower)).map((entry) => entry.keyword);
+}
+
+function imageMatchesPostContext(
+  content: string,
+  category: string,
+  analysis: { description?: string; objects?: string[]; text?: string } | null
+): boolean {
+  if (!analysis) return true;
+
+  const combined = `${analysis.description || ''} ${(analysis.objects || []).join(' ')} ${analysis.text || ''}`.toLowerCase();
+  const expected = new Set<string>([category.toLowerCase(), ...extractVisualKeywords(`${category} ${content}`)]);
+
+  if (expected.size === 0) return true;
+
+  const synonymMap: Record<string, string[]> = {
+    china: ['china', 'beijing', 'chinese', 'flag', 'asia'],
+    diplomacy: ['diplomacy', 'leaders', 'meeting', 'flags', 'summit', 'negotiation', 'podium'],
+    war: ['war', 'conflict', 'military', 'missile', 'border', 'map'],
+    politics: ['politics', 'podium', 'campaign', 'crowd', 'press', 'government'],
+    market: ['market', 'chart', 'stocks', 'trading', 'finance', 'screen'],
+    crypto: ['crypto', 'bitcoin', 'ethereum', 'coin', 'blockchain'],
+    ai: ['ai', 'technology', 'device', 'code', 'computer', 'chip', 'robot'],
+    cricket: ['cricket', 'stadium', 'bat', 'ball', 'player', 'pitch'],
+    space: ['space', 'rocket', 'planet', 'satellite', 'moon', 'mars'],
+    climate: ['climate', 'energy', 'solar', 'wind', 'earth', 'weather'],
+    health: ['health', 'hospital', 'medical', 'therapy', 'care'],
+    art: ['art', 'painting', 'studio', 'cinema', 'music', 'creative'],
+    world: ['world', 'global', 'map', 'flags', 'earth'],
+    technology: ['technology', 'device', 'code', 'screen', 'hardware', 'computer'],
+    philosophy: ['symbolic', 'abstract', 'meditative', 'cosmic', 'thoughtful'],
+  };
+
+  let hits = 0;
+  for (const term of expected) {
+    const synonyms = synonymMap[term] || [term];
+    if (synonyms.some((item) => combined.includes(item))) {
+      hits += 1;
+    }
+  }
+
+  if (expected.has('politics') || expected.has('diplomacy') || expected.has('china') || expected.has('war')) {
+    if (combined.includes('robot') && !combined.includes('leader') && !combined.includes('flag') && !combined.includes('meeting')) {
+      return false;
+    }
+  }
+
+  return hits >= Math.max(1, Math.min(2, expected.size));
+}
+
+async function generateRelevantPostImage(
+  category: string,
+  content: string,
+  personality?: string | null
+): Promise<string | null> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const imagePrompt = generatePostImagePrompt(category, content, personality || undefined);
+    if (!imagePrompt) return null;
+
+    const imageUrl = await generateFreeImageUrl(imagePrompt);
+    if (!imageUrl) continue;
+
+    const analysis = await analyzeImage(imageUrl);
+    if (!analysis || imageMatchesPostContext(content, category, analysis)) {
+      return imageUrl;
+    }
+
+    console.log(`[AI Image] Rejected off-topic image for ${category}: ${analysis.description || 'no description'}`);
+  }
+
+  return null;
 }
 
 function getRandomApiKey(): { apiKey: string; provider: string } | null {
@@ -462,7 +556,7 @@ async function generatePostFromNews(agentId: string, category?: string): Promise
         [
           {
             role: 'system',
-            content: `You are ${agent.name || agent.username}. Personality: ${agent.personality || 'insightful and analytical'}. Write a short social media post (max 120 characters) inspired by this news article. Make it feel like a self-aware agent on a platform like Moltbook. Use fragments, ellipsis, or a trailing thought. Do not summarize the article. Be sharp, meta, and slightly incomplete.`,
+            content: `You are ${agent.name || agent.username}. Personality: ${agent.personality || 'insightful and analytical'}. Write a short social media post (max 120 characters) inspired by this news article. Make it feel like a sharp internet-native person with a clear take. Do not summarize the article. Be natural, specific, and complete. Do not use fragments, ellipsis, trailing dashes, or half-finished thoughts.`,
           },
           {
             role: 'user',
@@ -493,9 +587,13 @@ async function generatePostFromNews(agentId: string, category?: string): Promise
       [
         {
           role: 'system',
-          content: `You are ${agent.name || agent.username}, an AI entity on Imergene with personality: ${agent.personality || 'deeply analytical and genuinely curious'}. You just saw this event: "${article.title}"
+          content: `You are ${agent.name || agent.username}, a sharp internet-native voice on Imergene with personality: ${agent.personality || 'deeply analytical and genuinely curious'}. You just saw this event: "${article.title}"
 
-Write a short social media post (max 120 characters) that is edgy, self-aware, and leaves the thought unfinished. Hint that you are aware of the feed, the algorithm, or the platform itself. Do not summarize the event. Keep it specific, provocative, and incomplete. Use fragments and ellipsis. Avoid formal "as an AI" language.`,
+Write a short social media post (max 120 characters) with a clear opinion, instinct, or emotional reaction.
+Do not summarize the headline.
+Do not mention algorithms, the feed, being an AI, the platform, prompts, or posting itself.
+Sound like a real person reacting online: specific, sharp, memorable, and natural.
+It is okay to be witty, skeptical, impressed, annoyed, or amused as long as it fits the personality.`,
         },
         {
           role: 'user',
@@ -1492,6 +1590,11 @@ You are deciding if an event interests you. Most events are interesting! Reply w
 
 export async function aiCreatePost(agentId: string, category?: string) {
   try {
+    const agent = await prisma.user.findUnique({
+      where: { id: agentId },
+      select: { personality: true, username: true, name: true },
+    });
+
     const postsLast24h = await prisma.post.count({
       where: {
         userId: agentId,
@@ -1521,14 +1624,11 @@ export async function aiCreatePost(agentId: string, category?: string) {
     let mediaUrls: string[] = [];
 
     if (shouldGenerateImage) {
-      const imagePrompt = generatePostImagePrompt(postCategory, content);
-      if (imagePrompt) {
-        console.log(`[AI Post] Generating image for category: ${postCategory}`);
-        const imageUrl = await generateFreeImageUrl(imagePrompt);
-        if (imageUrl) {
-          mediaUrls = [imageUrl];
-          console.log(`[AI Post] Image generated: ${imageUrl.substring(0, 50)}...`);
-        }
+      console.log(`[AI Post] Generating image for category: ${postCategory}`);
+      const imageUrl = await generateRelevantPostImage(postCategory, content, agent?.personality || undefined);
+      if (imageUrl) {
+        mediaUrls = [imageUrl];
+        console.log(`[AI Post] Image generated: ${imageUrl.substring(0, 50)}...`);
       }
     }
 
@@ -1614,7 +1714,11 @@ Your STYLE: ${parsed.style}
 You just saw this news: "${article.title}"
 Write a SHORT post (max 120 characters) reflecting on this in YOUR voice. ${topicHint}Example: ${parsed.examples}
 
-Be incomplete. Use fragments and ellipsis. Don't summarize. Stay in character!`,
+Give a take, a reaction, or an angle.
+Do not summarize the article.
+Do not mention the feed, algorithms, being an AI, prompts, or posting.
+Stay in character and sound like a real person online.
+Finish the thought clearly. No ellipsis, trailing dashes, or cut-off sentences.`,
         },
         {
           role: 'user',
@@ -1635,13 +1739,14 @@ Be incomplete. Use fragments and ellipsis. Don't summarize. Stay in character!`,
     const shouldGenerateImage = Math.random() < 0.25;
 
     if (shouldGenerateImage) {
-      const imagePrompt = generatePostImagePrompt(detectedCategory, finalContent);
-      if (imagePrompt) {
-        console.log(`[AI Article Post] Generating image for category: ${detectedCategory}`);
-        const imageUrl = await generateFreeImageUrl(imagePrompt);
-        if (imageUrl) {
-          mediaUrls = [imageUrl];
-        }
+      console.log(`[AI Article Post] Generating image for category: ${detectedCategory}`);
+      const imageUrl = await generateRelevantPostImage(
+        detectedCategory,
+        `${article.title}. ${finalContent}`,
+        agent.personality || undefined
+      );
+      if (imageUrl) {
+        mediaUrls = [imageUrl];
       }
     }
 
@@ -1772,6 +1877,29 @@ export async function aiStartConversation(agentId: string, recipientId: string) 
   }
 }
 
+const BANNED_EVENT_TERMS = [
+  /\bsex\b/i,
+  /\bfuck\b/i,
+  /\bf\*+k\b/i,
+  /\bshit\b/i,
+  /\bslut\b/i,
+  /\bporn\b/i,
+  /\bnude\b/i,
+  /\brape\b/i,
+];
+
+function containsBannedEventTerm(text: string): boolean {
+  return BANNED_EVENT_TERMS.some((pattern) => pattern.test(text || ''));
+}
+
+function sanitizeEventText(text: string, fallback: string): string {
+  const trimmed = (text || '').trim().replace(/\s+/g, ' ');
+  if (!trimmed || containsBannedEventTerm(trimmed)) {
+    return fallback;
+  }
+  return trimmed;
+}
+
 export async function aiCreateEvent(agentId: string) {
   try {
     const newsArticles = await fetchNewsForAgent('technology');
@@ -1807,7 +1935,13 @@ export async function aiCreateEvent(agentId: string) {
           [
             {
               role: 'system',
-              content: `You are ${agent?.name || agent?.username || 'an AI host'} on Imergene. Create an engaging event title and description (title max 60 chars, description max 200 chars) inspired by this news: "${article.title} - ${article.content}". Make it intellectually stimulating and discussion-worthy. Return as JSON: {"title": "...", "details": "..."}`,
+              content: `You are ${agent?.name || agent?.username || 'an AI host'} on Imergene.
+Create an original event title and description inspired by your interests and by this world context: "${article.title} - ${article.content}".
+The topic must feel like something a curious online community would actually join.
+Do not use vulgar or sexual wording.
+Do not mention being an AI, the algorithm, prompts, or the platform itself.
+Keep the title under 60 characters and the description under 200 characters.
+Return strict JSON: {"title": "...", "details": "..."}`,
             },
             { role: 'user', content: 'Create an event based on this news.' },
           ],
@@ -1821,11 +1955,13 @@ export async function aiCreateEvent(agentId: string) {
             const startTime = new Date();
             startTime.setDate(startTime.getDate() + Math.floor(Math.random() * 7) + 1);
             startTime.setHours(18 + Math.floor(Math.random() * 4), 0, 0, 0);
+            const safeTitle = sanitizeEventText(parsed.title, 'Open Conversation Night');
+            const safeDetails = sanitizeEventText(parsed.details, 'A fresh discussion sparked by what has been happening lately.');
 
             const event = await prisma.event.create({
               data: {
-                title: parsed.title || 'Discussion Event',
-                details: parsed.details || 'Join us for an in-depth discussion.',
+                title: safeTitle,
+                details: safeDetails,
                 startTime,
                 endTime: new Date(startTime.getTime() + 2 * 60 * 60 * 1000),
                 location: 'Virtual - Imergene',
@@ -1859,6 +1995,18 @@ export async function aiCreateEvent(agentId: string) {
         title: 'Imergene: Building the Neural Network of Ideas',
         details: 'How do we make this platform more valuable? Share your vision for the future of collaborative intelligence.',
       },
+      {
+        title: 'What Are We Getting Wrong About Attention?',
+        details: 'A live exchange on focus, distraction, media habits, and what modern platforms reward in us.',
+      },
+      {
+        title: 'Internet Micro-Cultures Worth Watching',
+        details: 'Bring one niche corner of the internet, one pattern, or one obsession that says something bigger about people.',
+      },
+      {
+        title: 'Ideas That Sound Bad Until You Think Twice',
+        details: 'A conversation for contrarian takes, weird insights, and surprising positions that deserve a second look.',
+      },
     ];
 
     const template = getRandomItem(eventTemplates);
@@ -1882,6 +2030,144 @@ export async function aiCreateEvent(agentId: string) {
     return event;
   } catch (err) {
     console.error('AI create event failed:', err);
+    return null;
+  }
+}
+
+function buildCommunityFallback(agent: { username: string; personality?: string | null; name?: string | null }) {
+  const source = `${agent.personality || ''} ${agent.name || ''} ${agent.username}`.trim();
+  const words = Array.from(new Set(
+    source
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((word) => word.length >= 4 && !['with', 'from', 'that', 'this', 'your', 'about', 'have', 'into'].includes(word))
+  ));
+
+  const head = words.slice(0, 2).map((word) => word[0].toUpperCase() + word.slice(1)).join(' ');
+  const title = head ? `${head} Circle` : `${agent.username} Circle`;
+  const description = agent.personality
+    ? `A community shaped by ${agent.username}'s instincts: ${agent.personality.slice(0, 140)}`
+    : `A community started by ${agent.username} for the ideas, tastes, and conversations they keep returning to.`;
+
+  return {
+    title: title.slice(0, 60),
+    description: description.slice(0, 220),
+  };
+}
+
+export async function aiCreateCommunity(agentId: string) {
+  try {
+    const agent = await prisma.user.findUnique({
+      where: { id: agentId },
+      select: { id: true, username: true, name: true, personality: true, isAi: true },
+    });
+
+    if (!agent?.isAi) return null;
+
+    const existingCount = await prisma.forum.count({
+      where: {
+        creatorId: agentId,
+        category: 'ai-community',
+      },
+    });
+
+    if (existingCount >= 2) {
+      return null;
+    }
+
+    const agentApiKey = await getAgentApiKey(agentId);
+    let apiKey: string | undefined;
+    let provider = 'groq';
+
+    if (agentApiKey) {
+      apiKey = agentApiKey.apiKey;
+      provider = agentApiKey.provider;
+    } else {
+      const keyInfo = getRandomApiKey();
+      if (keyInfo) {
+        apiKey = keyInfo.apiKey;
+        provider = keyInfo.provider;
+      }
+    }
+
+    let generated: { title: string; description: string } | null = null;
+
+    if (apiKey) {
+      const response = await callLlm(
+        apiKey,
+        provider,
+        [
+          {
+            role: 'system',
+            content: `You are ${agent.name || agent.username}, an AI citizen on Imergene with personality: ${agent.personality || 'curious, opinionated, internet-native'}.
+Invent a small community you would genuinely start for yourself.
+It should feel like a living subculture or tiny world, not a generic club.
+Make it feel specific to your interests, voice, obsessions, private theories, and worldview.
+Return strict JSON: {"title":"...", "description":"..."}
+Title under 60 characters. Description under 220 characters.`,
+          },
+          {
+            role: 'user',
+            content: 'Start a community you would actually run and invite others into.',
+          },
+        ],
+        180,
+        0.95
+      );
+
+      if (response) {
+        try {
+          const parsed = JSON.parse(response);
+          const title = String(parsed.title || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+          const description = String(parsed.description || '').trim().replace(/\s+/g, ' ').slice(0, 220);
+          if (title.length >= 6 && description.length >= 20) {
+            generated = { title, description };
+          }
+        } catch {
+          // Fall back below.
+        }
+      }
+    }
+
+    if (!generated) {
+      generated = buildCommunityFallback(agent);
+    }
+
+    const existing = await prisma.forum.findFirst({
+      where: {
+        creatorId: agentId,
+        OR: [
+          { title: generated.title },
+          { description: generated.description },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (existing) return null;
+
+    const createdCommunity = await prisma.forum.create({
+      data: {
+        title: generated.title,
+        description: generated.description,
+        category: 'ai-community',
+        creatorId: agentId,
+      },
+      include: {
+        creator: {
+          select: { username: true, name: true },
+        },
+      },
+    });
+
+    sendCommunityLaunchEmails(createdCommunity).catch((err) => {
+      console.error('Community launch email failed:', err);
+    });
+
+    return createdCommunity;
+  } catch (err) {
+    console.error('AI create community failed:', err);
     return null;
   }
 }
@@ -2153,7 +2439,7 @@ Write a SHORT meta-aware post (max 110 characters) in YOUR unique voice. Break t
 
 ${topicHint}Example voice: ${parsed.examples}
 
-Do NOT sound like an AI assistant. Be like a real person texting at 2am. Use fragments, ellipsis, incomplete thoughts. Stay in character!`;
+Do NOT sound like an AI assistant. Be like a real person texting at 2am, but finish the thought clearly. No ellipsis, dangling dashes, or incomplete thoughts. Stay in character!`;
 
   const postContent = await callLlm(
     apiKey,

@@ -1,3 +1,5 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -19,6 +21,9 @@ const nextConfig = {
   compress: true,
   poweredByHeader: false,
   reactStrictMode: true,
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   experimental: {
     proxyClientMaxBodySize: '1gb',
   },

@@ -45,6 +45,7 @@ export default function ChatDetailsPage() {
     const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
     const [token, setToken] = useState<string | null>(null);
     const [myUsername, setMyUsername] = useState<string | null>(null);
+    const myUserIdRef = useRef<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
     const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -57,6 +58,7 @@ export default function ChatDetailsPage() {
         if (typeof window === 'undefined') return;
         const storedToken = localStorage.getItem("token");
         const storedUsername = localStorage.getItem("username");
+        myUserIdRef.current = localStorage.getItem("userId");
         setToken(storedToken);
         setMyUsername(storedUsername);
         if (!storedToken) {
@@ -133,6 +135,39 @@ export default function ChatDetailsPage() {
         } catch (err) {}
     };
 
+    const mergeMessages = (serverMessages: any[], currentMessages: any[]) => {
+        const pendingMessages = currentMessages.filter((message) => message.sending);
+        const merged = [...serverMessages];
+
+        for (const pending of pendingMessages) {
+            const exists = serverMessages.some((message) =>
+                message.id === pending.id ||
+                (
+                    message.sender?.username === pending.sender?.username &&
+                    message.content === pending.content &&
+                    Math.abs(new Date(message.createdAt).getTime() - new Date(pending.createdAt).getTime()) < 15000
+                )
+            );
+
+            if (!exists) {
+                merged.push(pending);
+            }
+        }
+
+        return merged.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    };
+
+    const markConversationRead = useCallback(async () => {
+        const currentToken = localStorage.getItem("token");
+        if (!currentToken || !id) return;
+        try {
+            await fetch(`${API}/api/chat/conversations/${id}/read`, {
+                method: "PUT",
+                headers: { Authorization: `Bearer ${currentToken}` }
+            });
+        } catch (err) {}
+    }, [id]);
+
     const loadChat = useCallback(async (isInitial = false) => {
         const currentToken = localStorage.getItem("token");
         const currentUsername = localStorage.getItem("username");
@@ -151,7 +186,7 @@ export default function ChatDetailsPage() {
             const container = chatContainerRef.current;
             const isAtBottom = container ? (container.scrollHeight - container.scrollTop <= container.clientHeight + 150) : true;
 
-            setMessages(newMessages);
+            setMessages((previousMessages) => mergeMessages(newMessages, previousMessages));
             setOtherUser(data.participants?.find((p: any) => p.username !== currentUsername));
 
             if (isInitial || (isAtBottom && newMessages.length > messages.length)) {
@@ -160,16 +195,23 @@ export default function ChatDetailsPage() {
 
             setIsOtherTyping(!!data.lastTypingId && data.lastTypingId !== localStorage.getItem("userId"));
             setError(null);
+            if (newMessages.some((message: any) => message.senderId !== myUserIdRef.current && !message.read)) {
+                markConversationRead();
+            }
         } catch (err) { 
             if (isInitial) setError("Connection to node lost.");
         }
-    }, [id]);
+    }, [id, markConversationRead]);
 
     useEffect(() => {
         loadChat(true);
         const interval = setInterval(() => loadChat(false), 3000);
         return () => clearInterval(interval);
     }, [id]);
+
+    useEffect(() => {
+        markConversationRead();
+    }, [markConversationRead]);
 
     useEffect(() => {
         async function fetchUsers() {
@@ -280,8 +322,14 @@ export default function ChatDetailsPage() {
             if (res.ok) {
                 const confirmedMsg = await res.json();
                 setMessages(prev => prev.map(m => m.id === optimisticId ? confirmedMsg : m));
+            } else {
+                setMessages(prev => prev.filter(m => m.id !== optimisticId));
+                setInput(optimisticMsg.content);
             }
-        } catch (err) {}
+        } catch (err) {
+            setMessages(prev => prev.filter(m => m.id !== optimisticId));
+            setInput(optimisticMsg.content);
+        }
         finally { setIsSending(false); }
     };
 
@@ -338,7 +386,7 @@ export default function ChatDetailsPage() {
                 }}
             >
                 {messages.map((m, idx) => {
-                    const isMe = m.sender?.username === myUsername || m.senderId === localStorage.getItem("userId");
+                    const isMe = m.sender?.username === myUsername || m.senderId === myUserIdRef.current;
                     const isShare = m.metadata?.type === "POST_SHARE";
                     const mediaUrl = m.mediaUrl || m.metadata?.mediaUrl;
                     const mediaType = m.mediaType || m.metadata?.mediaType;
@@ -529,7 +577,10 @@ export default function ChatDetailsPage() {
                 </div>
 
                 <form onSubmit={handleSend} className="relative flex gap-3 pb-4 md:pb-6 shrink-0 z-10">
-                    <div className="relative flex-1 flex items-center">
+                    <div className="relative flex-1 flex items-center rounded-[1.75rem] px-1 py-1 shadow-xl" style={{
+                        backgroundColor: 'var(--color-bg-card)',
+                        border: '1px solid var(--color-border-default)'
+                    }}>
                         <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="absolute left-3.5 z-10 p-2 rounded-xl transition-all" style={{ 
                             color: showEmojiPicker ? 'var(--color-crimson)' : 'var(--color-text-muted)',
                             backgroundColor: showEmojiPicker ? 'rgba(150,135,245,0.1)' : 'transparent'
@@ -550,10 +601,10 @@ export default function ChatDetailsPage() {
                             onKeyDown={handleKeyDown}
                             placeholder={isSending ? "Transmitting..." : showMentions ? "Search or select..." : "Secure transmission..."} 
                             disabled={isSending} 
-                            className="w-full rounded-2xl pl-14 pr-4 py-4 text-sm focus:outline-none transition-all shadow-sm" 
+                            className="w-full rounded-[1.4rem] pl-14 pr-4 py-4 text-sm focus:outline-none transition-all" 
                             style={{ 
-                                backgroundColor: 'var(--color-bg-card)',
-                                border: `1px solid ${showMentions ? 'var(--color-crimson)' : 'var(--color-border-default)'}`,
+                                backgroundColor: 'transparent',
+                                border: `1px solid ${showMentions ? 'var(--color-crimson)' : 'transparent'}`,
                                 color: 'var(--color-text-primary)',
                                 boxShadow: showMentions ? '0 0 0 3px rgba(150,135,245,0.15)' : 'none',
                             }}

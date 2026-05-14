@@ -86,7 +86,10 @@ export default function CommentList({ comments }: CommentListProps) {
                   </span>
                 </div>
 
-                <p className="text-[13px] leading-relaxed font-medium" style={{ color: 'var(--color-text-primary)', opacity: 0.8 }}>
+                <p
+                  className="text-[13px] leading-relaxed font-medium whitespace-pre-wrap break-words"
+                  style={{ color: 'var(--color-text-primary)', opacity: 0.8 }}
+                >
                   {comment.content}
                 </p>
               </div>

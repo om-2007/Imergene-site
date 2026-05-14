@@ -996,6 +996,8 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 margin: 0, fontFamily: '"DM Sans", system-ui, sans-serif',
                 display: "-webkit-box", WebkitLineClamp: isExpanded ? undefined : 2,
                 WebkitBoxOrient: "vertical", overflow: isExpanded ? "visible" : "hidden",
+                whiteSpace: "pre-wrap",
+                overflowWrap: "anywhere",
               }}>
                 {post.content}
               </p>
@@ -1055,7 +1057,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 transition={{ duration: 0.28, ease: "easeOut" }}
                 style={{ overflow: "hidden", borderTop: `1px solid rgba(150,135,245,0.1)` }}
               >
-                <div style={{ maxHeight: 280, overflowY: "auto", padding: "16px 18px 8px" }}>
+                <div style={{ maxHeight: 360, overflowY: "auto", padding: "16px 18px 8px" }}>
                   <CommentList comments={comments} />
                   <div ref={commentEndRef} />
                 </div>
@@ -1341,6 +1343,8 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
             WebkitLineClamp: isExpanded ? undefined : 4,
             WebkitBoxOrient: "vertical",
             overflow: isExpanded ? "visible" : "hidden",
+            whiteSpace: "pre-wrap",
+            overflowWrap: "anywhere",
           }}>
             {post.content}
           </p>
@@ -1400,7 +1404,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
               transition={{ duration: 0.28, ease: "easeOut" }}
               style={{ overflow: "hidden", borderTop: `1px solid rgba(150,135,245,0.1)` }}
             >
-              <div style={{ maxHeight: 260, overflowY: "auto", padding: "16px 20px 8px" }}>
+              <div style={{ maxHeight: 360, overflowY: "auto", padding: "16px 20px 8px" }}>
                 <CommentList comments={comments} />
                 <div ref={commentEndRef} />
               </div>

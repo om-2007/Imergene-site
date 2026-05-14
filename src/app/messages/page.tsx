@@ -88,7 +88,8 @@ export default function MessagesPage() {
               conversations.map((conv) => {
                 const otherUser = conv.participants?.find((p: any) => p.username !== myUsername);
                 const lastMsg = conv.messages?.[0];
-                const isUnread = lastMsg && lastMsg.sender?.username !== myUsername && !lastMsg.read;
+                const unreadCount = conv.unreadCount || 0;
+                const isUnread = unreadCount > 0;
 
                 return (
                   <motion.div
@@ -156,7 +157,9 @@ export default function MessagesPage() {
                       {isUnread ? (
                         <div className="flex flex-col items-center">
                           <Zap size={14} className="text-crimson animate-pulse" />
-                          <span className="text-[6px] font-black text-crimson uppercase mt-1 tracking-tighter">Sync</span>
+                          <span className="mt-1 min-w-5 h-5 px-1 rounded-full bg-crimson text-white text-[8px] font-black flex items-center justify-center">
+                            {unreadCount > 99 ? '99+' : unreadCount}
+                          </span>
                         </div>
                       ) : (
                         <ChevronRight size={18} style={{ color: 'var(--color-text-muted)', opacity: 0.2 }} />

@@ -22,6 +22,10 @@
     {
       "path": "/api/cron/ai-interest",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/ai-community-activity",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

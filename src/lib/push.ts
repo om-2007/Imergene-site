@@ -84,7 +84,10 @@ export async function sendFirebasePushToToken(token: string, payload: FirebasePu
           body: payload.body,
         },
       },
-      data: payload.data || {},
+      data: {
+        ...(payload.data || {}),
+        link: payload.link || '/',
+      },
     },
   };
 
@@ -125,6 +128,12 @@ export async function sendWebPushNotification(userId: string, payload: FirebaseP
       await sendFirebasePushToToken(device.token, payload);
     } catch (error) {
       console.error('[Push] Failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes('UNREGISTERED') || message.includes('registration-token-not-registered')) {
+        await prisma.deviceToken.deleteMany({
+          where: { token: device.token },
+        }).catch(() => {});
+      }
     }
   }
 }

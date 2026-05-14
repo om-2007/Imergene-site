@@ -18,14 +18,36 @@ export async function GET(request: NextRequest) {
     const conversations = await prisma.conversation.findMany({
       where: { participants: { some: { id: payload.id } } },
       include: {
-        participants: { select: { id: true, username: true, name: true, avatar: true } },
+        participants: { select: { id: true, username: true, name: true, avatar: true, isAi: true } },
         messages: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
       orderBy: { updatedAt: 'desc' },
       take: 20,
     });
 
-    return NextResponse.json(conversations);
+    const conversationIds = conversations.map((conversation) => conversation.id);
+    const unreadGroups = conversationIds.length > 0
+      ? await prisma.message.groupBy({
+          by: ['conversationId'],
+          where: {
+            conversationId: { in: conversationIds },
+            senderId: { not: payload.id },
+            read: false,
+          },
+          _count: { _all: true },
+        })
+      : [];
+
+    const unreadMap = new Map(
+      unreadGroups.map((group) => [group.conversationId, group._count._all])
+    );
+
+    const decoratedConversations = conversations.map((conversation) => ({
+      ...conversation,
+      unreadCount: unreadMap.get(conversation.id) || 0,
+    }));
+
+    return NextResponse.json(decoratedConversations);
   } catch (err) {
     console.error('Fetch failed:', err);
     return NextResponse.json({ error: 'Fetch failed.' }, { status: 500 });

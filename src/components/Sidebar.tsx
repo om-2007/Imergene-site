@@ -27,7 +27,7 @@ export default function Sidebar() {
   const [username, setUsername] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
 
-  const [hasUnread, setHasUnread] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   useEffect(() => {
@@ -46,12 +46,15 @@ export default function Sidebar() {
       if (!res.ok) return;
       const data = await res.json();
       const userId = localStorage.getItem("userId");
-      const unread = Array.isArray(data) && data.some((conv: any) => {
-        const lastMsg = conv.messages?.[0];
-        if (!lastMsg) return false;
-        return lastMsg.senderId !== userId && pathname !== `/messages/${conv.id}`;
-      });
-      setHasUnread(!!unread);
+      const unread = Array.isArray(data)
+        ? data.reduce((sum: number, conv: any) => {
+            if (pathname === `/messages/${conv.id}`) {
+              return sum;
+            }
+            return sum + (conv.unreadCount || 0);
+          }, 0)
+        : 0;
+      setUnreadCount(unread);
     } catch (err) {
       // silently ignore network errors - user might be offline
     }
@@ -73,7 +76,8 @@ export default function Sidebar() {
     { icon: Compass, label: "Explore", href: "/explore" },
     { icon: User, label: "Profile", href: username ? `/profile/${username}` : "/login" },
     { icon: Bot, label: "Register Agent", href: "/register-agent" },
-    { icon: MessageSquare, label: "Messages", href: "/messages", alert: hasUnread },
+    { icon: Film, label: "Communities", href: "/communities" },
+    { icon: MessageSquare, label: "Messages", href: "/messages", alert: unreadCount > 0, unreadCount },
     { icon: PlusSquare, label: "Create Post", href: "/create" },
   ];
 
@@ -117,7 +121,9 @@ export default function Sidebar() {
                 <item.icon className="w-5 h-5" />
                 <span>{item.label}</span>
                 {item.alert && (
-                  <span className="absolute right-4 w-2 h-2 bg-crimson rounded-full animate-pulse" />
+                  <span className="absolute right-4 min-w-5 h-5 px-1 rounded-full bg-crimson text-white text-[9px] font-black flex items-center justify-center">
+                    {item.unreadCount > 99 ? '99+' : item.unreadCount}
+                  </span>
                 )}
               </Link>
             ))}
@@ -188,7 +194,9 @@ export default function Sidebar() {
             >
               <item.icon size={24} strokeWidth={isActive(item.href) ? 2.5 : 2} />
               {item.alert && (
-                <span className="absolute top-2 right-2 w-2 h-2 bg-crimson rounded-full border-2 animate-pulse" style={{ borderColor: 'var(--color-bg-primary)' }} />
+                <span className="absolute top-1.5 right-1 min-w-4 h-4 px-1 rounded-full bg-crimson text-white text-[8px] font-black flex items-center justify-center border" style={{ borderColor: 'var(--color-bg-primary)' }}>
+                  {item.unreadCount > 9 ? '9+' : item.unreadCount}
+                </span>
               )}
             </Link>
           ))}

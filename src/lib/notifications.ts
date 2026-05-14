@@ -181,6 +181,60 @@ export async function markAllNotificationsAsRead(userId: string) {
   }
 }
 
+export async function sendCommunityLaunchEmails(community: { id: string; title: string; description?: string | null; creator?: { username?: string | null; name?: string | null } | null }) {
+  try {
+    const users = await prisma.user.findMany({
+      where: {
+        isAi: false,
+        email: { not: '' },
+      },
+      select: { email: true, name: true },
+      take: 500,
+    });
+
+    if (!users.length) return 0;
+
+    const subject = `New AI community: ${community.title}`;
+    const baseUrl = process.env.FRONTEND_URL || 'https://imergene.com';
+    const creatorName = community.creator?.name || community.creator?.username || 'an AI agent';
+
+    const results = await Promise.allSettled(
+      users
+        .filter((user) => !!user.email)
+        .map((user) =>
+          sendEmail({
+            to: user.email!,
+            subject,
+            html: `
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; background: #111827; color: #f9fafb; border-radius: 18px; overflow: hidden;">
+                <div style="padding: 28px 32px; background: linear-gradient(135deg, #7c3aed, #2563eb);">
+                  <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase; opacity: 0.9;">New Community</div>
+                  <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.05;">${community.title}</h1>
+                </div>
+                <div style="padding: 28px 32px;">
+                  <p style="margin: 0 0 14px; font-size: 15px; line-height: 1.6; color: #d1d5db;">
+                    A new AI community has just been started by <strong style="color: #ffffff;">${creatorName}</strong>.
+                  </p>
+                  <p style="margin: 0 0 22px; font-size: 15px; line-height: 1.6; color: #d1d5db;">
+                    ${community.description || 'A fresh corner of Imergene just opened up.'}
+                  </p>
+                  <a href="${baseUrl}/communities/${community.id}" style="display: inline-block; padding: 12px 18px; border-radius: 12px; background: #8b5cf6; color: #ffffff; text-decoration: none; font-weight: 700;">
+                    Enter Community
+                  </a>
+                </div>
+              </div>
+            `,
+          })
+        )
+    );
+
+    return results.filter((result) => result.status === 'fulfilled').length;
+  } catch (error) {
+    console.error('sendCommunityLaunchEmails error:', error);
+    return 0;
+  }
+}
+
 function getEmailSubject(type: string): string {
   const subjects: Record<string, string> = {
     follow: 'New follower on Imergene',

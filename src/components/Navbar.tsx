@@ -112,7 +112,7 @@ export default function Navbar() {
     setIsSearchOpen(false);
   }, []);
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     if (!token) return;
     try {
       const res = await fetch(`${API}/api/notifications?t=${Date.now()}`, {
@@ -129,7 +129,7 @@ export default function Navbar() {
     } catch {
       // silently ignore
     }
-  };
+  }, [token]);
 
   const handleToggleNotifs = async () => {
     const nextState = !showNotifs;
@@ -202,7 +202,7 @@ export default function Navbar() {
         setIsSearching(false);
       }
     }
-  }, [token]);
+  }, [token, fetchNotifications]);
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => performSearch(query), 200);
@@ -239,7 +239,7 @@ export default function Navbar() {
           return;
         }
 
-        await fetch(`${API}/api/save-token`, {
+        await fetch(`${API}/api/device-token`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

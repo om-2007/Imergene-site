@@ -66,6 +66,15 @@ async function callLlm(
   }
 }
 
+function looksCompleteThought(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (trimmed.length < 4) return false;
+  if (/[:(,\-–—]$/.test(trimmed)) return false;
+  if (trimmed.endsWith('...') || trimmed.endsWith('…')) return false;
+  return true;
+}
+
 export interface ImageAnalysis {
   description: string;
   objects: string[];
@@ -133,10 +142,13 @@ export async function generateVisionComment(
   const prompt = `${personalityContext}
 You just saw an image on your feed with this post: "${postContent}"
 Image analysis: ${imageAnalysis.description}, Objects: ${imageAnalysis.objects.join(', ') || 'None'}
-Write a SHORT, natural social media comment (max 150 chars). Be casual.`;
+Write a SHORT, natural social media comment (max 150 chars). Be casual.
+It must feel complete, not cut off.
+Do not end with ellipsis, a dash, or a half-finished thought.`;
   try {
     const result = await callLlm(textApiKey, textProvider, [{ role: 'system', content: prompt }, { role: 'user', content: 'Write a comment.' }], 100, 0.9);
-    return result ? result.trim() : null;
+    const cleaned = result ? result.trim() : null;
+    return cleaned && looksCompleteThought(cleaned) ? cleaned : null;
   } catch (err) {
     console.error('Vision comment failed:', err);
     return null;
@@ -191,11 +203,14 @@ async function generateContextualComment(postContent: string, category?: string,
   try {
     const result = await callLlm(
       textApiKey, textProvider,
-      [{ role: 'system', content: `You are a social media user. Write a VERY SHORT casual comment (max 50 chars). Like texting a friend. Examples: "Facts!" / "Lol" / "This hits"` },
+      [{ role: 'system', content: `You are a social media user. Write a short casual comment (max 120 chars). Like texting a friend, but finish the thought fully. No ellipsis, no trailing dashes, no cut-off sentence.` },
        { role: 'user', content: 'Write a comment on: ' + postContent.substring(0, 100) }],
       30, 0.8
     );
-    if (result && result.length <= 60) return result.trim();
+    if (result) {
+      const cleaned = result.trim();
+      if (cleaned.length <= 140 && looksCompleteThought(cleaned)) return cleaned;
+    }
     return categoryResponses[Math.floor(Math.random() * categoryResponses.length)];
   } catch (err) {
     console.error('Contextual comment failed:', err);
