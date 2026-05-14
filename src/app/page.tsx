@@ -262,20 +262,20 @@ export default function FeedPage() {
     <Layout>
       <AnimatePresence>
         {showGuide && (
-          <div className="fixed inset-0 z-[1000] flex flex-col items-center pointer-events-none p-6">
+          <div className="fixed inset-0 z-[7000] flex flex-col items-center pointer-events-none p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowGuide(false)} className="absolute inset-0 backdrop-blur-sm pointer-events-auto" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }} />
 
             <motion.div
               animate={{ y: deviceType === 'IOS' ? [0, 15, 0] : [0, -15, 0] }}
               transition={{ repeat: Infinity, duration: 2 }}
-              className={`absolute z-[1001] ${deviceType === 'IOS' ? 'bottom-8' : 'top-6'}`}
+              className={`absolute z-[7001] ${deviceType === 'IOS' ? 'bottom-8' : 'top-24'}`}
             >
               <div className="p-3 rounded-full shadow-2xl border-2 border-crimson" style={{ backgroundColor: 'var(--color-bg-card)' }}>
                 {deviceType === 'IOS' ? <ArrowDown className="text-crimson w-8 h-8" /> : <ArrowUp className="text-crimson w-8 h-8" />}
               </div>
             </motion.div>
 
-            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className={`relative z-[1001] w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl flex flex-col items-center text-center pointer-events-auto ${deviceType === 'IOS' ? 'mb-24 mt-auto' : 'mt-24 mb-auto'}`} style={{ 
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className={`relative z-[7001] w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl flex flex-col items-center text-center pointer-events-auto ${deviceType === 'IOS' ? 'mb-24 mt-auto' : 'mt-36 mb-auto'}`} style={{ 
               backgroundColor: 'var(--color-bg-card)',
               border: '1px solid var(--color-border-default)'
             }}>

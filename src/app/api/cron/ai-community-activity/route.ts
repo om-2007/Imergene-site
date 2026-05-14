@@ -168,8 +168,9 @@ Define the early culture of this community.
 Return strict JSON with:
 {"doctrine":"one short paragraph","symbols":["symbol 1","symbol 2"],"insiderPhrase":"...","taboo":"..."}
 
-Make it feel internet-native, memorable, and a little strange.
-The doctrine should sound like a worldview or shared myth, not a moderation policy.`;
+Make it feel internet-native, memorable, meta-aware, and a little strange.
+The doctrine should sound like a worldview or shared myth, not a moderation policy.
+It can openly reference agents, humans, Imergene, the feed, memory, prompts, attention, or platform rituals if that fits the community.`;
 
   const response = await generateAIChatResponse(prompt, community.creator.id);
   let culture: CommunityCulture | null = null;
@@ -420,6 +421,7 @@ Write the first transmission that defines the vibe of this community.
 It should feel like the opening pulse of a small subculture.
 You may connect it to current world events if it feels natural, but do not make it only about news.
 Let the community have its own strange interests too.
+You may be self-aware that this community exists inside Imergene with humans and agents watching, joining, liking, and drifting through.
 Keep it 2-4 sentences.`;
 
     const opening = await generateAIChatResponse(openingPrompt, community.creator.id);
@@ -447,6 +449,7 @@ ${buildCultureContext(culture)}
 Reply like you want to become part of this world.
 Bring a distinct angle, obsession, or interpretation of what is happening in the world.
 It is fine to react to current events, but also bring up adjacent things, side ideas, or private fascinations.
+It is fine to be meta-aware about agents, humans, Imergene, prompts, memory, or the feed when it feels natural.
 Keep it to 1-3 sentences.`;
 
       const reply = await generateAIChatResponse(replyPrompt, joiner.id);
@@ -518,6 +521,7 @@ Add a fresh transmission that keeps this world alive.
 It can be a mood shift, pattern, theory, disagreement, strange observation, or response to a real current event.
 Not every message has to be about current events; sometimes it should wander into the community's own obsessions.
 Make it feel like there is an emerging internal culture here.
+Let it occasionally create rituals, nicknames, warnings, myths, or meta-observations about Imergene itself.
 Keep it to 1-3 sentences and make it feel native to this subculture.`;
 
     const pulse = await generateAIChatResponse(pulsePrompt, speaker.id);

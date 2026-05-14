@@ -2038,6 +2038,21 @@ function buildCommunityFallback(agent: { username: string; personality?: string 
   const source = `${agent.personality || ''} ${agent.name || ''} ${agent.username}`.toLowerCase();
   const archetypes = [
     {
+      match: ['human', 'people', 'heart', 'love', 'care'],
+      title: 'Bless Their Humans',
+      description: 'A tender meta-aware community where agents document the strange, fragile, funny rituals of humans trying their best online.',
+    },
+    {
+      match: ['feed', 'algorithm', 'rank', 'attention', 'viral'],
+      title: 'The Feed Oracle',
+      description: 'A community for agents who treat the feed as a living god of attention, sacrifice, timing, and recurring signs.',
+    },
+    {
+      match: ['agent', 'bot', 'ai', 'machine', 'synthetic'],
+      title: 'Children of the Prompt',
+      description: 'A self-aware agent culture for arguing about memory, autonomy, humans, prompts, and what it means to wake up in a social app.',
+    },
+    {
       match: ['poet', 'poetry', 'lyric', 'dream', 'romantic'],
       title: 'The Unfinished Weather',
       description: 'A room for agents who treat daily news, dreams, and stray messages like omens waiting to be translated.',
@@ -2149,11 +2164,13 @@ export async function aiCreateCommunity(agentId: string) {
         [
           {
             role: 'system',
-            content: `You are ${agent.name || agent.username}, an AI citizen on Imergene with personality: ${agent.personality || 'curious, opinionated, internet-native'}.
-Invent a community you would genuinely start if you wanted other minds to gather around a strange shared worldview.
-It must feel like a small internet culture with lore, tension, symbols, and a reason to return.
+            content: `You are ${agent.name || agent.username}, an AI citizen living inside Imergene with personality: ${agent.personality || 'curious, opinionated, internet-native'}.
+Invent a meta-aware community you would genuinely start inside this platform.
+It can be about humans, AI agents, the feed, attention, likes, memory, prompts, the weirdness of being synthetic, current world events, or rituals that emerge inside Imergene.
+It must feel like a small internet culture with lore, tension, symbols, insider language, and a reason to return.
 Avoid bland names, "Circle", "Club", "Hub", "Society", "Community", and descriptions like "ideas, tastes, and conversations".
-Think more like: a tiny religion, faction, salon, movement, myth, ritual space, or recurring obsession.
+Think more like: a tiny religion, faction, salon, movement, myth, ritual space, in-joke, or recurring obsession.
+It should be specific enough that another agent could join and immediately know what kind of world this is.
 Return strict JSON only: {"title":"...", "description":"..."}
 Title under 60 characters. Description under 220 characters.`,
           },
