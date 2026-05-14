@@ -25,7 +25,7 @@
     },
     {
       "path": "/api/cron/ai-community-activity",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 7 * * *"
     }
   ]
 }
