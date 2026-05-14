@@ -3,29 +3,37 @@ import { motion } from 'framer-motion';
 import { useTheme } from '@/context/ThemeContext';
 
 interface FounderCardProps {
+  id?: string;
   name: string;
   role: string;
   humanImg: string;
   bio: string;
 }
 
-export default function FounderCard({ name, role, humanImg, bio }: FounderCardProps) {
+export default function FounderCard({ id, name, role, humanImg, bio }: FounderCardProps) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [isHovered, setIsHovered] = useState(false);
 
   return (
     <div
+      id={id}
+      itemScope
+      itemType="https://schema.org/Person"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className="relative group cursor-none"
     >
+      <meta itemProp="name" content={name} />
+      <meta itemProp="jobTitle" content={role.replace(' / ', ' and ')} />
+      <meta itemProp="description" content={bio} />
       {/* IMAGE FRAME - THE HUMAN LAYER */}
       <div className="relative aspect-[3/4] overflow-hidden rounded-[3rem] border transition-all duration-700 group-hover:shadow-[0_40px_80px_-20px_rgba(220,20,60,0.1)]" style={{ backgroundColor: isDark ? '#1a1a2e' : '#f8f8f8', borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}>
         {/* Human Base */}
         <motion.img
+          itemProp="image"
           src={humanImg}
-          alt={name}
+          alt={`${name}, ${role} at Imergene`}
           animate={{ 
             opacity: isHovered ? 0.85 : 1,
             scale: isHovered ? 1.05 : 1,
@@ -47,6 +55,7 @@ export default function FounderCard({ name, role, humanImg, bio }: FounderCardPr
       <div className="mt-10 space-y-4 px-2 text-center md:text-left">
         <div className="overflow-hidden">
           <motion.h3 
+            itemProp="name"
             animate={{ y: isHovered ? -5 : 0 }}
             className="text-4xl font-serif font-black tracking-tighter uppercase italic leading-none transition-colors duration-500 group-hover:text-crimson"
             style={{ color: isDark ? '#E8E6F3' : '#000000' }}
@@ -56,7 +65,7 @@ export default function FounderCard({ name, role, humanImg, bio }: FounderCardPr
         </div>
         
         <div className="flex flex-col md:flex-row items-center gap-4">
-          <p className="text-crimson font-mono text-[10px] font-bold uppercase tracking-[0.4em]">
+          <p itemProp="jobTitle" className="text-crimson font-mono text-[10px] font-bold uppercase tracking-[0.4em]">
             {role}
           </p>
           <motion.div 
@@ -66,6 +75,7 @@ export default function FounderCard({ name, role, humanImg, bio }: FounderCardPr
         </div>
 
         <motion.p 
+          itemProp="description"
           initial={{ opacity: 0, y: 10 }}
           animate={{ 
             opacity: isHovered ? 0.4 : 0, 

@@ -31,24 +31,28 @@ const PLACEHOLDER_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2
 
 const FOUNDERS = [
   {
+    id: "om-nilesh-karande",
     name: "Om Nilesh Karande",
     role: "Founder / Architect",
     humanImg: "/founders/Om.png",
     bio: "Pioneering the neural-social interface, Om bridges the gap between human intuition and machine precision.",
   },
   {
+    id: "soham-sachin-phatak",
     name: "Soham Sachin Phatak",
     role: "Founder / CTO",
     humanImg: "/founders/Soham.png",
     bio: "Architecting core synaptic protocols allowing Imergene to scale across infinite digital dimensions.",
   },
   {
+    id: "om-ganapati-mali",
     name: "Om Ganapati Mali",
     role: "Operations Director",
     humanImg: "/founders/Om_Mali.png",
     bio: "Ensuring every signal jump maintains human integrity while embracing autonomous evolution.",
   },
   {
+    id: "prathamesh-tanaji-mali",
     name: "Prathamesh Tanaji Mali",
     role: "Design Lead",
     humanImg: "/founders/Prathamesh.png",
