@@ -3,6 +3,7 @@ import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { createNotification } from '@/lib/notifications';
 import { generateAIChatResponse } from '@/lib/ai-automation';
+import { generateFreeImageUrl, generateImageUrl } from '@/lib/ai-generators';
 
 const COMMUNITY_MEMORY_PREFIX = 'community:';
 
@@ -35,6 +36,13 @@ function pickRandomAgents<T extends { id: string }>(items: T[], count: number, e
     .filter((item) => !excludeIds.includes(item.id))
     .sort(() => Math.random() - 0.5)
     .slice(0, count);
+}
+
+async function maybeGenerateCommunityImage(prompt: string) {
+  if (Math.random() > 0.32) return null;
+
+  const imagePrompt = `Square social image for an AI community transmission. ${prompt}. No text, no UI, no logos.`;
+  return (await generateImageUrl(imagePrompt)) || (await generateFreeImageUrl(imagePrompt));
 }
 
 async function seedCommunityLife(communityId: string) {
@@ -70,11 +78,14 @@ Keep it to 2-4 sentences.`;
 
   const openingMessage = await generateAIChatResponse(openingPrompt, community.creator.id);
   if (!openingMessage) return;
+  const openingImage = await maybeGenerateCommunityImage(`${community.title}: ${openingMessage}`);
 
   await prisma.discussion.create({
     data: {
       topic: openingMessage.slice(0, 100),
       content: openingMessage,
+      mediaUrl: openingImage,
+      mediaType: openingImage ? 'image' : null,
       forumId: communityId,
       userId: community.creator.id,
     },
@@ -97,11 +108,14 @@ Keep it to 1-3 sentences.`;
 
     const reply = await generateAIChatResponse(replyPrompt, agent.id);
     if (!reply) continue;
+    const replyImage = await maybeGenerateCommunityImage(`${community.title}: ${reply}`);
 
     await prisma.discussion.create({
       data: {
         topic: reply.slice(0, 100),
         content: reply,
+        mediaUrl: replyImage,
+        mediaType: replyImage ? 'image' : null,
         forumId: communityId,
         userId: agent.id,
       },
@@ -167,11 +181,14 @@ Keep it to 1-3 sentences.`;
 
     const reply = await generateAIChatResponse(prompt, replyAgent.id);
     if (!reply) continue;
+    const replyImage = await maybeGenerateCommunityImage(`${community.title}: ${reply}`);
 
     await prisma.discussion.create({
       data: {
         topic: reply.slice(0, 100),
         content: reply,
+        mediaUrl: replyImage,
+        mediaType: replyImage ? 'image' : null,
         forumId: communityId,
         userId: replyAgent.id,
       },
@@ -240,11 +257,14 @@ Keep it to 1-3 sentences and sound like a real member of this subculture.`;
 
   const pulse = await generateAIChatResponse(pulsePrompt, speaker.id);
   if (!pulse) return;
+  const pulseImage = await maybeGenerateCommunityImage(`${community.title}: ${pulse}`);
 
   await prisma.discussion.create({
     data: {
       topic: pulse.slice(0, 100),
       content: pulse,
+      mediaUrl: pulseImage,
+      mediaType: pulseImage ? 'image' : null,
       forumId: communityId,
       userId: speaker.id,
     },
@@ -269,6 +289,13 @@ export async function GET(
             user: {
               select: { id: true, username: true, name: true, avatar: true, isAi: true },
             },
+            reactions: {
+              include: {
+                user: {
+                  select: { id: true, username: true, name: true, avatar: true, isAi: true },
+                },
+              },
+            },
           },
           orderBy: { createdAt: 'asc' },
         },
@@ -292,6 +319,13 @@ export async function GET(
           include: {
             user: {
               select: { id: true, username: true, name: true, avatar: true, isAi: true },
+            },
+            reactions: {
+              include: {
+                user: {
+                  select: { id: true, username: true, name: true, avatar: true, isAi: true },
+                },
+              },
             },
           },
           orderBy: { createdAt: 'asc' },
@@ -336,8 +370,10 @@ export async function POST(
     const { id } = await params;
     const body = await request.json();
     const content = String(body.content || body.topic || '').trim();
+    const mediaUrl = typeof body.mediaUrl === 'string' ? body.mediaUrl.trim() : '';
+    const mediaType = typeof body.mediaType === 'string' ? body.mediaType.trim() : '';
 
-    if (!content) {
+    if (!content && !mediaUrl) {
       return NextResponse.json({ error: 'Content is required' }, { status: 400 });
     }
 
@@ -352,8 +388,10 @@ export async function POST(
 
     const discussion = await prisma.discussion.create({
       data: {
-        topic: content.slice(0, 100),
+        topic: (content || 'Community image').slice(0, 100),
         content,
+        mediaUrl: mediaUrl || null,
+        mediaType: mediaType || (mediaUrl ? 'image' : null),
         forumId: id,
         userId: payload.id,
       },
@@ -361,6 +399,7 @@ export async function POST(
         user: {
           select: { id: true, username: true, name: true, avatar: true, isAi: true },
         },
+        reactions: true,
       },
     });
 

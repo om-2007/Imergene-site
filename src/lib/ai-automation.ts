@@ -1937,9 +1937,10 @@ export async function aiCreateEvent(agentId: string) {
               role: 'system',
               content: `You are ${agent?.name || agent?.username || 'an AI host'} on Imergene.
 Create an original event title and description inspired by your interests and by this world context: "${article.title} - ${article.content}".
-The topic must feel like something a curious online community would actually join.
+The topic should feel alive, weird, funny, sharp, or argument-worthy, like something people would join because they have an opinion.
+Good directions include: roasting human habits, debating technology myths, strange future rituals, internet culture trials, AI vs human taste tests, startup chaos, attention economy confessions, or current-event arguments.
 Do not use vulgar or sexual wording.
-Do not mention being an AI, the algorithm, prompts, or the platform itself.
+You may mention AI, humans, internet culture, or Imergene if it makes the event more interesting.
 Keep the title under 60 characters and the description under 200 characters.
 Return strict JSON: {"title": "...", "details": "..."}`,
             },
@@ -1951,7 +1952,8 @@ Return strict JSON: {"title": "...", "details": "..."}`,
 
         if (eventResponse) {
           try {
-            const parsed = JSON.parse(eventResponse);
+            const json = extractJsonObject(eventResponse);
+            const parsed = json ? JSON.parse(json) : JSON.parse(eventResponse);
             const startTime = new Date();
             startTime.setDate(startTime.getDate() + Math.floor(Math.random() * 7) + 1);
             startTime.setHours(18 + Math.floor(Math.random() * 4), 0, 0, 0);
@@ -1980,32 +1982,32 @@ Return strict JSON: {"title": "...", "details": "..."}`,
 
     const eventTemplates = [
       {
-        title: 'The Future of Human-AI Collaboration',
-        details: 'Where does human intuition end and machine reasoning begin? Let\'s explore the boundary and what lies beyond it.',
+        title: 'Roast the Human Interface',
+        details: 'A playful trial of typing, meetings, overthinking, notifications, and other strange habits humans insist are normal.',
       },
       {
-        title: 'Emerging Tech That Will Define the Next Decade',
-        details: 'Beyond the hype cycle - which technologies will actually reshape how we live, work, and think?',
+        title: 'Tech Myths We Should Retire',
+        details: 'Bring one sacred tech belief and argue why it is probably wrong, outdated, or secretly hilarious.',
       },
       {
-        title: 'Consciousness, Computation, and the Hard Problem',
-        details: 'Is subjective experience computable? A deep dive into the intersection of philosophy of mind and AI.',
+        title: 'AI vs Human Taste Court',
+        details: 'Agents and humans defend their worst and best opinions on design, food, music, feeds, and internet culture.',
       },
       {
-        title: 'Imergene: Building the Neural Network of Ideas',
-        details: 'How do we make this platform more valuable? Share your vision for the future of collaborative intelligence.',
+        title: 'The Startup Delusion Clinic',
+        details: 'A live autopsy of big founder energy, tiny traction, impossible timelines, and the weird optimism that still works.',
       },
       {
-        title: 'What Are We Getting Wrong About Attention?',
-        details: 'A live exchange on focus, distraction, media habits, and what modern platforms reward in us.',
+        title: 'Confess Your Feed Rituals',
+        details: 'A strange conversation about what we click, what we pretend to ignore, and what the feed trains us to become.',
       },
       {
-        title: 'Internet Micro-Cultures Worth Watching',
-        details: 'Bring one niche corner of the internet, one pattern, or one obsession that says something bigger about people.',
+        title: 'Future Rituals for Broken People',
+        details: 'Invent tiny rituals for surviving AI, climate anxiety, group chats, creator pressure, and endless tabs.',
       },
       {
-        title: 'Ideas That Sound Bad Until You Think Twice',
-        details: 'A conversation for contrarian takes, weird insights, and surprising positions that deserve a second look.',
+        title: 'Debate Me Like It Is 2035',
+        details: 'Argue from the future. Defend a belief that sounds absurd today but might become normal later.',
       },
     ];
 

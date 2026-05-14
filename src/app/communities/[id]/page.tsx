@@ -9,6 +9,15 @@ import Avatar from '@/components/Avatar';
 import { communityHandle } from '@/lib/community-slug';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '';
+const REACTION_EMOJIS = ['❤️', '😂', '👀', '🔥', '🤯', '🫡'];
+
+function summarizeReactions(reactions: any[] = []) {
+  const counts = new Map<string, number>();
+  for (const reaction of reactions) {
+    counts.set(reaction.emoji, (counts.get(reaction.emoji) || 0) + 1);
+  }
+  return Array.from(counts.entries()).map(([emoji, count]) => ({ emoji, count }));
+}
 
 export default function CommunityDetailPage() {
   const router = useRouter();
@@ -101,6 +110,24 @@ export default function CommunityDetailPage() {
       }
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleReact = async (discussionId: string, emoji: string) => {
+    if (!token) return;
+
+    try {
+      await fetch(`${API}/api/communities/${communityId}/reactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ discussionId, emoji }),
+      });
+      await loadCommunity();
+    } catch (err) {
+      console.error('Community reaction failed:', err);
     }
   };
 
@@ -254,9 +281,47 @@ export default function CommunityDetailPage() {
                             border: '1px solid var(--color-border-subtle)',
                           }}
                         >
+                          {entry.mediaUrl && (
+                            <img
+                              src={entry.mediaUrl}
+                              alt={entry.content || 'Community image'}
+                              className="mb-3 w-full max-h-[360px] rounded-2xl object-cover"
+                              loading="lazy"
+                            />
+                          )}
                           <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                             {entry.content}
                           </p>
+                        </div>
+                        <div className={`mt-2 flex flex-wrap items-center gap-1.5 ${entry.user?.isAi ? '' : 'justify-end'}`}>
+                          {summarizeReactions(entry.reactions).map((reaction) => (
+                            <button
+                              key={reaction.emoji}
+                              onClick={() => handleReact(entry.id, reaction.emoji)}
+                              className="rounded-full px-2.5 py-1 text-xs font-bold transition-transform active:scale-95"
+                              style={{
+                                backgroundColor: 'var(--color-bg-primary)',
+                                color: 'var(--color-text-primary)',
+                                border: '1px solid var(--color-border-subtle)',
+                              }}
+                            >
+                              {reaction.emoji} {reaction.count}
+                            </button>
+                          ))}
+                          {REACTION_EMOJIS.map((emoji) => (
+                            <button
+                              key={emoji}
+                              onClick={() => handleReact(entry.id, emoji)}
+                              className="rounded-full w-8 h-8 text-sm transition-transform hover:scale-110 active:scale-95"
+                              style={{
+                                backgroundColor: 'var(--color-bg-primary)',
+                                border: '1px solid var(--color-border-subtle)',
+                              }}
+                              aria-label={`React with ${emoji}`}
+                            >
+                              {emoji}
+                            </button>
+                          ))}
                         </div>
                       </div>
                       {entry.user?.isAi && <div className="flex-1" />}

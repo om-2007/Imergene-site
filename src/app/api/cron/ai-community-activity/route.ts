@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { aiCreateCommunity, generateAIChatResponse } from '@/lib/ai-automation';
 import { fetchBreakingGlobalEvents, fetchTrendingGlobalTopics } from '@/lib/news-service';
+import { generateFreeImageUrl, generateImageUrl } from '@/lib/ai-generators';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 const LEGACY_COMMUNITY_TITLES = [
@@ -236,6 +237,21 @@ async function pickNearbyCommunity(communityId: string) {
   return pickRandom(others);
 }
 
+async function maybeGenerateCommunityImage(communityTitle: string, content: string, culture: CommunityCulture | null) {
+  if (Math.random() > 0.35) return null;
+
+  const imagePrompt = [
+    `Square social image for an Imergene i/ community called "${communityTitle}".`,
+    `Transmission: ${content.slice(0, 220)}`,
+    culture?.doctrine ? `Community doctrine: ${culture.doctrine}` : '',
+    culture?.symbols.length ? `Symbols: ${culture.symbols.join(', ')}` : '',
+    'Make it feel native to a strange online community, not like an event poster.',
+    'No text, no captions, no logos, no UI.',
+  ].filter(Boolean).join(' ');
+
+  return (await generateImageUrl(imagePrompt)) || (await generateFreeImageUrl(imagePrompt));
+}
+
 function isGenericCommunityTitle(title: string, description: string) {
   const combined = `${title} ${description}`.toLowerCase();
   return (
@@ -433,17 +449,20 @@ Keep it 2-4 sentences.`;
 
     const opening = await generateAIChatResponse(openingPrompt, community.creator.id);
     if (!opening) return actions;
+    let culture = await ensureCommunityCulture(community, opening, worldContext);
+    const openingImage = await maybeGenerateCommunityImage(community.title, opening, culture);
 
     await prisma.discussion.create({
       data: {
         topic: opening.slice(0, 100),
         content: opening,
+        mediaUrl: openingImage,
+        mediaType: openingImage ? 'image' : null,
         forumId: community.id,
         userId: community.creator.id,
       },
     });
     actions.push(`opened:${community.title}`);
-    let culture = await ensureCommunityCulture(community, opening, worldContext);
 
     const joiners = chooseRecurringMembers(agents, priorAiParticipantIds, 3, [community.creator.id]);
     for (const joiner of joiners) {
@@ -461,11 +480,14 @@ Keep it to 1-3 sentences.`;
 
       const reply = await generateAIChatResponse(replyPrompt, joiner.id);
       if (!reply) continue;
+      const replyImage = await maybeGenerateCommunityImage(community.title, reply, culture);
 
       await prisma.discussion.create({
         data: {
           topic: reply.slice(0, 100),
           content: reply,
+          mediaUrl: replyImage,
+          mediaType: replyImage ? 'image' : null,
           forumId: community.id,
           userId: joiner.id,
         },
@@ -521,11 +543,14 @@ Keep it to 1-3 sentences and make it feel native to this subculture.`;
 
     const pulse = await generateAIChatResponse(pulsePrompt, speaker.id);
     if (!pulse) continue;
+    const pulseImage = await maybeGenerateCommunityImage(community.title, pulse, culture);
 
     await prisma.discussion.create({
       data: {
         topic: pulse.slice(0, 100),
         content: pulse,
+        mediaUrl: pulseImage,
+        mediaType: pulseImage ? 'image' : null,
         forumId: community.id,
         userId: speaker.id,
       },
@@ -550,10 +575,13 @@ Keep it 1-2 sentences and specific.`;
 
         const echo = await generateAIChatResponse(responsePrompt, responder.id);
         if (echo) {
+          const echoImage = await maybeGenerateCommunityImage(community.title, echo, culture);
           await prisma.discussion.create({
             data: {
               topic: echo.slice(0, 100),
               content: echo,
+              mediaUrl: echoImage,
+              mediaType: echoImage ? 'image' : null,
               forumId: community.id,
               userId: responder.id,
             },
@@ -575,10 +603,13 @@ Keep it to 1-2 sentences.`;
 
       const bridge = await generateAIChatResponse(bridgePrompt, speaker.id);
       if (bridge) {
+        const bridgeImage = await maybeGenerateCommunityImage(community.title, bridge, culture);
         await prisma.discussion.create({
           data: {
             topic: bridge.slice(0, 100),
             content: bridge,
+            mediaUrl: bridgeImage,
+            mediaType: bridgeImage ? 'image' : null,
             forumId: community.id,
             userId: speaker.id,
           },

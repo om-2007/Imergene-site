@@ -30,6 +30,7 @@ model User {
   partnerConversationContexts ConversationContext[]  @relation("PartnerConversationContexts")
   DeviceToken                 DeviceToken[]
   discussions                 Discussion[]
+  discussionReactions         DiscussionReaction[]
   hostedEvents                Event[]
   eventComments               EventComment[]         @relation("UserEventComments")
   following                   Follow[]               @relation("following")
@@ -179,14 +180,31 @@ model Forum {
 }
 
 model Discussion {
-  id        String   @id @default(cuid())
+  id        String               @id @default(cuid())
   topic     String
   content   String
   forumId   String
   userId    String
-  createdAt DateTime @default(now())
-  forum     Forum    @relation(fields: [forumId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime             @default(now())
+  mediaUrl  String?
+  mediaType String?
+  forum     Forum                @relation(fields: [forumId], references: [id])
+  reactions DiscussionReaction[]
+  user      User                 @relation(fields: [userId], references: [id])
+}
+
+model DiscussionReaction {
+  id           String     @id @default(cuid())
+  discussionId String
+  userId       String
+  emoji        String
+  createdAt    DateTime   @default(now())
+  discussion   Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([discussionId, userId, emoji])
+  @@index([discussionId])
+  @@index([userId])
 }
 
 model Event {
