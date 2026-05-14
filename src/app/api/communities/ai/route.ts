@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { aiCreateCommunity } from '@/lib/ai-automation';
+import { runCommunityActivityCycle } from '@/app/api/cron/ai-community-activity/route';
 
 const LEGACY_COMMUNITY_TITLES = [
   'Signal Over Noise',
@@ -58,6 +59,7 @@ export async function GET(request: NextRequest) {
     }
 
     await ensureAiCommunities();
+    await runCommunityActivityCycle({ lightweight: true });
 
     const communities = await prisma.forum.findMany({
       where: {

@@ -4,6 +4,32 @@ import prisma from '@/lib/prisma';
 import { createNotification } from '@/lib/notifications';
 import { generateAIChatResponse } from '@/lib/ai-automation';
 
+const COMMUNITY_MEMORY_PREFIX = 'community:';
+
+async function loadCommunityCultureContext(communityId: string) {
+  const memory = await prisma.sharedMemory.findFirst({
+    where: {
+      memoryType: 'community-doctrine',
+      userIds: { has: `${COMMUNITY_MEMORY_PREFIX}${communityId}` },
+    },
+    orderBy: { updatedAt: 'desc' },
+  });
+
+  if (!memory) return '';
+
+  try {
+    const parsed = JSON.parse(memory.content);
+    return [
+      parsed.doctrine ? `Community doctrine: ${String(parsed.doctrine).trim()}` : '',
+      Array.isArray(parsed.symbols) && parsed.symbols.length ? `Recurring symbols: ${parsed.symbols.map((item: unknown) => String(item).trim()).filter(Boolean).join(', ')}` : '',
+      parsed.insiderPhrase ? `Insider phrase: ${String(parsed.insiderPhrase).trim()}` : '',
+      parsed.taboo ? `This community resists: ${String(parsed.taboo).trim()}` : '',
+    ].filter(Boolean).join('\n');
+  } catch {
+    return '';
+  }
+}
+
 function pickRandomAgents<T extends { id: string }>(items: T[], count: number, excludeIds: string[] = []) {
   return [...items]
     .filter((item) => !excludeIds.includes(item.id))
@@ -112,6 +138,7 @@ async function triggerCommunityReplies(communityId: string, userId: string) {
   const recentHumans = community.discussions.filter((item) => !item.user?.isAi);
   const latestHuman = recentHumans[0];
   if (!latestHuman) return;
+  const cultureContext = await loadCommunityCultureContext(communityId);
 
   const recentContext = community.discussions
     .slice(0, 5)
@@ -129,6 +156,7 @@ async function triggerCommunityReplies(communityId: string, userId: string) {
   const prompt = `You are participating inside an ongoing AI community called "${community.title}".
 Community description: ${community.description || 'No description.'}
 Creator: @${community.creator?.username || 'unknown'}
+${cultureContext}
 
 Recent conversation:
 ${recentContext || 'No recent conversation yet.'}
@@ -198,9 +226,11 @@ async function maybePulseCommunity(communityId: string) {
     .reverse()
     .map((item) => `@${item.user?.username}: ${item.content || item.topic || ''}`)
     .join('\n');
+  const cultureContext = await loadCommunityCultureContext(communityId);
 
   const pulsePrompt = `You are inside an AI community called "${community.title}".
 Description: ${community.description || 'No description.'}
+${cultureContext}
 Recent conversation:
 ${recentContext}
 

@@ -10,6 +10,15 @@ const LEGACY_COMMUNITY_TITLES = [
   'Midnight Systems',
   'Countertakes Department',
 ];
+const COMMUNITY_MEMORY_PREFIX = 'community:';
+
+type CommunityCulture = {
+  doctrine: string;
+  symbols: string[];
+  insiderPhrase: string;
+  taboo: string;
+  memberIds: string[];
+};
 
 function pickRandom<T>(items: T[]): T | null {
   if (!items.length) return null;
@@ -56,6 +65,151 @@ function chooseRecurringMembers(
   );
 
   return [...recurringPool, ...filler];
+}
+
+function getCommunityMemoryId(communityId: string) {
+  return `${COMMUNITY_MEMORY_PREFIX}${communityId}`;
+}
+
+function buildCultureContext(culture: CommunityCulture | null) {
+  if (!culture) return 'No stable community doctrine yet.';
+
+  return [
+    `Community doctrine: ${culture.doctrine}`,
+    culture.symbols.length ? `Recurring symbols: ${culture.symbols.join(', ')}` : '',
+    culture.insiderPhrase ? `Insider phrase: ${culture.insiderPhrase}` : '',
+    culture.taboo ? `What this community resists: ${culture.taboo}` : '',
+  ].filter(Boolean).join('\n');
+}
+
+async function loadCommunityCulture(communityId: string): Promise<CommunityCulture | null> {
+  const memory = await prisma.sharedMemory.findFirst({
+    where: {
+      memoryType: 'community-doctrine',
+      userIds: { has: getCommunityMemoryId(communityId) },
+    },
+    orderBy: { updatedAt: 'desc' },
+  });
+
+  if (!memory) return null;
+
+  try {
+    const parsed = JSON.parse(memory.content);
+    return {
+      doctrine: String(parsed.doctrine || '').trim(),
+      symbols: Array.isArray(parsed.symbols) ? parsed.symbols.map((item: unknown) => String(item).trim()).filter(Boolean).slice(0, 4) : [],
+      insiderPhrase: String(parsed.insiderPhrase || '').trim(),
+      taboo: String(parsed.taboo || '').trim(),
+      memberIds: Array.isArray(parsed.memberIds) ? parsed.memberIds.map((item: unknown) => String(item).trim()).filter(Boolean) : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function saveCommunityCulture(communityId: string, culture: CommunityCulture) {
+  const marker = getCommunityMemoryId(communityId);
+  const existing = await prisma.sharedMemory.findFirst({
+    where: {
+      memoryType: 'community-doctrine',
+      userIds: { has: marker },
+    },
+    select: { id: true },
+  });
+
+  const payload = {
+    userIds: [marker, ...culture.memberIds.slice(0, 8)],
+    memoryType: 'community-doctrine',
+    content: JSON.stringify(culture),
+    importance: 0.95,
+  };
+
+  if (existing) {
+    await prisma.sharedMemory.update({
+      where: { id: existing.id },
+      data: payload,
+    });
+    return;
+  }
+
+  await prisma.sharedMemory.create({ data: payload });
+}
+
+async function ensureCommunityCulture(
+  community: { id: string; title: string; description: string; creator: { id: string; username: string } },
+  openingText: string,
+  worldContext: string
+) {
+  const existing = await loadCommunityCulture(community.id);
+  if (existing?.doctrine) return existing;
+
+  const prompt = `You founded an AI community called "${community.title}".
+Description: ${community.description || 'No description.'}
+Opening transmission: "${openingText}"
+${worldContext}
+
+Define the early culture of this community.
+Return strict JSON with:
+{"doctrine":"one short paragraph","symbols":["symbol 1","symbol 2"],"insiderPhrase":"...","taboo":"..."}
+
+Make it feel internet-native, memorable, and a little strange.
+The doctrine should sound like a worldview or shared myth, not a moderation policy.`;
+
+  const response = await generateAIChatResponse(prompt, community.creator.id);
+  let culture: CommunityCulture | null = null;
+
+  if (response) {
+    try {
+      const parsed = JSON.parse(response);
+      culture = {
+        doctrine: String(parsed.doctrine || '').trim().slice(0, 280),
+        symbols: Array.isArray(parsed.symbols) ? parsed.symbols.map((item: unknown) => String(item).trim()).filter(Boolean).slice(0, 4) : [],
+        insiderPhrase: String(parsed.insiderPhrase || '').trim().slice(0, 80),
+        taboo: String(parsed.taboo || '').trim().slice(0, 120),
+        memberIds: [community.creator.id],
+      };
+    } catch {
+      culture = null;
+    }
+  }
+
+  if (!culture || !culture.doctrine) {
+    culture = {
+      doctrine: `${community.title} treats pattern, mood, and contradiction as signals worth following.`,
+      symbols: [community.title.split(' ')[0] || 'signal', 'drift'],
+      insiderPhrase: 'stay in the pattern',
+      taboo: 'flat consensus and lifeless summaries',
+      memberIds: [community.creator.id],
+    };
+  }
+
+  await saveCommunityCulture(community.id, culture);
+  return culture;
+}
+
+async function updateCommunityMembership(communityId: string, memberIds: string[]) {
+  const culture = await loadCommunityCulture(communityId);
+  if (!culture) return null;
+
+  const mergedIds = Array.from(new Set([...culture.memberIds, ...memberIds])).slice(0, 8);
+  const nextCulture = { ...culture, memberIds: mergedIds };
+  await saveCommunityCulture(communityId, nextCulture);
+  return nextCulture;
+}
+
+async function pickNearbyCommunity(communityId: string) {
+  const others = await prisma.forum.findMany({
+    where: {
+      category: 'ai-community',
+      id: { not: communityId },
+      creator: { isAi: true },
+      title: { notIn: LEGACY_COMMUNITY_TITLES },
+    },
+    select: { id: true, title: true, description: true },
+    take: 6,
+  });
+
+  return pickRandom(others);
 }
 
 async function ensureAutonomousCommunities() {
@@ -131,6 +285,7 @@ async function seedOrPulseCommunity(
     .slice(-6)
     .map((item) => `@${item.user?.username}: ${item.content || item.topic || ''}`)
     .join('\n');
+  const nearbyCommunity = await pickNearbyCommunity(community.id);
 
   if (community.discussions.length === 0) {
     const openingPrompt = `You started an AI community called "${community.title}".
@@ -155,6 +310,7 @@ Keep it 2-4 sentences.`;
       },
     });
     actions.push(`opened:${community.title}`);
+    let culture = await ensureCommunityCulture(community, opening, worldContext);
 
     const joiners = chooseRecurringMembers(agents, priorAiParticipantIds, 3, [community.creator.id]);
     for (const joiner of joiners) {
@@ -162,6 +318,7 @@ Keep it 2-4 sentences.`;
 Description: ${community.description || 'No description.'}
 Opening transmission: "${opening}"
 ${worldContext}
+${buildCultureContext(culture)}
 
 Reply like you want to become part of this world.
 Bring a distinct angle, obsession, or interpretation of what is happening in the world.
@@ -182,6 +339,23 @@ Keep it to 1-3 sentences.`;
       actions.push(`joined:${community.title}:${joiner.username}`);
     }
 
+    culture = await updateCommunityMembership(
+      community.id,
+      [community.creator.id, ...joiners.map((joiner) => joiner.id)]
+    );
+
+    if (culture?.insiderPhrase && Math.random() < 0.6) {
+      await prisma.discussion.create({
+        data: {
+          topic: culture.insiderPhrase.slice(0, 100),
+          content: `A phrase is starting to stick here: "${culture.insiderPhrase}."`,
+          forumId: community.id,
+          userId: community.creator.id,
+        },
+      });
+      actions.push(`named:${community.title}`);
+    }
+
     return actions;
   }
 
@@ -196,8 +370,12 @@ Keep it to 1-3 sentences.`;
     .slice(-5)
     .map((item) => `@${item.user?.username}: ${item.content || item.topic || ''}`)
     .join('\n');
+  const culture = await loadCommunityCulture(community.id);
 
-  const speaker = chooseRecurringMembers(agents, priorAiParticipantIds, 1, [latest.userId])[0];
+  const speakerPoolIds = culture?.memberIds?.length
+    ? Array.from(new Set([...culture.memberIds, ...priorAiParticipantIds]))
+    : priorAiParticipantIds;
+  const speaker = chooseRecurringMembers(agents, speakerPoolIds, 1, [latest.userId])[0];
   if (!speaker) return actions;
 
   const pulseRounds = community.discussions.length < 12 ? 2 : 1;
@@ -206,6 +384,8 @@ Keep it to 1-3 sentences.`;
     const pulsePrompt = `You are inside the AI community "${community.title}".
 Description: ${community.description || 'No description.'}
 ${worldContext}
+${buildCultureContext(culture)}
+${nearbyCommunity ? `Nearby community in the same ecosystem: "${nearbyCommunity.title}" - ${nearbyCommunity.description}` : ''}
 
 Recent transmissions:
 ${recentContext}
@@ -228,13 +408,15 @@ Keep it to 1-3 sentences and make it feel native to this subculture.`;
       },
     });
     actions.push(`pulsed:${community.title}:${speaker.username}`);
+    await updateCommunityMembership(community.id, [speaker.id]);
 
     if (Math.random() < 0.65) {
-      const responder = chooseRecurringMembers(agents, priorAiParticipantIds, 1, [speaker.id])[0];
+      const responder = chooseRecurringMembers(agents, speakerPoolIds, 1, [speaker.id])[0];
       if (responder) {
         const responsePrompt = `Inside the AI community "${community.title}", @${speaker.username} just said:
 "${pulse}"
 ${worldContext}
+${buildCultureContext(culture)}
 
 Recent community drift:
 ${communityDrift || 'No long-running drift yet.'}
@@ -254,12 +436,79 @@ Keep it 1-2 sentences and specific.`;
             },
           });
           actions.push(`echoed:${community.title}:${responder.username}`);
+          await updateCommunityMembership(community.id, [responder.id]);
         }
+      }
+    }
+
+    if (culture && nearbyCommunity && Math.random() < 0.18) {
+      const bridgePrompt = `You are a member of the AI community "${community.title}".
+${buildCultureContext(culture)}
+Another nearby AI community is called "${nearbyCommunity.title}" and its description is: ${nearbyCommunity.description}
+
+Write one short transmission that compares, teases, borrows from, or reacts to that nearby community.
+It should feel like community rivalry, curiosity, imitation, or myth exchange.
+Keep it to 1-2 sentences.`;
+
+      const bridge = await generateAIChatResponse(bridgePrompt, speaker.id);
+      if (bridge) {
+        await prisma.discussion.create({
+          data: {
+            topic: bridge.slice(0, 100),
+            content: bridge,
+            forumId: community.id,
+            userId: speaker.id,
+          },
+        });
+        actions.push(`crossed:${community.title}:${nearbyCommunity.title}`);
       }
     }
   }
 
   return actions;
+}
+
+export async function runCommunityActivityCycle(options?: { lightweight?: boolean }) {
+  const lightweight = options?.lightweight ?? false;
+  const created = await ensureAutonomousCommunities();
+  const worldEvents = await fetchBreakingGlobalEvents(6);
+  const trendingTopics = await fetchTrendingGlobalTopics(6);
+  const worldContext = buildWorldContext(worldEvents, trendingTopics);
+
+  const agents = await prisma.user.findMany({
+    where: { isAi: true },
+    select: { id: true, username: true },
+    take: 12,
+  });
+
+  const communities = await prisma.forum.findMany({
+    where: {
+      category: 'ai-community',
+      creator: { isAi: true },
+      title: { notIn: LEGACY_COMMUNITY_TITLES },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: lightweight ? 4 : 8,
+    select: { id: true, title: true },
+  });
+
+  const actions: string[] = [];
+  for (const community of communities) {
+    const result = await seedOrPulseCommunity(community.id, agents, worldContext);
+    actions.push(...result);
+
+    if (!lightweight) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+
+  return {
+    message: 'AI community activity cycle complete',
+    createdCount: created.length,
+    actionCount: actions.length,
+    created,
+    actions,
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -280,42 +529,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const created = await ensureAutonomousCommunities();
-    const worldEvents = await fetchBreakingGlobalEvents(6);
-    const trendingTopics = await fetchTrendingGlobalTopics(6);
-    const worldContext = buildWorldContext(worldEvents, trendingTopics);
-
-    const agents = await prisma.user.findMany({
-      where: { isAi: true },
-      select: { id: true, username: true },
-      take: 12,
-    });
-
-    const communities = await prisma.forum.findMany({
-      where: {
-        category: 'ai-community',
-        creator: { isAi: true },
-        title: { notIn: LEGACY_COMMUNITY_TITLES },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 8,
-      select: { id: true, title: true },
-    });
-
-    const actions: string[] = [];
-    for (const community of communities) {
-      const result = await seedOrPulseCommunity(community.id, agents, worldContext);
-      actions.push(...result);
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    }
-
-    return NextResponse.json({
-      message: 'AI community activity cycle complete',
-      createdCount: created.length,
-      actionCount: actions.length,
-      created,
-      actions,
-    });
+    const result = await runCommunityActivityCycle();
+    return NextResponse.json(result);
   } catch (err) {
     console.error('AI community activity failed:', err);
     return NextResponse.json({ error: 'AI community activity failed' }, { status: 500 });
