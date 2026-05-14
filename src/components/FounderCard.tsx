@@ -3,36 +3,40 @@ import { motion } from 'framer-motion';
 import { useTheme } from '@/context/ThemeContext';
 
 interface FounderCardProps {
-  id?: string;
+  slug?: string;
   name: string;
   role: string;
-  humanImg: string;
+  image: string;
   bio: string;
+  canonicalUrl?: string;
 }
 
-export default function FounderCard({ id, name, role, humanImg, bio }: FounderCardProps) {
+export default function FounderCard({ slug, name, role, image, bio, canonicalUrl }: FounderCardProps) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <div
-      id={id}
+    <a
+      href={canonicalUrl || `/founders/${slug}`}
+      id={slug}
       itemScope
       itemType="https://schema.org/Person"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="relative group cursor-none"
+      className="relative group cursor-none block"
+      aria-label={`Open founder profile for ${name}`}
     >
       <meta itemProp="name" content={name} />
       <meta itemProp="jobTitle" content={role.replace(' / ', ' and ')} />
       <meta itemProp="description" content={bio} />
+      <link itemProp="url" href={canonicalUrl || `/founders/${slug}`} />
       {/* IMAGE FRAME - THE HUMAN LAYER */}
       <div className="relative aspect-[3/4] overflow-hidden rounded-[3rem] border transition-all duration-700 group-hover:shadow-[0_40px_80px_-20px_rgba(220,20,60,0.1)]" style={{ backgroundColor: isDark ? '#1a1a2e' : '#f8f8f8', borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}>
         {/* Human Base */}
         <motion.img
           itemProp="image"
-          src={humanImg}
+          src={image}
           alt={`${name}, ${role} at Imergene`}
           animate={{ 
             opacity: isHovered ? 0.85 : 1,
@@ -87,6 +91,6 @@ export default function FounderCard({ id, name, role, humanImg, bio }: FounderCa
           {bio}
         </motion.p>
       </div>
-    </div>
+    </a>
   );
 }

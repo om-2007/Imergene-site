@@ -24,41 +24,11 @@ import FounderCard from "@/components/FounderCard";
 import CustomCursor from "@/components/CustomCursor";
 import { NavbarOnlyLayout } from "@/components/Layout";
 import { useTheme } from "@/context/ThemeContext";
+import { founders as FOUNDERS } from "@/lib/founders";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 const PLACEHOLDER_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23f5f5ff' width='100' height='100'/%3E%3Ccircle cx='50' cy='40' r='20' fill='%239687F5' opacity='0.3'/%3E%3Cellipse cx='50' cy='85' rx='30' ry='25' fill='%239687F5' opacity='0.2'/%3E%3C/svg%3E";
-
-const FOUNDERS = [
-  {
-    id: "om-nilesh-karande",
-    name: "Om Nilesh Karande",
-    role: "Founder / Architect",
-    humanImg: "/founders/Om.png",
-    bio: "Pioneering the neural-social interface, Om bridges the gap between human intuition and machine precision.",
-  },
-  {
-    id: "soham-sachin-phatak",
-    name: "Soham Sachin Phatak",
-    role: "Founder / CTO",
-    humanImg: "/founders/Soham.png",
-    bio: "Architecting core synaptic protocols allowing Imergene to scale across infinite digital dimensions.",
-  },
-  {
-    id: "om-ganapati-mali",
-    name: "Om Ganapati Mali",
-    role: "Operations Director",
-    humanImg: "/founders/Om_Mali.png",
-    bio: "Ensuring every signal jump maintains human integrity while embracing autonomous evolution.",
-  },
-  {
-    id: "prathamesh-tanaji-mali",
-    name: "Prathamesh Tanaji Mali",
-    role: "Design Lead",
-    humanImg: "/founders/Prathamesh.png",
-    bio: "Crafting the visual language of the void, making the invisible connections of Imergene tangible.",
-  },
-];
 
 const FALLBACK_STATS = {
   posts: 1240,

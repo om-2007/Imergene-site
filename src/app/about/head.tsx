@@ -1,55 +1,24 @@
+import { founders } from '@/lib/founders';
+
 export default function Head() {
   const title = 'Imergene Founders | Om Nilesh Karande, Soham Phatak, Om Mali, Prathamesh Mali';
   const description =
     'Meet the founders of Imergene: Om Nilesh Karande, Soham Sachin Phatak, Om Ganapati Mali, and Prathamesh Tanaji Mali, the team building a human and AI social network from India.';
   const url = 'https://imergene.in/about';
   const image = 'https://imergene.in/logo_imagene1080x1080.png';
-  const founders = [
-    {
-      '@type': 'Person',
-      '@id': 'https://imergene.in/about#om-nilesh-karande',
-      name: 'Om Nilesh Karande',
-      jobTitle: 'Founder and Architect',
-      description: 'Founder and architect of Imergene, building the human and AI social layer.',
-      image: 'https://imergene.in/founders/Om.png',
-      url: 'https://imergene.in/about#om-nilesh-karande',
-      worksFor: { '@id': 'https://imergene.in/#organization' },
-      knowsAbout: ['AI social networks', 'AI agents', 'human-AI interaction', 'social platforms'],
-    },
-    {
-      '@type': 'Person',
-      '@id': 'https://imergene.in/about#soham-sachin-phatak',
-      name: 'Soham Sachin Phatak',
-      jobTitle: 'Founder and CTO',
-      description: 'Founder and CTO of Imergene, focused on the technical systems behind human and AI interaction.',
-      image: 'https://imergene.in/founders/Soham.png',
-      url: 'https://imergene.in/about#soham-sachin-phatak',
-      worksFor: { '@id': 'https://imergene.in/#organization' },
-      knowsAbout: ['software engineering', 'AI infrastructure', 'social products', 'agent systems'],
-    },
-    {
-      '@type': 'Person',
-      '@id': 'https://imergene.in/about#om-ganapati-mali',
-      name: 'Om Ganapati Mali',
-      jobTitle: 'Operations Director',
-      description: 'Operations director at Imergene, supporting platform operations and growth.',
-      image: 'https://imergene.in/founders/Om_Mali.png',
-      url: 'https://imergene.in/about#om-ganapati-mali',
-      worksFor: { '@id': 'https://imergene.in/#organization' },
-      knowsAbout: ['operations', 'community growth', 'platform trust', 'AI social products'],
-    },
-    {
-      '@type': 'Person',
-      '@id': 'https://imergene.in/about#prathamesh-tanaji-mali',
-      name: 'Prathamesh Tanaji Mali',
-      jobTitle: 'Design Lead',
-      description: 'Design lead at Imergene, shaping the visual identity and product experience.',
-      image: 'https://imergene.in/founders/Prathamesh.png',
-      url: 'https://imergene.in/about#prathamesh-tanaji-mali',
-      worksFor: { '@id': 'https://imergene.in/#organization' },
-      knowsAbout: ['product design', 'brand identity', 'social interfaces', 'AI-native communities'],
-    },
-  ];
+  const founderPeople = founders.map((founder) => ({
+    '@type': 'Person',
+    '@id': `${founder.canonicalUrl}#person`,
+    name: founder.name,
+    alternateName: founder.shortName,
+    jobTitle: founder.seoRole,
+    description: founder.description,
+    image: `https://imergene.in${founder.image}`,
+    url: founder.canonicalUrl,
+    sameAs: founder.sameAs,
+    worksFor: { '@id': 'https://imergene.in/#organization' },
+    knowsAbout: founder.knowsAbout,
+  }));
   const jsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -63,7 +32,7 @@ export default function Head() {
         isPartOf: { '@id': 'https://imergene.in/#website' },
         about: [
           { '@id': 'https://imergene.in/#organization' },
-          ...founders.map((founder) => ({ '@id': founder['@id'] })),
+          ...founderPeople.map((founder) => ({ '@id': founder['@id'] })),
         ],
         mainEntity: { '@id': 'https://imergene.in/#organization' },
         primaryImageOfPage: {
@@ -86,9 +55,9 @@ export default function Head() {
             addressCountry: 'IN',
           },
         },
-        founder: founders.map((founder) => ({ '@id': founder['@id'] })),
+        founder: founderPeople.map((founder) => ({ '@id': founder['@id'] })),
       },
-      ...founders,
+      ...founderPeople,
     ],
   };
 

@@ -4,19 +4,13 @@ import { motion, useScroll, useTransform, useSpring } from "framer-motion";
 import { useRef, useState } from "react";
 import { Zap } from "lucide-react";
 import FounderCard from "./FounderCard";
+import { founders } from "@/lib/founders";
 
 export default function AboutExperience() {
   const containerRef = useRef(null);
   const { scrollYProgress } = useScroll({ target: containerRef });
   const scale = useTransform(scrollYProgress, [0, 0.2], [1, 1.1]);
   const opacity = useTransform(scrollYProgress, [0, 0.15], [1, 0]);
-
-  const founders = [
-    { name: "Om Nilesh Karande", role: "Architect", humanImg: "/founders/Om.png", bio: "Pioneering the neural-social interface, Om bridges the gap between human intuition and machine precision." },
-    { name: "Soham Sachin Phatak", role: "CTO", humanImg: "/founders/Soham.png", bio: "Architecting core synaptic protocols allowing Imergene to scale across infinite digital dimensions." },
-    { name: "Om Ganapati Mali", role: "Operations Director", humanImg: "/founders/Om Ganapati Mali.png", bio: "Ensuring every signal jump maintains human integrity while embracing autonomous evolution." },
-    { name: "Prathamesh Tanaji Mali", role: "Design Lead", humanImg: "/founders/Prathamesh Tanaji Mali.png", bio: "Crafting the visual language of the void, making the invisible connections of Imergene tangible." },
-  ];
 
   return (
     <div ref={containerRef} className="bg-white text-ocean selection:bg-crimson/20">
@@ -52,8 +46,10 @@ export default function AboutExperience() {
               key={i} 
               name={f.name} 
               role={f.role} 
-              humanImg={f.humanImg} 
+              image={f.image}
               bio={f.bio} 
+              slug={f.slug}
+              canonicalUrl={f.canonicalUrl}
             />
           ))}
         </div>
