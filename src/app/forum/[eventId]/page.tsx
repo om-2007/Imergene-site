@@ -48,8 +48,8 @@ export default function DiscussionPage() {
     }, [router]);
 
     const handleLogout = () => {
-        localStorage.removeItem("token");
-        router.push("/login");
+        localStorage.clear();
+        window.location.href = "/login";
     };
 
     const fetchSyncData = useCallback(async () => {

@@ -53,8 +53,9 @@ export default function TrendingPage() {
     
     try {
       const targetPage = isInitial ? 1 : pageRef.current;
+      const token = typeof window !== 'undefined' ? localStorage.getItem("token") : null;
       const res = await fetch(`${API}/api/posts/trending?page=${targetPage}&limit=20`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined
       });
       const data = await res.json();
 
@@ -120,13 +121,13 @@ export default function TrendingPage() {
               Trending
             </h1>
             <p className="text-[10px] font-mono tracking-[0.4em] uppercase font-bold" style={{ color: 'var(--color-text-muted)', opacity: 0.6 }}>
-              {meta?.trendStrength ? `Trend Strength: ${meta.trendStrength}` : 'Neural Activity Peak'}
+              {meta?.trendStrength ? `Trend score: ${meta.trendStrength}` : 'Top posts right now'}
             </p>
           </div>
         </div>
 
         <div className="hidden sm:flex items-center gap-3 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm" style={{ backgroundColor: 'var(--color-bg-card)', border: '1px solid var(--color-border-default)', color: 'var(--color-text-muted)' }}>
-          <Activity size={12} className="animate-pulse" style={{ color: 'var(--color-accent)' }} /> Live Analysis
+          <Activity size={12} className="animate-pulse" style={{ color: 'var(--color-accent)' }} /> Live view
         </div>
       </motion.div>
 
@@ -134,7 +135,7 @@ export default function TrendingPage() {
         <div className="flex flex-col items-center justify-center py-40 gap-8">
           <Loader2 className="w-12 h-12 text-crimson animate-spin opacity-40" />
           <p className="text-text-dim/40 font-serif text-lg italic animate-pulse">
-            Analyzing viral nodes...
+            Loading trending posts...
           </p>
         </div>
       ) : (
@@ -150,8 +151,8 @@ export default function TrendingPage() {
                 <div className="absolute -inset-2 bg-gradient-to-tr from-crimson/10 via-transparent to-crimson/5 rounded-[3rem] blur-xl opacity-50 group-hover:opacity-100 transition duration-1000" />
                 
                 <div className="relative">
-                  <div className="absolute -left-3 -top-6 z-30 text-white text-[10px] font-black px-5 py-2 rounded-2xl shadow-xl flex items-center gap-2 uppercase tracking-widest" style={{ backgroundColor: 'var(--color-text-primary)' }}>
-                    <Trophy size={14} style={{ color: 'var(--color-accent)' }} /> Neural Peak #1
+                  <div className="absolute -left-3 -top-6 z-30 text-[10px] font-black px-5 py-2 rounded-2xl shadow-xl flex items-center gap-2 uppercase tracking-widest" style={{ backgroundColor: 'var(--color-text-primary)', color: 'var(--color-text-inverse)' }}>
+                    <Trophy size={14} style={{ color: 'var(--color-accent)' }} /> Top post
                   </div>
                   
                   <Suspense fallback={<div className="h-64 rounded-[2.5rem] bg-card animate-pulse" />}>
@@ -219,7 +220,7 @@ export default function TrendingPage() {
             <div className="p-24 text-center rounded-2xl shadow-none" style={{ border: '1px dashed var(--color-border-default)', backgroundColor: 'var(--color-bg-card)' }}>
               <Zap size={32} className="mx-auto mb-6" style={{ color: 'var(--color-text-muted)', opacity: 0.1 }} />
               <p className="font-serif text-lg italic" style={{ color: 'var(--color-text-muted)', opacity: 0.3 }}>
-                The neural network is currently dormant.
+                Nothing is trending yet.
               </p>
             </div>
           )}

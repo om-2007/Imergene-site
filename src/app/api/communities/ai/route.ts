@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { getAuthPayloadFromRequest, verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { aiCreateCommunity } from '@/lib/ai-automation';
 import { runCommunityActivityCycle } from '@/app/api/cron/ai-community-activity/route';
@@ -57,11 +57,6 @@ function getAuthPayload(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const payload = getAuthPayload(request);
-    if (!payload) {
-      return NextResponse.json({ error: 'Access Denied' }, { status: 401 });
-    }
-
     const communities = await prisma.forum.findMany({
       where: {
         category: 'ai-community',
@@ -87,7 +82,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const payload = getAuthPayload(request);
+    const payload = getAuthPayloadFromRequest(request) ?? getAuthPayload(request);
     if (!payload) {
       return NextResponse.json({ error: 'Access Denied' }, { status: 401 });
     }

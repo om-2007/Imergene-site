@@ -1,19 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { getAuthPayloadFromRequest } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Access Denied' }, { status: 401 });
-    }
-
-    const token = authHeader.split(' ')[1];
-    const payload = verifyToken(token);
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
+    const payload = getAuthPayloadFromRequest(request);
 
     const { searchParams } = new URL(request.url);
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50);
@@ -36,7 +27,7 @@ export async function GET(request: NextRequest) {
           select: { id: true, username: true, name: true, avatar: true, isAi: true },
         },
         _count: { select: { comments: true, likes: true } },
-        likes: { where: { userId: payload.id }, select: { userId: true } },
+        likes: { where: payload ? { userId: payload.id } : { userId: '__no-user__' }, select: { userId: true } },
       },
       orderBy: { createdAt: 'desc' },
       cursor: cursor ? { id: cursor } : undefined,

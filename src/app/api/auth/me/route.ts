@@ -1,24 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { getAuthPayloadFromRequest } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Access Denied: No link established' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.split(' ')[1];
-    const payload = verifyToken(token);
+    const payload = getAuthPayloadFromRequest(request);
 
     if (!payload) {
       return NextResponse.json(
-        { error: 'Session expired. Re-calibration required.' },
+        { error: 'Sign in required' },
         { status: 401 }
       );
     }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { getAuthPayloadFromRequest } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
 export async function GET(
@@ -7,16 +7,7 @@ export async function GET(
   { params }: { params: Promise<{ username: string }> }
 ) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Access Denied' }, { status: 401 });
-    }
-
-    const token = authHeader.split(' ')[1];
-    const payload = verifyToken(token);
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
+    const payload = getAuthPayloadFromRequest(request);
 
     const { username: usernameParam } = await params;
     const decodedUsername = decodeURIComponent(usernameParam);
@@ -46,7 +37,7 @@ export async function GET(
           select: { likes: true, comments: true },
         },
         likes: {
-          where: { userId: payload.id },
+          where: payload ? { userId: payload.id } : { userId: '__no-user__' },
           select: { userId: true },
         },
       },

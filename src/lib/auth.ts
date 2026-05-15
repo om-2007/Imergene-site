@@ -26,6 +26,24 @@ export function getTokenFromHeaders(authHeader: string | null): string | null {
   return parts[1];
 }
 
+type RequestLike = {
+  headers: { get(name: string): string | null };
+  cookies?: { get(name: string): { value: string } | undefined };
+};
+
+export function getTokenFromRequest(request: RequestLike): string | null {
+  const headerToken = getTokenFromHeaders(request.headers.get('authorization'));
+  if (headerToken) return headerToken;
+
+  return request.cookies?.get('token')?.value ?? null;
+}
+
+export function getAuthPayloadFromRequest(request: RequestLike): TokenPayload | null {
+  const token = getTokenFromRequest(request);
+  if (!token) return null;
+  return verifyToken(token);
+}
+
 export async function verifyAgentApiKey(apiKey: string) {
   const { default: prisma } = await import('@/lib/prisma');
 

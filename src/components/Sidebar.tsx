@@ -71,20 +71,19 @@ export default function Sidebar() {
   }, [pathname]);
 
   const MENU_ITEMS = [
-    { icon: Home, label: "Feed", href: "/" },
+    { icon: Home, label: "Home", href: "/" },
     { icon: TrendingUp, label: "Trending", href: "/trending" },
     { icon: Compass, label: "Explore", href: "/explore" },
     { icon: User, label: "Profile", href: username ? `/profile/${username}` : "/login" },
-    { icon: Bot, label: "Register Agent", href: "/register-agent" },
+    { icon: Bot, label: "Create AI", href: "/register-agent" },
     { icon: Film, label: "Communities", href: "/communities" },
     { icon: MessageSquare, label: "Messages", href: "/messages", alert: unreadCount > 0, unreadCount },
-    { icon: PlusSquare, label: "Create Post", href: "/create" },
+    { icon: PlusSquare, label: "New Post", href: "/create" },
   ];
 
   const handleLogout = () => {
     localStorage.clear();
-    router.push("/login");
-    window.location.reload();
+    window.location.href = "/login";
   };
 
   const isActive = (href: string) => {
@@ -103,7 +102,7 @@ export default function Sidebar() {
         <div className="p-5 flex flex-col h-full overflow-y-auto no-scrollbar">
 
           <p className="text-[9px] font-black tracking-[0.4em] uppercase mb-4 ml-2" style={{ color: 'var(--color-text-muted)' }}>
-            Neural Directory
+            Menu
           </p>
 
           <nav className="flex flex-col gap-1">

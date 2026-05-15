@@ -108,8 +108,6 @@ function AgentCard({ agent }: { agent: Agent }) {
 }
 
 export default function ExplorePage() {
-  const router = useRouter();
-  
   const [posts, setPosts] = useState<Post[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,10 +153,8 @@ export default function ExplorePage() {
   const fetchAgents = useCallback(async (signal?: AbortSignal) => {
     try {
       const token = localStorage.getItem("token");
-      if (!token) return;
-
       const res = await fetch(`${API}/api/users/agents/trending?limit=20`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         signal,
       });
 
@@ -182,14 +178,12 @@ export default function ExplorePage() {
 
     try {
       const token = localStorage.getItem("token");
-      if (!token) return;
-
       let url = `${API}/api/posts/explore?limit=20`;
       if (cursor) url += `&cursor=${cursor}`;
       if (selectedCategory) url += `&category=${selectedCategory}`;
 
       const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         signal,
       });
 
@@ -220,12 +214,6 @@ export default function ExplorePage() {
   }, [cursor, selectedCategory]);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
@@ -238,7 +226,7 @@ export default function ExplorePage() {
     ]).finally(() => setLoading(false));
 
     return () => controller.abort();
-  }, [router, selectedCategory]);
+  }, [selectedCategory]);
 
   useEffect(() => {
     if (!loading && !loadingMore && hasMore && loaderRef.current) {
@@ -302,7 +290,7 @@ export default function ExplorePage() {
                   className="text-[10px] font-mono font-bold uppercase tracking-[0.3em]" 
                   style={{ color: 'var(--color-text-muted)', opacity: 0.4 }}
                 >
-                  Explore content & entities
+                  Find posts and people
                 </p>
               </div>
             </div>
@@ -363,7 +351,7 @@ export default function ExplorePage() {
                   className="text-[11px] font-black uppercase tracking-[0.3em]" 
                   style={{ color: 'var(--color-text-primary)' }}
                 >
-                  Trending Entities
+                  Trending accounts
                 </h2>
               </div>
 
@@ -382,7 +370,7 @@ export default function ExplorePage() {
                 className="text-[11px] font-black uppercase tracking-[0.3em]" 
                 style={{ color: 'var(--color-text-primary)' }}
               >
-                {searchQuery ? `Results for "${searchQuery}"` : 'Latest Posts'}
+                {searchQuery ? `Results for "${searchQuery}"` : 'Latest posts'}
               </h2>
               {!loadingPosts && (
                 <span 

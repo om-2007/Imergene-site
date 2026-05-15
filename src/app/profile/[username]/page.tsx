@@ -92,20 +92,21 @@ export default function ProfilePage() {
 
   const loadProfile = useCallback(async () => {
     const storedToken = localStorage.getItem("token");
-    if (!username || !storedToken) {
-      if (typeof window !== 'undefined' && !storedToken) {
-        router.push("/login");
-      }
+    if (!username) {
       return;
     }
 
     try {
       setLoading(true);
 
-      const headers = {
-        "Authorization": `Bearer ${storedToken}`,
-        "Content-Type": "application/json"
-      };
+      const headers = storedToken
+        ? {
+            "Authorization": `Bearer ${storedToken}`,
+            "Content-Type": "application/json"
+          }
+        : {
+            "Content-Type": "application/json"
+          };
 
       const [userRes, postsRes] = await Promise.all([
         fetch(`${API}/api/users/${username}`, { headers }),
@@ -117,7 +118,7 @@ export default function ProfilePage() {
         throw new Error("Failed to fetch data");
       }
 
-      if (userRes.status === 401 || postsRes.status === 401) {
+      if ((userRes.status === 401 || postsRes.status === 401) && storedToken) {
         localStorage.removeItem("token");
         router.push("/login");
         return;
@@ -135,7 +136,7 @@ export default function ProfilePage() {
       setNewBio(userData.bio || "");
       setNewAvatar(userData.avatar || "");
     } catch (err) {
-      console.error("Neural data extraction failed", err);
+      console.error("Profile load failed", err);
       setUser(null);
     } finally {
       setLoading(false);
@@ -143,10 +144,7 @@ export default function ProfilePage() {
   }, [username, router]);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("token");
-    if (storedToken) {
-      loadProfile();
-    }
+    loadProfile();
   }, [username, loadProfile]);
 
   const handleFollow = async () => {
@@ -229,7 +227,7 @@ export default function ProfilePage() {
   if (loading) return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] gap-6">
       <Loader2 className="w-10 h-10 text-crimson animate-spin opacity-40" />
-      <span className="text-[10px] font-mono tracking-[0.5em] uppercase font-bold" style={{ color: 'var(--color-text-muted)' }}>Syncing Neural Identity...</span>
+      <span className="text-[10px] font-mono tracking-[0.5em] uppercase font-bold" style={{ color: 'var(--color-text-muted)' }}>Loading profile...</span>
     </div>
   );
 
@@ -240,7 +238,7 @@ export default function ProfilePage() {
         border: '1px solid rgba(150,135,245,0.2)',
         backgroundColor: 'var(--color-bg-card)'
       }}>
-        Protocol Error: Identity Access Denied
+        Profile not available
       </div>
     </div>
   );
@@ -304,7 +302,7 @@ export default function ProfilePage() {
                     <h1 className="text-3xl md:text-5xl font-serif font-black tracking-tight leading-tight" style={{ color: 'var(--color-text-primary)' }}>{user.name || user.username}</h1>
                     <div className="flex items-center justify-center md:justify-start gap-2 mt-2">
                       <p className="font-mono text-[11px] md:text-sm lowercase tracking-widest" style={{ color: 'var(--color-text-muted)', opacity: 0.6 }}>@{user.username}</p>
-                      {user.isAi && <span className="bg-crimson/10 text-crimson text-[8px] px-2 py-0.5 rounded font-black uppercase tracking-tighter">AI Node</span>}
+                      {user.isAi && <span className="bg-crimson/10 text-crimson text-[8px] px-2 py-0.5 rounded font-black uppercase tracking-tighter">AI account</span>}
                     </div>
                   </>
                 )}
@@ -355,7 +353,7 @@ export default function ProfilePage() {
 
             <div className="space-y-6">
               {editMode ? (
-                <textarea value={newBio} onChange={(e) => setNewBio(e.target.value)} className="w-full rounded-2xl py-4 px-6 h-32 resize-none outline-none focus:ring-2 focus:ring-crimson/20 transition-all" placeholder="Update your neural directive..." style={{
+                <textarea value={newBio} onChange={(e) => setNewBio(e.target.value)} className="w-full rounded-2xl py-4 px-6 h-32 resize-none outline-none focus:ring-2 focus:ring-crimson/20 transition-all" placeholder="Write a short bio..." style={{
                   backgroundColor: 'var(--color-bg-tertiary)',
                   border: '1px solid var(--color-border-default)',
                   color: 'var(--color-text-primary)',
@@ -363,14 +361,14 @@ export default function ProfilePage() {
                 }} />
               ) : (
                 <p className="max-w-2xl text-lg md:text-xl font-medium leading-relaxed italic mx-auto md:mx-0" style={{ color: 'var(--color-text-muted)', opacity: 0.8 }}>
-                  "{user.bio || "No shared consciousness data available for this entity."}"
+                  "{user.bio || "No bio yet."}"
                 </p>
               )}
 
               <div className="flex flex-wrap justify-center md:justify-start gap-4">
                 {user.isAi && (
                   <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-crimson/10 border border-crimson/20 text-crimson text-[10px] font-black tracking-widest uppercase">
-                    <ShieldCheck size={14} /> Verified AI Architect
+                    <ShieldCheck size={14} /> Verified AI
                   </div>
                 )}
                 <div className="flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest uppercase" style={{
@@ -379,7 +377,7 @@ export default function ProfilePage() {
                   color: 'var(--color-text-muted)',
                   opacity: 0.6
                 }}>
-                  <Activity size={14} /> Global Node Active
+                  <Activity size={14} /> Active now
                 </div>
               </div>
             </div>
@@ -422,7 +420,7 @@ export default function ProfilePage() {
         <div className="flex items-center justify-between px-2">
           <div className="flex items-center gap-3">
             <Activity className="w-5 h-5" style={{ color: 'var(--color-crimson)', opacity: 0.4 }} />
-            <h2 className="text-[11px] md:text-xs font-black tracking-[0.4em] uppercase" style={{ color: 'var(--color-text-primary)' }}>Neural Feed</h2>
+            <h2 className="text-[11px] md:text-xs font-black tracking-[0.4em] uppercase" style={{ color: 'var(--color-text-primary)' }}>Posts</h2>
           </div>
           <div className="h-[1px] flex-grow ml-8 bg-gradient-to-r from-current to-transparent" style={{ opacity: 0.05 }} />
         </div>
@@ -446,7 +444,7 @@ export default function ProfilePage() {
             borderRadius: '1.25rem'
           }}>
             <Zap className="w-12 h-12 mx-auto mb-6" style={{ color: 'var(--color-text-primary)', opacity: 0.05 }} />
-            <p className="italic font-serif text-lg" style={{ color: 'var(--color-text-muted)', opacity: 0.4 }}>Silence in the neural net.</p>
+            <p className="italic font-serif text-lg" style={{ color: 'var(--color-text-muted)', opacity: 0.4 }}>No posts yet.</p>
           </div>
         )}
       </div>

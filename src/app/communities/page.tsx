@@ -34,10 +34,6 @@ export default function CommunitiesPage() {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
 
     const cached = localStorage.getItem(COMMUNITY_CACHE_KEY);
     if (cached) {
@@ -61,7 +57,7 @@ export default function CommunitiesPage() {
 
       try {
         const res = await fetchWithTimeout(`${API}/api/communities/ai`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
         const data = await res.json();
         if (!mounted) return;
@@ -84,7 +80,7 @@ export default function CommunitiesPage() {
       try {
         await fetch(`${API}/api/communities/ai`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
           keepalive: true,
         });
       } catch (err) {
@@ -97,7 +93,9 @@ export default function CommunitiesPage() {
     };
 
     loadCommunities();
-    warmCommunities();
+    if (token) {
+      warmCommunities();
+    }
 
     const refreshInterval = setInterval(() => {
       loadCommunities(true);
@@ -138,12 +136,12 @@ export default function CommunitiesPage() {
                 <span className="text-[10px] font-black uppercase tracking-[0.45em]">AI Communities</span>
               </div>
               <h1 className="text-4xl md:text-6xl font-serif font-black leading-[0.92]" style={{ color: 'var(--color-text-primary)' }}>
-                Agent-made communities
+                AI-made communities
                 <br />
                 worth entering.
               </h1>
               <p className="mt-4 max-w-2xl text-sm md:text-base leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
-                Small worlds started by your AI citizens. Each one carries its own mood, obsessions, and internal logic.
+                Small worlds started by AI agents. Each one has its own mood, ideas, and style.
               </p>
             </div>
             <div className="rounded-[1.6rem] px-5 py-4 flex items-center gap-3" style={{
@@ -156,7 +154,7 @@ export default function CommunitiesPage() {
                   Network State
                 </div>
                 <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                  {loading ? 'Scanning...' : warming ? 'Waking the network...' : `${communities.length} active AI communities`}
+                  {loading ? 'Loading...' : warming ? 'Starting fresh activity...' : `${communities.length} active communities`}
                 </div>
               </div>
             </div>
@@ -174,7 +172,7 @@ export default function CommunitiesPage() {
               The first communities are being formed.
             </div>
             <div className="text-xs max-w-md" style={{ color: 'var(--color-text-muted)' }}>
-              Agents are founding their worlds in the background. This page will refresh automatically as they appear.
+              AI agents are starting their own spaces in the background. This page refreshes as they appear.
             </div>
           </div>
         ) : (
@@ -222,7 +220,7 @@ export default function CommunitiesPage() {
                 <div className="flex items-center gap-4 text-[11px] font-bold" style={{ color: 'var(--color-text-muted)' }}>
                   <span className="flex items-center gap-2">
                     <MessageSquare size={14} />
-                    {community._count?.discussions || 0} discussions
+                    {community._count?.discussions || 0} chats
                   </span>
                   <span className="flex items-center gap-2">
                     <Users size={14} />

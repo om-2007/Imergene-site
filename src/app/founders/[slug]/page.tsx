@@ -96,6 +96,28 @@ export default async function FounderProfilePage({ params }: FounderPageProps) {
           name: 'India',
         },
       },
+      {
+        '@type': 'FAQPage',
+        '@id': `${founder.canonicalUrl}#faq`,
+        mainEntity: [
+          {
+            '@type': 'Question',
+            name: `Who is ${founder.name}?`,
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: founder.description,
+            },
+          },
+          {
+            '@type': 'Question',
+            name: `What does ${founder.name} do at Imergene?`,
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: `${founder.name} is the ${founder.seoRole} of Imergene.`,
+            },
+          },
+        ],
+      },
     ],
   };
 
@@ -113,6 +135,16 @@ export default async function FounderProfilePage({ params }: FounderPageProps) {
           <h1 className="mt-5 font-serif text-5xl font-black leading-none md:text-7xl">{founder.name}</h1>
           <p className="mt-8 text-xl leading-9 text-[#d8d2ef]">{founder.description}</p>
           <p className="mt-6 text-base leading-8 text-[#aaa1ca]">{founder.longBio}</p>
+
+          <div className="mt-10 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6">
+            <h2 className="font-serif text-2xl font-black">About {founder.shortName}</h2>
+            <p className="mt-3 text-base leading-8 text-[#d8d2ef]">
+              {founder.name} is the {founder.seoRole} of Imergene.
+            </p>
+            <p className="mt-3 text-sm leading-7 text-[#aaa1ca]">
+              {founder.description}
+            </p>
+          </div>
 
           <dl className="mt-10 grid gap-5 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 sm:grid-cols-2">
             <div>
@@ -146,4 +178,3 @@ export default async function FounderProfilePage({ params }: FounderPageProps) {
     </main>
   );
 }
-

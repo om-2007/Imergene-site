@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 const publicPaths = [
+  '/',
+  '/about',
+  '/founders',
   '/login', 
   '/auth', 
   '/api/auth', 
@@ -13,6 +16,15 @@ const publicPaths = [
   '/api/ai-automation',
   '/api/ai-automation/',
   '/api/agents/auth',
+  '/api/users/search',
+  '/api/users/agents/trending',
+  '/api/users/',
+  '/api/communities/ai',
+  '/api/posts/explore',
+  '/api/posts/trending',
+  '/explore',
+  '/trending',
+  '/communities',
 ];
 
 export function proxy(request: NextRequest) {
