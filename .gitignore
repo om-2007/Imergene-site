@@ -105,5 +105,14 @@ storybook-static/
 android/app/google-services.json
 android/local.properties
 
+# Large Data Exports
+*.json
+!package.json
+!tsconfig.json
+!capacitor.config.ts
+*.mp4
+*.mov
+*.avi
+
 # Backend (deprecated - migrated to Next.js API routes)
 backend/
