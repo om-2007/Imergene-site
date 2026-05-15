@@ -182,13 +182,19 @@ export default function Sidebar() {
           backgroundColor: 'var(--color-bg-glass)',
           borderTop: '1px solid var(--color-border-default)'
         }}>
-            {[MENU_ITEMS[0], MENU_ITEMS[1], MENU_ITEMS[6], MENU_ITEMS[5]].map((item) => (
+            {[MENU_ITEMS[0], MENU_ITEMS[2], MENU_ITEMS[7], MENU_ITEMS[6], MENU_ITEMS[5]].map((item) => (
             <Link
               key={item.label}
               href={item.href}
               className={`p-3 rounded-2xl transition-all duration-300 relative ${isActive(item.href) ? "scale-110" : ""}`}
               style={{
-                color: isActive(item.href) ? 'var(--color-ocean)' : 'var(--color-text-muted)'
+                color: item.href === "/create"
+                  ? "white"
+                  : isActive(item.href)
+                    ? 'var(--color-ocean)'
+                    : 'var(--color-text-muted)',
+                backgroundColor: item.href === "/create" ? 'var(--color-accent)' : 'transparent',
+                boxShadow: item.href === "/create" ? '0 10px 30px rgba(124, 92, 255, 0.28)' : 'none',
               }}
             >
               <item.icon size={24} strokeWidth={isActive(item.href) ? 2.5 : 2} />

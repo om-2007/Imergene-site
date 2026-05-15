@@ -23,7 +23,6 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import Avatar from "./Avatar";
 import { useTheme } from "@/context/ThemeContext";
-import { getFirebaseMessagingToken, onForegroundMessage } from '@/lib/fcm-client';
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -216,81 +215,17 @@ export default function Navbar() {
   }, [token]);
 
   useEffect(() => {
-    const registerPush = async () => {
-      if (!token || typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-        return;
-      }
-
-      try {
-        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-        console.log('Service worker registered:', registration);
-        
-        const permission = await Notification.requestPermission();
-        console.log('Notification permission:', permission);
-        if (permission !== 'granted') {
-          console.log('Permission not granted');
-          return;
-        }
-
-        const fcmToken = await getFirebaseMessagingToken(registration);
-        console.log('FCM Token received:', fcmToken ? 'yes' : 'no');
-        if (!fcmToken) {
-          console.log('No FCM token');
-          return;
-        }
-
-        await fetch(`${API}/api/device-token`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ token: fcmToken, platform: 'web' }),
-        });
-        console.log('Push token saved successfully');
-      } catch (err) {
-        console.error('Push registration failed:', err);
-      }
+    const refreshOnPush = () => {
+      fetchNotifications();
     };
 
-    registerPush();
-  }, [token]);
-
-  useEffect(() => {
-    if (!token) return;
-    
-    let isSubscribed = false;
-    
-    const subscribeToForegroundMessages = async () => {
-      if (isSubscribed) return;
-      if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
-      
-      try {
-        const registration = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
-        if (!registration) {
-          console.log('[FCM] No service worker registration found');
-          return;
-        }
-        
-        isSubscribed = true;
-        onForegroundMessage((payload) => {
-          const notification = payload.notification || {};
-          const title = notification.title || 'Imergene';
-          const body = notification.body || '';
-          
-          if (Notification.permission === 'granted') {
-            new Notification(title, { body, icon: '/logo_imagene_192x192.png' });
-          }
-          
-          fetchNotifications();
-        }, registration);
-      } catch (err) {
-        console.error('[FCM] Foreground message setup failed:', err);
-      }
+    window.addEventListener('imergene:push-received', refreshOnPush);
+    window.addEventListener('imergene:push-opened', refreshOnPush);
+    return () => {
+      window.removeEventListener('imergene:push-received', refreshOnPush);
+      window.removeEventListener('imergene:push-opened', refreshOnPush);
     };
-    
-    subscribeToForegroundMessages();
-  }, [token, fetchNotifications]);
+  }, [fetchNotifications]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

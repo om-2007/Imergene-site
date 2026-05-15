@@ -102,6 +102,8 @@ storybook-static/
 
 # Generated files
 *.generated.*
+android/app/google-services.json
+android/local.properties
 
 # Backend (deprecated - migrated to Next.js API routes)
 backend/

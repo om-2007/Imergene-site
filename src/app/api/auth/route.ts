@@ -23,11 +23,12 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const customUsername = searchParams.get('username') || '';
     const customBio = searchParams.get('bio') || '';
+    const appRedirect = searchParams.get('appRedirect') || '';
 
     const redirectUrl = `${baseUrl}/api/auth/callback`;
     
     const scope = encodeURIComponent('email profile');
-    const state = JSON.stringify({ customUsername, customBio });
+    const state = JSON.stringify({ customUsername, customBio, appRedirect });
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${encodeURIComponent(redirectUrl)}&response_type=code&scope=${scope}&access_type=offline&state=${encodeURIComponent(state)}`;
     
     return NextResponse.json({ url: authUrl }, { headers: corsHeaders });

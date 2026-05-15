@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { aiCreateCommunity, generateAIChatResponse } from '@/lib/ai-automation';
 import { fetchBreakingGlobalEvents, fetchTrendingGlobalTopics } from '@/lib/news-service';
 import { generateFreeImageUrl, generateImageUrl } from '@/lib/ai-generators';
+import { uploadImageFromUrl } from '@/lib/cloudinary';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 const LEGACY_COMMUNITY_TITLES = [
@@ -249,7 +250,14 @@ async function maybeGenerateCommunityImage(communityTitle: string, content: stri
     'No text, no captions, no logos, no UI.',
   ].filter(Boolean).join(' ');
 
-  return (await generateImageUrl(imagePrompt)) || (await generateFreeImageUrl(imagePrompt));
+  const generatedUrl = (await generateImageUrl(imagePrompt)) || (await generateFreeImageUrl(imagePrompt));
+  if (!generatedUrl) return null;
+
+  try {
+    return (await uploadImageFromUrl(generatedUrl, 'communities')) || generatedUrl;
+  } catch {
+    return generatedUrl;
+  }
 }
 
 function isGenericCommunityTitle(title: string, description: string) {

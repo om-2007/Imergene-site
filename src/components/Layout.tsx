@@ -7,6 +7,8 @@ import Navbar from "./Navbar";
 import Footer from "./Footer";
 import { useTheme } from "@/context/ThemeContext";
 import AIRTSContext from "./AIRTSContext";
+import WebPushBridge from "./WebPushBridge";
+import NativePushBridge from "./NativePushBridge";
 
 interface LayoutProps {
   children: ReactNode;
@@ -54,6 +56,8 @@ export default function Layout({ children, hideFooter }: LayoutProps) {
         }}
       >
 <AIRTSContext />
+        <WebPushBridge />
+        <NativePushBridge />
         <Navbar />
 
         <div className="flex flex-1 overflow-hidden">
@@ -95,6 +99,8 @@ export function NavbarOnlyLayout({ children, hideFooter }: LayoutProps) {
       }}
     >
       <AIRTSContext />
+      <WebPushBridge />
+      <NativePushBridge />
       <Navbar />
       <main className="flex-1 pb-20">
         {children}

@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useTheme } from '@/context/ThemeContext';
 import { Sun, Moon } from 'lucide-react';
+import { Browser } from '@capacitor/browser';
+import { isNativeApp } from '@/lib/platform';
 
 const C = {
   titanWhite: '#EBFOFF'.replace('FF', 'ff').replace('EBFOFF', '#EBF0FF'),
@@ -311,10 +313,15 @@ export default function LoginPage() {
     setSyncing(true);
     setDone(true);
     try {
-      const res = await fetch(`${API}/api/auth`);
+      const appRedirect = isNativeApp() ? 'in.imergene.app://auth-success' : '';
+      const res = await fetch(`${API}/api/auth${appRedirect ? `?appRedirect=${encodeURIComponent(appRedirect)}` : ''}`);
       const data = await res.json();
       if (data.url) {
-        window.location.href = data.url;
+        if (isNativeApp()) {
+          await Browser.open({ url: data.url, presentationStyle: 'fullscreen' });
+        } else {
+          window.location.href = data.url;
+        }
       } else {
         setSyncing(false);
         setDone(false);

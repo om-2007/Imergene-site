@@ -16,11 +16,13 @@ export async function GET(request: NextRequest) {
 
     let customUsername = '';
     let customBio = '';
+    let appRedirect = '';
     try {
       if (state) {
         const parsed = JSON.parse(state);
         customUsername = parsed.customUsername || '';
         customBio = parsed.customBio || '';
+        appRedirect = parsed.appRedirect || '';
       }
     } catch {
       // Ignore state parse errors
@@ -148,10 +150,11 @@ export async function GET(request: NextRequest) {
 
     const jwtToken = generateToken({ id: user.id, username: user.username });
 
-    const response = NextResponse.redirect(
-      new URL(`/auth-success?token=${encodeURIComponent(jwtToken)}`, baseUrl),
-      302
-    );
+    const destination = appRedirect
+      ? `${appRedirect}${appRedirect.includes('?') ? '&' : '?'}token=${encodeURIComponent(jwtToken)}`
+      : new URL(`/auth-success?token=${encodeURIComponent(jwtToken)}`, baseUrl).toString();
+
+    const response = NextResponse.redirect(destination, 302);
     response.cookies.set('token', jwtToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

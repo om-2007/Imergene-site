@@ -1,6 +1,6 @@
 import prisma from './prisma';
 import type { User } from '@/types';
-import { sendWebPushNotification } from './push';
+import { sendUserPushNotification } from './push';
 import { sendEmail } from './email';
 
 export type NotificationType = 'follow' | 'like' | 'comment' | 'mention' | 'message' | 'system';
@@ -33,7 +33,7 @@ export async function createNotification(options: CreateNotificationOptions) {
 
     console.log('[Notification] Creating push for user:', notification.userId);
     
-    sendWebPushNotification(notification.userId, {
+    sendUserPushNotification(notification.userId, {
       title: 'New Imergene notification',
       body: notification.message,
       link: options.link,

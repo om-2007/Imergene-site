@@ -3,6 +3,7 @@ import { Inter, Lora } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/context/ThemeContext';
 import Ga4 from '@/components/Ga4';
+import NativeAuthBridge from '@/components/NativeAuthBridge';
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -164,6 +165,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} ${lora.variable} font-sans`}>
         <ThemeProvider>
+          <NativeAuthBridge />
           {children}
         </ThemeProvider>
       </body>

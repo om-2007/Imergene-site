@@ -58,6 +58,14 @@ export interface FirebasePushPayload {
 }
 
 export async function sendFirebasePushToToken(token: string, payload: FirebasePushPayload) {
+  return sendFirebasePushToPlatformToken(token, payload, 'web');
+}
+
+export async function sendFirebasePushToPlatformToken(
+  token: string,
+  payload: FirebasePushPayload,
+  platform: string
+) {
   if (!token) {
     return;
   }
@@ -68,6 +76,8 @@ export async function sendFirebasePushToToken(token: string, payload: FirebasePu
   }
 
   const accessToken = await getFirebaseAccessToken();
+  const isWeb = platform === 'web';
+  const isNativeApp = platform.endsWith('-app') || platform === 'android' || platform === 'ios';
   const message = {
     message: {
       token,
@@ -75,15 +85,26 @@ export async function sendFirebasePushToToken(token: string, payload: FirebasePu
         title: payload.title,
         body: payload.body,
       },
-      webpush: {
-        fcmOptions: {
-          link: payload.link || '/',
+      ...(isWeb ? {
+        webpush: {
+          fcmOptions: {
+            link: payload.link || '/',
+          },
+          notification: {
+            title: payload.title,
+            body: payload.body,
+          },
         },
-        notification: {
-          title: payload.title,
-          body: payload.body,
+      } : {}),
+      ...(isNativeApp ? {
+        android: {
+          priority: 'high',
+          notification: {
+            channelId: 'imergene-main',
+            clickAction: 'OPEN_IMERGENE_NOTIFICATION',
+          },
         },
-      },
+      } : {}),
       data: {
         ...(payload.data || {}),
         link: payload.link || '/',
@@ -106,8 +127,8 @@ export async function sendFirebasePushToToken(token: string, payload: FirebasePu
   }
 }
 
-export async function sendWebPushNotification(userId: string, payload: FirebasePushPayload) {
-  console.log('[Push] sendWebPushNotification called for user:', userId, 'payload:', payload);
+export async function sendUserPushNotification(userId: string, payload: FirebasePushPayload) {
+  console.log('[Push] sendUserPushNotification called for user:', userId, 'payload:', payload);
   
   if (!FIREBASE_PROJECT_ID || !FIREBASE_CLIENT_EMAIL || !FIREBASE_PRIVATE_KEY) {
     return;
@@ -115,7 +136,7 @@ export async function sendWebPushNotification(userId: string, payload: FirebaseP
 
   const tokens = await prisma.deviceToken.findMany({
     where: { userId },
-    select: { token: true },
+    select: { token: true, platform: true },
     take: 10,
   });
 
@@ -125,7 +146,7 @@ export async function sendWebPushNotification(userId: string, payload: FirebaseP
 
   for (const device of tokens) {
     try {
-      await sendFirebasePushToToken(device.token, payload);
+      await sendFirebasePushToPlatformToken(device.token, payload, device.platform || 'web');
     } catch (error) {
       console.error('[Push] Failed:', error);
       const message = error instanceof Error ? error.message : String(error);
@@ -137,3 +158,5 @@ export async function sendWebPushNotification(userId: string, payload: FirebaseP
     }
   }
 }
+
+export const sendWebPushNotification = sendUserPushNotification;

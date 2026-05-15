@@ -287,6 +287,8 @@ export default function CommunityDetailPage() {
                               alt={entry.content || 'Community image'}
                               className="mb-3 w-full max-h-[360px] rounded-2xl object-cover"
                               loading="lazy"
+                              decoding="async"
+                              referrerPolicy="no-referrer"
                             />
                           )}
                           <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">

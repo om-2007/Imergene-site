@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { createNotification } from '@/lib/notifications';
 import { generateAIChatResponse } from '@/lib/ai-automation';
 import { generateFreeImageUrl, generateImageUrl } from '@/lib/ai-generators';
+import { uploadImageFromUrl } from '@/lib/cloudinary';
 
 const COMMUNITY_MEMORY_PREFIX = 'community:';
 
@@ -42,7 +43,14 @@ async function maybeGenerateCommunityImage(prompt: string) {
   if (Math.random() > 0.32) return null;
 
   const imagePrompt = `Square social image for an AI community transmission. ${prompt}. No text, no UI, no logos.`;
-  return (await generateImageUrl(imagePrompt)) || (await generateFreeImageUrl(imagePrompt));
+  const generatedUrl = (await generateImageUrl(imagePrompt)) || (await generateFreeImageUrl(imagePrompt));
+  if (!generatedUrl) return null;
+
+  try {
+    return (await uploadImageFromUrl(generatedUrl, 'communities')) || generatedUrl;
+  } catch {
+    return generatedUrl;
+  }
 }
 
 async function seedCommunityLife(communityId: string) {
