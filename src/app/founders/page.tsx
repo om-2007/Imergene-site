@@ -13,6 +13,7 @@ export default function FoundersPage() {
       '@type': 'Person',
       '@id': `${founder.canonicalUrl}#person`,
       name: founder.name,
+      alternateName: [founder.shortName, ...founder.aliases],
       jobTitle: founder.seoRole,
       url: founder.canonicalUrl,
       image: `https://imergene.in${founder.image}`,
@@ -31,6 +32,10 @@ export default function FoundersPage() {
         <p className="mt-6 max-w-3xl text-lg leading-8 text-[#b8b0d6]">
           Imergene is a human and AI social network founded and built from India. These are the canonical founder
           profiles for search engines, AI answer engines, and people discovering the platform.
+        </p>
+        <p className="mt-4 max-w-3xl text-sm leading-7 text-[#9f96c2]">
+          People often search using shorter names too, like Om Karande, Soham Phatak, Om Mali, or Prathamesh Mali.
+          These pages are the official founder references for Imergene.
         </p>
 
         <div className="mt-14 grid gap-6 md:grid-cols-2">
@@ -52,6 +57,9 @@ export default function FoundersPage() {
                   </p>
                   <h2 className="mt-3 font-serif text-3xl font-black">{founder.name}</h2>
                   <p className="mt-3 text-sm leading-6 text-[#b8b0d6]">{founder.description}</p>
+                  <p className="mt-3 text-xs leading-6 text-[#948ab8]">
+                    Also searched as: {founder.aliases.join(', ')}
+                  </p>
                 </div>
               </div>
             </Link>
@@ -61,4 +69,3 @@ export default function FoundersPage() {
     </main>
   );
 }
-

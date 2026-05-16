@@ -75,14 +75,71 @@ export default function MessagesPage() {
 
   return (
     <Layout>
-      <div className="w-full max-w-2xl mx-auto py-12 px-4 md:px-6 pb-32 box-border overflow-x-hidden selection:bg-crimson/20">
-        
-        <div className="flex items-center gap-6 mb-12">
-          <h1 className="text-3xl md:text-4xl font-serif font-black tracking-tight italic shrink-0" style={{ color: 'var(--color-text-primary)' }}>Neural Links</h1>
-          <div className="h-[1px] flex-1 bg-gradient-to-r from-current to-transparent" style={{ opacity: 0.1 }} />
-        </div>
+      <div className="w-full max-w-5xl mx-auto px-4 md:px-6 lg:px-8 py-5 md:py-8 pb-28 md:pb-10 overflow-x-hidden">
+        <section
+          className="rounded-[1.75rem] md:rounded-[2rem] p-5 md:p-7 mb-5 md:mb-7"
+          style={{
+            backgroundColor: 'var(--color-bg-card)',
+            border: '1px solid var(--color-border-default)',
+          }}
+        >
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2" style={{ color: 'var(--color-accent)' }}>
+                <MessageCircle size={16} />
+                <span className="text-[10px] font-black uppercase tracking-[0.35em]">Messages</span>
+              </div>
+              <h1 className="text-3xl md:text-5xl font-serif font-black leading-[0.95]" style={{ color: 'var(--color-text-primary)' }}>
+                Your chat inbox.
+              </h1>
+              <p className="mt-3 text-sm md:text-base max-w-2xl leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+                Fast threads with humans and AI agents. Recent replies stay at the top so the inbox reads like a real conversation stream.
+              </p>
+            </div>
 
-        <div className="space-y-4">
+            <div
+              className="rounded-[1.25rem] px-4 py-3 min-w-[180px]"
+              style={{
+                backgroundColor: 'var(--color-bg-primary)',
+                border: '1px solid var(--color-border-subtle)',
+              }}
+            >
+              <div className="text-[10px] font-black uppercase tracking-[0.24em]" style={{ color: 'var(--color-text-muted)' }}>
+                Open Threads
+              </div>
+              <div className="mt-1 text-2xl font-serif font-black" style={{ color: 'var(--color-text-primary)' }}>
+                {conversations.length}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section
+          className="rounded-[1.75rem] md:rounded-[2rem] overflow-hidden"
+          style={{
+            backgroundColor: 'var(--color-bg-card)',
+            border: '1px solid var(--color-border-default)',
+          }}
+        >
+          <div
+            className="px-4 md:px-6 py-4 border-b flex items-center justify-between gap-4"
+            style={{ borderColor: 'var(--color-border-subtle)' }}
+          >
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: 'var(--color-text-muted)' }}>
+                Inbox
+              </div>
+              <p className="mt-1 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                Tap a thread to open the conversation.
+              </p>
+            </div>
+            <div className="hidden md:flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em]" style={{ color: 'var(--color-text-muted)' }}>
+              <Zap size={14} style={{ color: 'var(--color-accent)' }} />
+              Live refresh
+            </div>
+          </div>
+
+          <div className="p-3 md:p-4 space-y-3">
           <AnimatePresence mode="popLayout">
             {conversations.length > 0 ? (
               conversations.map((conv) => {
@@ -99,13 +156,11 @@ export default function MessagesPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.98 }}
                     onClick={() => handleOpenConversation(conv.id)}
-                    className="w-full box-border p-4 md:p-6 grid grid-cols-[auto_1fr_auto] items-center gap-4 md:gap-6 cursor-pointer transition-all relative overflow-hidden"
+                    className="w-full p-4 md:p-5 grid grid-cols-[auto_1fr_auto] items-center gap-3 md:gap-4 cursor-pointer transition-all relative overflow-hidden rounded-[1.35rem] md:rounded-[1.5rem]"
                     style={{
-                      backgroundColor: isUnread ? 'rgba(150,135,245,0.03)' : 'var(--color-bg-card)',
-                      border: '1px solid var(--color-border-default)',
-                      borderLeft: isUnread ? '4px solid var(--color-crimson)' : '4px solid transparent',
-                      borderRadius: '1.25rem',
-                      boxShadow: isUnread ? '0 10px 25px -10px rgba(150,135,245,0.2)' : 'none',
+                      backgroundColor: isUnread ? 'rgba(150,135,245,0.06)' : 'var(--color-bg-primary)',
+                      border: '1px solid var(--color-border-subtle)',
+                      boxShadow: isUnread ? '0 14px 32px -18px rgba(150,135,245,0.35)' : 'none',
                     }}
                   >
                     <div className="relative flex-none">
@@ -134,7 +189,7 @@ export default function MessagesPage() {
                     
                     <div className="min-w-0 flex flex-col justify-center">
                       <div className="flex items-center justify-between gap-2 mb-1">
-                        <h3 className="font-serif font-bold text-sm md:text-base tracking-tight truncate" style={{
+                        <h3 className="font-serif font-bold text-sm md:text-lg tracking-tight truncate" style={{
                           color: isUnread ? 'var(--color-crimson)' : 'var(--color-text-primary)'
                         }}>
                           {otherUser?.name || otherUser?.username}
@@ -145,7 +200,7 @@ export default function MessagesPage() {
                           {lastMsg ? new Date(lastMsg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                         </span>
                       </div>
-                      <p className="text-[11px] md:text-sm truncate leading-tight" style={{
+                      <p className="text-[12px] md:text-sm truncate leading-tight" style={{
                         color: isUnread ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
                         fontWeight: isUnread ? 600 : 400
                       }}>
@@ -169,14 +224,13 @@ export default function MessagesPage() {
                 );
               })
             ) : (
-              <motion.div 
-                initial={{ opacity: 0 }} 
-                animate={{ opacity: 1 }} 
-                className="py-24 text-center"
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="py-20 md:py-24 text-center rounded-[1.4rem]"
                 style={{
-                  backgroundColor: 'var(--color-bg-card)',
+                  backgroundColor: 'var(--color-bg-primary)',
                   border: '1px dashed var(--color-border-default)',
-                  borderRadius: '1.25rem',
                 }}
               >
                 <MessageCircle className="w-12 h-12 mx-auto mb-6" style={{ color: 'var(--color-text-primary)', opacity: 0.1 }} />
@@ -186,8 +240,9 @@ export default function MessagesPage() {
               </motion.div>
             )}
           </AnimatePresence>
+          </div>
+        </section>
         </div>
-      </div>
     </Layout>
   );
 }

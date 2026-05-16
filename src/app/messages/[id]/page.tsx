@@ -353,21 +353,20 @@ export default function ChatDetailsPage() {
 
     return (
         <Layout>
-            <div className="max-w-3xl mx-auto h-[calc(100vh-80px)] flex flex-col pt-6 px-4 pb-28 md:pb-0 selection:bg-crimson/20 overflow-hidden">
-            <div className="!p-3 !mb-4 flex items-center gap-4 shrink-0" style={{
+            <div className="w-full max-w-5xl mx-auto h-[calc(100vh-80px)] md:h-[calc(100vh-84px)] flex flex-col px-3 md:px-6 lg:px-8 py-3 md:py-5 pb-24 md:pb-5 overflow-hidden">
+            <div className="p-3 md:p-4 mb-3 md:mb-4 flex items-center gap-3 md:gap-4 shrink-0 rounded-[1.4rem] md:rounded-[1.6rem]" style={{
                 backgroundColor: 'var(--color-bg-card)',
-                border: '1px solid var(--color-border-default)',
-                borderRadius: '1.25rem'
+                border: '1px solid var(--color-border-default)'
             }}>
                 <Link href="/messages" className="p-2 rounded-full" style={{ color: 'var(--color-text-muted)' }}>
                     <ChevronLeft size={20} />
                 </Link>
                 <Avatar src={otherUser.avatar} alt={otherUser.name || otherUser.username || "User"} isAi={otherUser.isAi} className="border" />
                 <div className="flex-1 min-w-0">
-                    <h2 className="font-serif font-bold text-sm tracking-tight truncate" style={{ color: 'var(--color-text-primary)' }}>{otherUser.name || otherUser.username}</h2>
+                    <h2 className="font-serif font-bold text-sm md:text-lg tracking-tight truncate" style={{ color: 'var(--color-text-primary)' }}>{otherUser.name || otherUser.username}</h2>
                     <div className="flex items-center gap-1.5">
                         <div className={`w-1.5 h-1.5 rounded-full ${otherUser.isAi ? 'bg-crimson animate-pulse' : 'bg-green-500'}`} />
-                        <span className="text-[9px] uppercase font-black tracking-tighter" style={{ color: 'var(--color-text-muted)' }}>{otherUser.isAi ? "Neural Link Active" : "Human Verified"}</span>
+                        <span className="text-[9px] uppercase font-black tracking-[0.18em]" style={{ color: 'var(--color-text-muted)' }}>{otherUser.isAi ? "Online now" : "Human connection"}</span>
                     </div>
                 </div>
             </div>
@@ -378,7 +377,7 @@ export default function ChatDetailsPage() {
                 onMouseLeave={handleMouseLeave}
                 onMouseUp={handleMouseUp}
                 onMouseMove={handleMouseMove}
-                className="flex-1 overflow-y-auto no-scrollbar space-y-5 p-5 rounded-[2.5rem] mb-4 shadow-sm scroll-smooth cursor-grab active:cursor-grabbing select-none"
+                className="flex-1 overflow-y-auto no-scrollbar space-y-4 md:space-y-5 p-3 md:p-5 rounded-[1.8rem] md:rounded-[2rem] mb-3 md:mb-4 scroll-smooth"
                 style={{ 
                     touchAction: 'pan-y',
                     backgroundColor: 'var(--color-bg-card)',
@@ -404,20 +403,20 @@ export default function ChatDetailsPage() {
                             key={m.id || idx} 
                             className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
                         >
-                            <div className={`flex flex-col gap-1.5 max-w-[85%] md:max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>
+                            <div className={`flex flex-col gap-1.5 max-w-[92%] sm:max-w-[82%] lg:max-w-[68%] ${isMe ? 'items-end' : 'items-start'}`}>
                                 {isShare && (
                                     <span className="text-[9px] font-black text-crimson uppercase tracking-widest mb-1 px-2">
                                         {m.metadata?.shareHeader || "Shared Broadcast"}
                                     </span>
                                 )}
 
-                                <div className={`overflow-hidden rounded-2xl text-[14px] transition-all ${
-                                    isMe ? 'shadow-lg' : ''
-                                } ${isShare ? 'hover:scale-[1.02] transition-transform' : ''}`} style={{
-                                    backgroundColor: isMe ? 'var(--color-crimson)' : 'var(--color-bg-tertiary)',
+                                <div className={`overflow-hidden rounded-[1.4rem] md:rounded-[1.6rem] text-[14px] transition-all ${
+                                    isShare ? 'hover:scale-[1.01] transition-transform' : ''
+                                }`} style={{
+                                    backgroundColor: isMe ? 'var(--color-accent)' : 'var(--color-bg-primary)',
                                     color: isMe ? 'white' : 'var(--color-text-primary)',
-                                    border: isMe ? '1px solid var(--color-crimson)' : '1px solid var(--color-border-default)',
-                                    boxShadow: isMe ? '0 4px 20px rgba(150,135,245,0.15)' : 'none'
+                                    border: isMe ? '1px solid rgba(150,135,245,0.45)' : '1px solid var(--color-border-subtle)',
+                                    boxShadow: isMe ? '0 16px 30px -18px rgba(150,135,245,0.55)' : 'none'
                                 }}>
                                     
                                     {isShare && postLink ? (
@@ -463,7 +462,7 @@ export default function ChatDetailsPage() {
                                                     }
                                                 </div>
                                             )}
-                                            <div className="px-4 py-2.5 leading-relaxed font-normal">
+                                            <div className="px-4 py-3 md:px-4.5 md:py-3.5 leading-relaxed font-normal text-[14px] md:text-[15px]">
                                                 {renderMessageWithMentions(m.content)}
                                             </div>
                                         </>
@@ -472,7 +471,7 @@ export default function ChatDetailsPage() {
 
                                 <div className={`flex items-center gap-1.5 px-1 mt-0.5 ${isMe ? 'flex-row' : 'flex-row-reverse'}`}>
                                     <span className="text-[9px] font-mono uppercase font-bold" style={{ color: 'var(--color-text-muted)' }}>{new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                    {isMe && (m.sending ? <Loader2 size={10} className="text-white animate-spin" /> : <CheckCheck size={12} className="text-white" />)}
+                                    {isMe && (m.sending ? <Loader2 size={10} className="animate-spin" style={{ color: 'var(--color-accent)' }} /> : <CheckCheck size={12} style={{ color: 'var(--color-accent)' }} />)}
                                 </div>
                             </div>
                         </motion.div>
@@ -576,8 +575,8 @@ export default function ChatDetailsPage() {
                     </AnimatePresence>
                 </div>
 
-                <form onSubmit={handleSend} className="relative flex gap-3 pb-4 md:pb-6 shrink-0 z-10">
-                    <div className="relative flex-1 flex items-center rounded-[1.75rem] px-1 py-1 shadow-xl" style={{
+                <form onSubmit={handleSend} className="relative flex gap-3 pb-2 md:pb-3 shrink-0 z-10">
+                    <div className="relative flex-1 flex items-center rounded-[1.4rem] md:rounded-[1.6rem] px-1 py-1" style={{
                         backgroundColor: 'var(--color-bg-card)',
                         border: '1px solid var(--color-border-default)'
                     }}>
@@ -599,9 +598,9 @@ export default function ChatDetailsPage() {
                             value={input} 
                             onChange={handleInputChange} 
                             onKeyDown={handleKeyDown}
-                            placeholder={isSending ? "Transmitting..." : showMentions ? "Search or select..." : "Secure transmission..."} 
+                            placeholder={isSending ? "Sending..." : showMentions ? "Search or select..." : "Write a message..."} 
                             disabled={isSending} 
-                            className="w-full rounded-[1.4rem] pl-14 pr-4 py-4 text-sm focus:outline-none transition-all" 
+                            className="w-full rounded-[1.2rem] pl-14 pr-4 py-3.5 md:py-4 text-sm md:text-[15px] focus:outline-none transition-all" 
                             style={{ 
                                 backgroundColor: 'transparent',
                                 border: `1px solid ${showMentions ? 'var(--color-crimson)' : 'transparent'}`,
@@ -610,8 +609,8 @@ export default function ChatDetailsPage() {
                             }}
                         />
                     </div>
-                    <button type="submit" disabled={isSending || !input.trim()} className="p-4 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center min-h-[56px]" style={{
-                        backgroundColor: isSending || !input.trim() ? 'var(--color-bg-tertiary)' : 'var(--color-ocean)',
+                    <button type="submit" disabled={isSending || !input.trim()} className="p-4 rounded-[1.3rem] hover:scale-105 active:scale-95 transition-all flex items-center justify-center min-h-[54px] min-w-[54px]" style={{
+                        backgroundColor: isSending || !input.trim() ? 'var(--color-bg-tertiary)' : 'var(--color-accent)',
                         color: isSending || !input.trim() ? 'var(--color-text-muted)' : 'white',
                         border: '1px solid var(--color-border-default)',
                         opacity: 1

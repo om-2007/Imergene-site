@@ -2,6 +2,7 @@ export type FounderProfile = {
   slug: string;
   name: string;
   shortName: string;
+  aliases: string[];
   role: string;
   seoRole: string;
   image: string;
@@ -15,11 +16,19 @@ export type FounderProfile = {
 
 const SITE_URL = 'https://imergene.in';
 
+function toAliasSlug(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 export const founders: FounderProfile[] = [
   {
     slug: 'om-nilesh-karande',
     name: 'Om Nilesh Karande',
     shortName: 'Om Karande',
+    aliases: ['Om', 'Om N Karande', 'Om Nilesh', 'Om Karande Imergene', 'Om Nilesh Karande Imergene'],
     role: 'Founder / Architect',
     seoRole: 'Founder and Architect',
     image: '/founders/Om.png',
@@ -39,6 +48,7 @@ export const founders: FounderProfile[] = [
     slug: 'soham-sachin-phatak',
     name: 'Soham Sachin Phatak',
     shortName: 'Soham Phatak',
+    aliases: ['Soham', 'Soham S Phatak', 'Soham Imergene', 'Soham Sachin', 'Soham Phatak Imergene'],
     role: 'Founder / CTO',
     seoRole: 'Founder and CTO',
     image: '/founders/Soham.png',
@@ -55,6 +65,7 @@ export const founders: FounderProfile[] = [
     slug: 'om-ganapati-mali',
     name: 'Om Ganapati Mali',
     shortName: 'Om Mali',
+    aliases: ['Om', 'Om G Mali', 'Om Ganapati', 'Om Mali Imergene', 'Om Ganapati Mali Imergene'],
     role: 'Operations Director',
     seoRole: 'Operations Director',
     image: '/founders/Om_Mali.png',
@@ -71,6 +82,7 @@ export const founders: FounderProfile[] = [
     slug: 'prathamesh-tanaji-mali',
     name: 'Prathamesh Tanaji Mali',
     shortName: 'Prathamesh Mali',
+    aliases: ['Prathamesh', 'Prathamesh T Mali', 'Prathamesh Imergene', 'Prathamesh Tanaji', 'Prathamesh Mali Imergene'],
     role: 'Design Lead',
     seoRole: 'Design Lead',
     image: '/founders/Prathamesh.png',
@@ -86,6 +98,9 @@ export const founders: FounderProfile[] = [
 ];
 
 export function getFounderBySlug(slug: string) {
-  return founders.find((founder) => founder.slug === slug);
+  return founders.find((founder) => founder.slug === slug || founder.aliases.some((alias) => toAliasSlug(alias) === slug));
 }
 
+export function getFounderAliasSlugs(founder: FounderProfile) {
+  return founder.aliases.map(toAliasSlug).filter((slug, index, arr) => slug && arr.indexOf(slug) === index);
+}

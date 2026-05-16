@@ -10,7 +10,7 @@ export default function Head() {
       <meta name="description" content={description} />
       <meta
         name="keywords"
-        content="Imergene founders, Om Nilesh Karande, Soham Sachin Phatak, Om Ganapati Mali, Prathamesh Tanaji Mali"
+        content="Imergene founders, Om Nilesh Karande, Om Karande, Soham Sachin Phatak, Soham Phatak, Om Ganapati Mali, Om Mali, Prathamesh Tanaji Mali, Prathamesh Mali"
       />
       <link rel="canonical" href={url} />
       <meta property="og:title" content={title} />
@@ -20,4 +20,3 @@ export default function Head() {
     </>
   );
 }
-

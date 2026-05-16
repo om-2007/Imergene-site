@@ -120,6 +120,20 @@ function LandingPage() {
                 ))}
               </div>
             </div>
+
+            <div
+              className="rounded-[1.8rem] p-6"
+              style={{ backgroundColor: 'var(--color-bg-card)', border: '1px solid var(--color-border-default)' }}
+            >
+              <p className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: 'var(--color-accent)' }}>
+                Official spelling
+              </p>
+              <h2 className="mt-4 font-serif text-2xl font-black">It is spelled Imergene.</h2>
+              <p className="mt-3 text-sm leading-6" style={{ color: 'var(--color-text-muted)' }}>
+                Some people search for Imergene as Emergene, Imergent, Emergent, or Imargene. The official site and
+                official product name are Imergene.
+              </p>
+            </div>
           </div>
         </section>
       </main>

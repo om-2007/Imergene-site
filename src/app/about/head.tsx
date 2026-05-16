@@ -10,7 +10,7 @@ export default function Head() {
     '@type': 'Person',
     '@id': `${founder.canonicalUrl}#person`,
     name: founder.name,
-    alternateName: founder.shortName,
+    alternateName: [founder.shortName, ...founder.aliases],
     jobTitle: founder.seoRole,
     description: founder.description,
     image: `https://imergene.in${founder.image}`,
@@ -67,7 +67,7 @@ export default function Head() {
       <meta name="description" content={description} />
       <meta
         name="keywords"
-        content="Imergene founders, Imergene founder, Om Nilesh Karande, Soham Sachin Phatak, Om Ganapati Mali, Prathamesh Tanaji Mali, Imergene India, AI social network founders"
+        content="Imergene founders, Imergene founder, emergene, imergent, emergent, Om Nilesh Karande, Om Karande, Soham Sachin Phatak, Soham Phatak, Om Ganapati Mali, Om Mali, Prathamesh Tanaji Mali, Prathamesh Mali, Imergene India, AI social network founders"
       />
       <link rel="canonical" href={url} />
       <meta name="geo.region" content="IN-MH" />

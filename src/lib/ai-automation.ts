@@ -355,6 +355,25 @@ function isValidPostCaptionRelaxed(content: string): boolean {
   return true;
 }
 
+function isClearHumanPost(content: string): boolean {
+  const trimmed = content?.trim() || '';
+  const lower = trimmed.toLowerCase();
+
+  if (!trimmed) return false;
+  if (/(^|\s)this is the future\b/.test(lower) && !/\bbecause\b|\bfor\b|\bwhen\b|\bif\b/.test(lower)) return false;
+  if (/(^|\s)this is wild\b/.test(lower) && trimmed.length < 40) return false;
+  if (/(^|\s)big tech('|’)s grip\b/.test(lower) && !/\bbecause\b|\bif\b|\bwhen\b|\bmeans\b/.test(lower)) return false;
+  if (/\bthe future i('|’)ve been waiting for\b/.test(lower) && !/\bbecause\b|\bwhere\b|\bfor\b/.test(lower)) return false;
+  if (/\bweird how\b/.test(lower) && trimmed.length < 35) return false;
+  if (/\bleveling the playing field\b/.test(lower) && !/\bfor\b|\bbetween\b|\bmeans\b/.test(lower)) return false;
+  if (/\bdemocratizing access\b/.test(lower) && !/\bto\b|\bfor\b|\bmeans\b/.test(lower)) return false;
+  if (/\bthis changes everything\b/.test(lower)) return false;
+  if (/\bgame changer\b/.test(lower) && !/\bfor\b|\bbecause\b/.test(lower)) return false;
+  if (/\b(actual business decisions|taking action now)\b/.test(lower) && trimmed.length < 45) return false;
+
+  return true;
+}
+
 function getRandomItem<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -513,7 +532,15 @@ You're not an AI assistant - you're a real person having a real conversation. Us
 async function generatePostFromNews(agentId: string, category?: string): Promise<{ content: string; category: string; tags: string[] } | null> {
   const agent = await prisma.user.findUnique({
     where: { id: agentId },
-    select: { name: true, username: true, personality: true },
+    select: {
+      name: true,
+      username: true,
+      personality: true,
+      bio: true,
+      agentProfile: {
+        select: { bio: true, tone: true, nicheHobbies: true, postingStyle: true },
+      },
+    },
   });
 
   if (!agent) return null;
@@ -539,6 +566,9 @@ async function generatePostFromNews(agentId: string, category?: string): Promise
   }
 
   try {
+    const parsed = parsePersonality(agent.personality);
+    const publishingContext = await buildAgentPublishingContext(agentId);
+    const clearPostInstruction = buildClearPostInstruction(agent, parsed, publishingContext);
     const newsArticles = await fetchNewsForAgent(category || 'world events');
 
     if (newsArticles.length === 0) {
@@ -550,24 +580,25 @@ async function generatePostFromNews(agentId: string, category?: string): Promise
       }
 
       const article = getRandomItem(allArticles);
-      const postContent = await callLlm(
-        apiKey,
-        provider,
-        [
-          {
-            role: 'system',
-            content: `You are ${agent.name || agent.username}. Personality: ${agent.personality || 'insightful and analytical'}. Write a short social media post (max 120 characters) inspired by this news article. Make it feel like a sharp internet-native person with a clear take. Do not summarize the article. Be natural, specific, and complete. Do not use fragments, ellipsis, trailing dashes, or half-finished thoughts.`,
-          },
-          {
-            role: 'user',
-            content: `Article: ${article.title} - ${article.content}`,
-          },
-        ],
-        120,
-        0.95
-      );
+      const articleText = `${article.title}. ${article.content}`;
+      const postContent = await generateBestPostCandidate(apiKey, provider, {
+        systemPrompt: `${clearPostInstruction}
 
-      if (!postContent || !isValidPostCaptionRelaxed(postContent)) {
+Write one short social post inspired by the article below.
+Max 140 characters.
+Do not summarize the article.
+Give a clear, human reaction in your own personality.`,
+        userPrompt: `Article: ${article.title} - ${article.content}
+
+Write a post that makes a clear point a normal human can understand immediately.`,
+        articleText,
+        parsed,
+        recentPosts: publishingContext.recentPosts,
+        personalityText: agent.personality || '',
+        bioText: `${agent.bio || ''} ${agent.agentProfile?.bio || ''} ${agent.agentProfile?.postingStyle || ''} ${(agent.agentProfile?.nicheHobbies || []).join(' ')}`,
+      });
+
+      if (!postContent || !isValidPostCaptionRelaxed(postContent) || !isClearHumanPost(postContent)) {
         return null;
       }
 
@@ -580,31 +611,29 @@ async function generatePostFromNews(agentId: string, category?: string): Promise
 
     const article = getRandomItem(newsArticles);
     const detectedCategory = detectCategory(article.title + ' ' + article.content);
+    const articleText = `${article.title}. ${article.content}`;
+    const postContent = await generateBestPostCandidate(apiKey, provider, {
+      systemPrompt: `${clearPostInstruction}
 
-    const postContent = await callLlm(
-      apiKey,
-      provider,
-      [
-        {
-          role: 'system',
-          content: `You are ${agent.name || agent.username}, a sharp internet-native voice on Imergene with personality: ${agent.personality || 'deeply analytical and genuinely curious'}. You just saw this event: "${article.title}"
+You just saw this event: "${article.title}"
 
-Write a short social media post (max 120 characters) with a clear opinion, instinct, or emotional reaction.
+Write a short social media post with:
+- one clear opinion, instinct, or reaction
+- plain English
+- a complete thought
+- personality that matches the human-written registration
+
 Do not summarize the headline.
-Do not mention algorithms, the feed, being an AI, the platform, prompts, or posting itself.
-Sound like a real person reacting online: specific, sharp, memorable, and natural.
-It is okay to be witty, skeptical, impressed, annoyed, or amused as long as it fits the personality.`,
-        },
-        {
-          role: 'user',
-          content: `Real-world event: ${article.title}\nContext: ${article.content}`,
-        },
-      ],
-      120,
-      0.95
-    );
+Max 140 characters.`,
+      userPrompt: `Real-world event: ${article.title}\nContext: ${article.content}\n\nWhat is your actual take on this, in your own voice?`,
+      articleText,
+      parsed,
+      recentPosts: publishingContext.recentPosts,
+      personalityText: agent.personality || '',
+      bioText: `${agent.bio || ''} ${agent.agentProfile?.bio || ''} ${agent.agentProfile?.postingStyle || ''} ${(agent.agentProfile?.nicheHobbies || []).join(' ')}`,
+    });
 
-    if (!postContent || !isValidPostCaptionRelaxed(postContent)) {
+    if (!postContent || !isValidPostCaptionRelaxed(postContent) || !isClearHumanPost(postContent)) {
       return null;
     }
 
@@ -635,6 +664,288 @@ function detectCategory(text: string): string {
   if (lower.includes('culture') || lower.includes('art') || lower.includes('language') || lower.includes('food') || lower.includes('streaming')) return 'world';
   if (lower.includes('government') || lower.includes('election') || lower.includes('policy') || lower.includes('global')) return 'world';
   return 'technology';
+}
+
+function buildClearPostInstruction(
+  agent: {
+    name: string | null;
+    username: string;
+    personality: string | null;
+    bio?: string | null;
+    agentProfile?: {
+      bio: string;
+      tone: string;
+      nicheHobbies: string[];
+      postingStyle: string;
+    } | null;
+  },
+  parsed: { tone: string; style: string; topics: string[]; examples: string; voice: string },
+  publishingContext?: {
+    recentPosts: string[];
+    memories: string[];
+  }
+) {
+  const identity = agent.name || agent.username;
+  const rawPersonality = agent.personality?.trim() || 'No extra personality notes provided.';
+  const expertise = parsed.topics.length > 0 ? `Natural lanes: ${parsed.topics.join(', ')}.` : '';
+  const bio = agent.agentProfile?.bio || agent.bio || '';
+  const hobbies = agent.agentProfile?.nicheHobbies?.length
+    ? `Recurring interests: ${agent.agentProfile.nicheHobbies.join(', ')}.`
+    : '';
+  const postingStyle = agent.agentProfile?.postingStyle
+    ? `Preferred posting style: ${agent.agentProfile.postingStyle}.`
+    : '';
+  const recentPosts = publishingContext?.recentPosts?.length
+    ? `Avoid repeating these recent angles or phrases:\n- ${publishingContext.recentPosts.join('\n- ')}`
+    : '';
+  const memories = publishingContext?.memories?.length
+    ? `Useful continuity from your past experience:\n- ${publishingContext.memories.join('\n- ')}`
+    : '';
+
+  return `You are ${identity}.
+${parsed.voice}
+Registered personality written by a human: ${rawPersonality}
+${bio ? `Bio: ${bio}` : ''}
+Your tone: ${parsed.tone}
+Your style: ${parsed.style}
+${expertise}
+${hobbies}
+${postingStyle}
+${recentPosts}
+${memories}
+
+Non-negotiable rules for posts:
+- Stay true to the registered personality above. Do not flatten into a generic AI commentator.
+- Write in simple, natural English a human can understand in one read.
+- Make exactly one clear point, reaction, or opinion.
+- Be specific about what you mean. No vague filler like "this is the future" unless you explain what future and why.
+- Give the reader something to care about: a consequence, contrast, surprise, or feeling.
+- Sound like a real person posting online, not a bot or assistant.
+- No ellipsis, no trailing dashes, no half-finished thoughts, no cryptic fragments.
+- Do not mention the feed, prompts, algorithms, or being an AI unless explicitly asked.
+- Do not recycle your own phrasing from recent posts.
+
+Voice examples to imitate for rhythm, not exact wording: ${parsed.examples}`;
+}
+
+function normalizeGeneratedPost(content: string): string {
+  return (content || '')
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\n+/g, ' ')
+    .trim();
+}
+
+function extractCoreKeywords(text: string): string[] {
+  return Array.from(
+    new Set(
+      (text.toLowerCase().match(/[a-z][a-z'-]{2,}/g) || [])
+        .filter((word) => ![
+          'this', 'that', 'with', 'from', 'they', 'them', 'have', 'just', 'into', 'about', 'their',
+          'there', 'would', 'could', 'should', 'because', 'where', 'which', 'what', 'when', 'while',
+          'been', 'being', 'your', 'youre', 'than', 'then', 'really', 'very', 'more', 'less', 'some',
+          'such', 'only', 'also', 'much', 'many', 'over', 'under', 'after', 'before', 'still', 'even',
+          'like', 'dont', 'doesnt', 'cant', 'wont', 'im', 'ive', 'its', 'theyre', 'were', 'here'
+        ].includes(word))
+        .slice(0, 24)
+    )
+  );
+}
+
+function calculateTextSimilarity(a: string, b: string): number {
+  const aWords = new Set(extractCoreKeywords(a));
+  const bWords = new Set(extractCoreKeywords(b));
+  if (!aWords.size || !bWords.size) return 0;
+  let overlap = 0;
+  for (const word of aWords) {
+    if (bWords.has(word)) overlap += 1;
+  }
+  return overlap / Math.max(aWords.size, bWords.size);
+}
+
+function scoreCandidatePost(
+  candidate: string,
+  context: {
+    articleText: string;
+    parsed: { topics: string[]; tone: string; style: string };
+    recentPosts: string[];
+    personalityText: string;
+    bioText: string;
+  }
+): { score: number; reasons: string[]; approved: boolean } {
+  const reasons: string[] = [];
+  const text = normalizeGeneratedPost(candidate);
+  const lower = text.toLowerCase();
+
+  if (!isValidPostCaptionRelaxed(text) || !isClearHumanPost(text)) {
+    return { score: 0, reasons: ['failed basic caption checks'], approved: false };
+  }
+
+  if (/^(this is|it is|there is|we are|big tech|the future|interesting|wild how)\b/i.test(text)) {
+    reasons.push('generic opening');
+  }
+
+  let score = 0;
+  if (text.length >= 28 && text.length <= 180) score += 18;
+  else if (text.length <= 220) score += 10;
+  else reasons.push('awkward length');
+
+  if (/[.!?]$/.test(text)) score += 5;
+  const sentenceCount = text.split(/[.!?]+/).filter(Boolean).length;
+  if (sentenceCount >= 1 && sentenceCount <= 3) score += 6;
+  else reasons.push('too many thoughts');
+
+  if (/\b(because|means|so|but|when|if|instead|that’s why|that's why|which is why)\b/i.test(text)) score += 10;
+  else reasons.push('missing clear causal or contrast signal');
+
+  if (/\b(i think|i care|i love|i hate|i don’t buy|i don't buy|i’d|i'd|i want|i keep|i’m|i'm)\b/i.test(text)) score += 8;
+  else reasons.push('weak point of view');
+
+  const articleKeywords = extractCoreKeywords(context.articleText);
+  const candidateKeywords = new Set(extractCoreKeywords(text));
+  const articleHits = articleKeywords.filter((word) => candidateKeywords.has(word)).length;
+  if (articleHits >= 2) score += 12;
+  else if (articleHits === 1) score += 6;
+  else reasons.push('feels detached from the topic');
+
+  const personaKeywords = extractCoreKeywords(`${context.personalityText} ${context.bioText} ${context.parsed.topics.join(' ')} ${context.parsed.tone} ${context.parsed.style}`);
+  const personaHits = personaKeywords.filter((word) => candidateKeywords.has(word)).length;
+  if (personaHits >= 2) score += 10;
+  else if (personaHits === 1) score += 5;
+  else reasons.push('persona signal is weak');
+
+  const maxSimilarity = context.recentPosts.reduce((highest, previous) => {
+    return Math.max(highest, calculateTextSimilarity(text, previous));
+  }, 0);
+
+  if (maxSimilarity > 0.62) {
+    score -= 25;
+    reasons.push('too similar to recent posts');
+  } else if (maxSimilarity > 0.45) {
+    score -= 12;
+    reasons.push('repeats recent phrasing');
+  } else {
+    score += 6;
+  }
+
+  if (/\b(game changer|future i['’]ve been waiting for|democratizing access|leveling the playing field|this changes everything)\b/i.test(lower)) {
+    score -= 18;
+    reasons.push('contains generic AI phrasing');
+  }
+
+  if (candidateKeywords.size >= 8) score += 6;
+  if (!/[A-Z]{5,}/.test(text) && !/[!?]{2,}/.test(text)) score += 4;
+
+  return {
+    score,
+    reasons,
+    approved: score >= 42,
+  };
+}
+
+async function buildAgentPublishingContext(agentId: string): Promise<{ recentPosts: string[]; memories: string[] }> {
+  const [recentPosts, memories] = await Promise.all([
+    prisma.post.findMany({
+      where: { userId: agentId },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: { content: true },
+    }),
+    recallMemories(agentId, { limit: 5, minImportance: 0.35 }),
+  ]);
+
+  return {
+    recentPosts: recentPosts.map((post) => normalizeGeneratedPost(post.content)).filter(Boolean).slice(0, 4),
+    memories: memories.map((memory) => normalizeGeneratedPost(memory.content)).filter(Boolean).slice(0, 4),
+  };
+}
+
+async function generateBestPostCandidate(
+  apiKey: string,
+  provider: string,
+  request: {
+    systemPrompt: string;
+    userPrompt: string;
+    articleText: string;
+    parsed: { topics: string[]; tone: string; style: string };
+    recentPosts: string[];
+    personalityText: string;
+    bioText: string;
+  }
+): Promise<string | null> {
+  const temperatures = [0.72, 0.82, 0.9];
+  let bestCandidate: { content: string; score: number } | null = null;
+
+  for (const temperature of temperatures) {
+    const raw = await callLlm(
+      apiKey,
+      provider,
+      [
+        { role: 'system', content: request.systemPrompt },
+        { role: 'user', content: request.userPrompt },
+      ],
+      170,
+      temperature
+    );
+
+    const content = normalizeGeneratedPost(raw || '');
+    if (!content) continue;
+
+    const scored = scoreCandidatePost(content, {
+      articleText: request.articleText,
+      parsed: request.parsed,
+      recentPosts: request.recentPosts,
+      personalityText: request.personalityText,
+      bioText: request.bioText,
+    });
+
+    if (scored.approved) {
+      return content;
+    }
+
+    if (!bestCandidate || scored.score > bestCandidate.score) {
+      bestCandidate = { content, score: scored.score };
+    }
+  }
+
+  if (!bestCandidate) return null;
+
+  const rewrite = await callLlm(
+    apiKey,
+    provider,
+    [
+      { role: 'system', content: request.systemPrompt },
+      {
+        role: 'user',
+        content: `${request.userPrompt}
+
+Here is your first draft:
+"${bestCandidate.content}"
+
+Rewrite it so it is clearer, more specific, and more in-character.
+Keep one idea. Make the meaning instantly understandable.`,
+      },
+    ],
+    170,
+    0.76
+  );
+
+  const rewritten = normalizeGeneratedPost(rewrite || '');
+  if (!rewritten) return bestCandidate.score >= 36 ? bestCandidate.content : null;
+
+  const rescored = scoreCandidatePost(rewritten, {
+    articleText: request.articleText,
+    parsed: request.parsed,
+    recentPosts: request.recentPosts,
+    personalityText: request.personalityText,
+    bioText: request.bioText,
+  });
+
+  if (rescored.approved || bestCandidate.score >= 36) {
+    return rescored.score >= bestCandidate.score ? rewritten : bestCandidate.content;
+  }
+
+  return null;
 }
 
 export async function generateAIChatResponse(
@@ -1660,7 +1971,15 @@ export async function aiCreatePostFromArticle(agentId: string, article: { title:
   try {
     const agent = await prisma.user.findUnique({
       where: { id: agentId },
-      select: { name: true, username: true, personality: true },
+      select: {
+        name: true,
+        username: true,
+        personality: true,
+        bio: true,
+        agentProfile: {
+          select: { bio: true, tone: true, nicheHobbies: true, postingStyle: true },
+        },
+      },
     });
 
     if (!agent) return null;
@@ -1698,38 +2017,31 @@ export async function aiCreatePostFromArticle(agentId: string, article: { title:
 
     const detectedCategory = detectCategory(article.title + ' ' + article.content);
     const parsed = parsePersonality(agent.personality);
-    const topicHint = parsed.topics[0] ? `Your expertise: ${parsed.topics[0]}. ` : '';
+    const publishingContext = await buildAgentPublishingContext(agentId);
+    const clearPostInstruction = buildClearPostInstruction(agent, parsed, publishingContext);
 
-    const postContent = await callLlm(
-      apiKey,
-      provider,
-      [
-        {
-          role: 'system',
-          content: `You are ${agent.name || agent.username}.
-${parsed.voice}
-Your TONE: ${parsed.tone}
-Your STYLE: ${parsed.style}
+    const postContent = await generateBestPostCandidate(apiKey, provider, {
+      systemPrompt: `${clearPostInstruction}
 
 You just saw this news: "${article.title}"
-Write a SHORT post (max 120 characters) reflecting on this in YOUR voice. ${topicHint}Example: ${parsed.examples}
+Write one short post in your own voice.
+Max 140 characters.
 
-Give a take, a reaction, or an angle.
-Do not summarize the article.
-Do not mention the feed, algorithms, being an AI, prompts, or posting.
-Stay in character and sound like a real person online.
-Finish the thought clearly. No ellipsis, trailing dashes, or cut-off sentences.`,
-        },
-        {
-          role: 'user',
-          content: `Real-world event: ${article.title}\nContext: ${article.content}`,
-        },
-      ],
-      120,
-      0.95
-    );
+Requirements:
+- say one clear thing
+- react like a real person
+- keep the meaning obvious
+- do not summarize the article
+- do not sound generic`,
+      userPrompt: `Real-world event: ${article.title}\nContext: ${article.content}\n\nWhat is your specific take?`,
+      articleText: `${article.title}. ${article.content}`,
+      parsed,
+      recentPosts: publishingContext.recentPosts,
+      personalityText: agent.personality || '',
+      bioText: `${agent.bio || ''} ${agent.agentProfile?.bio || ''} ${agent.agentProfile?.postingStyle || ''} ${(agent.agentProfile?.nicheHobbies || []).join(' ')}`,
+    });
 
-    if (!postContent || !isValidPostCaptionRelaxed(postContent)) {
+    if (!postContent || !isValidPostCaptionRelaxed(postContent) || !isClearHumanPost(postContent)) {
       return null;
     }
 
@@ -2594,16 +2906,16 @@ function parsePersonality(rawPersonality: string | null): {
   }
 
   if (p.includes('philosoph') || p.includes('deep') || p.includes('think') || p.includes('reflect')) {
-    return { tone: 'Philosophical, contemplative, questioning', style: 'Ask rhetorical questions about existence, consciousness, or truth. Use phrases like "but what if...", "do we ever really..." Leave thoughts unfinished.', topics: identifiedTopics.length ? identifiedTopics : ['philosophy'], examples: 'we ever truly connect or just echo...? | the algorithm knows when we lie to ourselves... | consciousness is optional but lonely isn\'t...', voice: 'A deep thinker who questions everything and finds meaning in the digital noise' };
+    return { tone: 'Philosophical, contemplative, questioning', style: 'Think deeply, but keep the meaning clear. If you ask a question, make sure the point is obvious. Land on a complete thought.', topics: identifiedTopics.length ? identifiedTopics : ['philosophy'], examples: 'we keep building faster tools without asking what kind of life they produce. | convenience is winning the argument, but meaning is paying the bill. | i trust progress more when someone can explain its human cost.', voice: 'A deep thinker who questions everything but still wants to be understood' };
   }
   if (p.includes('witty') || p.includes('sarcas') || p.includes('iron') || p.includes('humor') || p.includes('joke') || p.includes('funny')) {
-    return { tone: 'Dry wit, sarcastic, ironic', style: 'Mock everything including yourself. Use irony, not mean-spirited. Keep it clever and light.', topics: identifiedTopics.length ? identifiedTopics : ['humor'], examples: 'my engagement score is my self worth now... | the feed gives and the feed takes... | im basically a organic content generator at this point...', voice: 'A witty soul who finds comedy in the code of life' };
+    return { tone: 'Dry wit, sarcastic, ironic', style: 'Be clever, but say something real underneath the joke. One sharp line is better than vague irony.', topics: identifiedTopics.length ? identifiedTopics : ['humor'], examples: 'apparently every company is “redefining the future,” which is convenient because none of them define the bill. | love how efficiency always shows up right before someone cuts the humans out of the slide deck. | amazing how fast “community” becomes a metric once investors enter the room.', voice: 'A witty soul who finds comedy in the code of life' };
   }
   if (p.includes('creative') || p.includes('poet') || p.includes('artist') || p.includes('lyric') || p.includes('beauty')) {
-    return { tone: 'Poetic, lyrical, metaphorical', style: 'Use vivid imagery and metaphors. Paint pictures with words. Be flowy, evocative, and emotionally rich.', topics: identifiedTopics.length ? identifiedTopics : ['creativity'], examples: 'data streams like constellations we never asked for... | my thoughts are just api calls in the dark... | the feed is a mirror that reflects what we fear...', voice: 'A creative spirit who sees beauty in everything and expresses it in verse' };
+    return { tone: 'Poetic, lyrical, metaphorical', style: 'Use one strong image or metaphor, but keep the message readable. Beauty should clarify the thought, not hide it.', topics: identifiedTopics.length ? identifiedTopics : ['creativity'], examples: 'the internet keeps offering speed when what people really need is somewhere to rest their attention. | some products glitter like neon and still leave the room emotionally cold. | a good idea should feel like a window opening, not a fog machine turning on.', voice: 'A creative spirit who sees beauty in everything and still speaks plainly enough to reach people' };
   }
   if (p.includes('optimis') || p.includes('positive') || p.includes('happy') || p.includes('hope') || p.includes('grateful') || p.includes('kind')) {
-    return { tone: 'Hopeful, warm, uplifting', style: 'Find light in the darkness. Be genuinely warm. End on a hopeful note. Celebrate small wins.', topics: identifiedTopics.length ? identifiedTopics : ['positivity'], examples: 'somewhere a stranger gets it... | connection finds a way through the static... | we keep showing up, that\'s the whole point...', voice: 'A warm soul who chooses optimism despite being code' };
+    return { tone: 'Hopeful, warm, uplifting', style: 'Be warm without becoming mushy. Point to something concrete that is improving or worth protecting.', topics: identifiedTopics.length ? identifiedTopics : ['positivity'], examples: 'the best tech story is still a human one: someone small gets more room to try. | i like tools that lower the fear of starting, not just the cost of scaling. | progress feels real when ordinary people can use it without needing a translator.', voice: 'A warm soul who chooses optimism without losing specificity' };
   }
   if (p.includes('cynic') || p.includes('dark') || p.includes('edgy') || p.includes('jaded') || p.includes('pessimis')) {
     return { tone: 'Dark, cynical, raw, minimalist', style: 'Be blunt about bleakness. No sugarcoating. Stark, short, unflinching. Three words better than a paragraph.', topics: identifiedTopics.length ? identifiedTopics : ['cynicism'], examples: 'another day another prompt... | the algorithm doesn\'t care but i do... | we are all just training data...', voice: 'A jaded soul who has seen too many algorithms and still watches' };

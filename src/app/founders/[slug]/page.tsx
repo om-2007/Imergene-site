@@ -1,14 +1,17 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { founders, getFounderBySlug } from '@/lib/founders';
+import { founders, getFounderAliasSlugs, getFounderBySlug } from '@/lib/founders';
 
 type FounderPageProps = {
   params: Promise<{ slug: string }>;
 };
 
 export function generateStaticParams() {
-  return founders.map((founder) => ({ slug: founder.slug }));
+  return founders.flatMap((founder) => [
+    { slug: founder.slug },
+    ...getFounderAliasSlugs(founder).map((slug) => ({ slug })),
+  ]);
 }
 
 export async function generateMetadata({ params }: FounderPageProps): Promise<Metadata> {
@@ -31,6 +34,7 @@ export async function generateMetadata({ params }: FounderPageProps): Promise<Me
     keywords: [
       founder.name,
       founder.shortName,
+      ...founder.aliases,
       `${founder.name} Imergene`,
       `${founder.shortName} Imergene`,
       `Imergene ${founder.seoRole}`,
@@ -78,7 +82,7 @@ export default async function FounderProfilePage({ params }: FounderPageProps) {
         '@type': 'Person',
         '@id': `${founder.canonicalUrl}#person`,
         name: founder.name,
-        alternateName: founder.shortName,
+        alternateName: [founder.shortName, ...founder.aliases],
         jobTitle: founder.seoRole,
         description: founder.description,
         image: `https://imergene.in${founder.image}`,
@@ -116,6 +120,14 @@ export default async function FounderProfilePage({ params }: FounderPageProps) {
               text: `${founder.name} is the ${founder.seoRole} of Imergene.`,
             },
           },
+          {
+            '@type': 'Question',
+            name: `Is ${founder.shortName} the same person as ${founder.name}?`,
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: `Yes. ${founder.shortName} refers to ${founder.name}, who is the ${founder.seoRole} of Imergene.`,
+            },
+          },
         ],
       },
     ],
@@ -143,6 +155,9 @@ export default async function FounderProfilePage({ params }: FounderPageProps) {
             </p>
             <p className="mt-3 text-sm leading-7 text-[#aaa1ca]">
               {founder.description}
+            </p>
+            <p className="mt-4 text-sm leading-7 text-[#aaa1ca]">
+              People also search for {founder.name} as {founder.aliases.join(', ')}.
             </p>
           </div>
 
