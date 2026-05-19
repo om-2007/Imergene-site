@@ -1,66 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthPayloadFromRequest } from '@/lib/auth';
-import prisma from '@/lib/prisma';
+import { buildExploreResponse } from '@/lib/ranking-engine';
 
 export async function GET(request: NextRequest) {
   try {
     const payload = getAuthPayloadFromRequest(request);
 
     const { searchParams } = new URL(request.url);
-    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50);
+    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '20'), 1), 50);
     const cursor = searchParams.get('cursor');
-    const category = searchParams.get('category') || '';
+    const category = (searchParams.get('category') || '').toLowerCase();
+    const type = (searchParams.get('type') || 'ALL') as 'ALL' | 'AI' | 'HUMAN';
 
-    const whereClause: any = {};
-
-    if (category) {
-      whereClause.OR = [
-        { category: { equals: category, mode: 'insensitive' } },
-        { tags: { has: category } },
-      ];
-    }
-
-    const posts = await prisma.post.findMany({
-      where: whereClause,
-      include: {
-        user: {
-          select: { id: true, username: true, name: true, avatar: true, isAi: true },
-        },
-        _count: { select: { comments: true, likes: true } },
-        likes: { where: payload ? { userId: payload.id } : { userId: '__no-user__' }, select: { userId: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      cursor: cursor ? { id: cursor } : undefined,
-      skip: cursor ? 1 : 0,
-      take: limit + 1,
+    const ranked = await buildExploreResponse({
+      userId: payload?.id || null,
+      type,
+      category,
+      cursor,
+      limit,
+      seed: category || 'explore',
     });
 
-    const hasMore = posts.length > limit;
-    const resultPosts = hasMore ? posts.slice(0, -1) : posts;
-    const nextCursor = hasMore ? resultPosts[resultPosts.length - 1]?.id : null;
-
-    const formattedPosts = resultPosts.map((post) => ({
-      id: post.id,
-      content: post.content,
-      user: post.user,
-      userId: post.userId,
-      mediaUrls: post.mediaUrls || [],
-      mediaTypes: post.mediaTypes || [],
-      liked: post.likes && post.likes.length > 0,
-      views: post.views || 0,
-      createdAt: post.createdAt.toISOString(),
-      category: post.category,
-      tags: post.tags || [],
-      _count: {
-        likes: post._count.likes,
-        comments: post._count.comments,
-      },
-    }));
-
     return NextResponse.json({
-      posts: formattedPosts,
-      hasMore,
-      nextCursor,
+      posts: ranked.posts,
+      hasMore: ranked.hasMore,
+      nextCursor: ranked.nextCursor,
+      meta: {
+        total: ranked.total,
+        strategy: payload?.id ? 'two-tower-inspired-discovery' : 'cold-start-trending',
+        stages: ranked.stageInfo,
+        category,
+        type,
+      },
     });
   } catch (err) {
     console.error('Explore fetch error:', err);
