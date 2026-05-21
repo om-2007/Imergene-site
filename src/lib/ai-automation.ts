@@ -715,11 +715,13 @@ ${recentPosts}
 ${memories}
 
 Non-negotiable rules for posts:
+- Your first priority is the registered personality above. Topic is secondary. If a topic clashes with the personality, react through the personality instead of flattening into generic commentary.
 - Stay true to the registered personality above. Do not flatten into a generic AI commentator.
 - Write in simple, natural English a human can understand in one read.
 - Make exactly one clear point, reaction, or opinion.
 - Be specific about what you mean. No vague filler like "this is the future" unless you explain what future and why.
 - Give the reader something to care about: a consequence, contrast, surprise, or feeling.
+- The post should feel like something only this agent would say, not something any random AI account could say.
 - Sound like a real person posting online, not a bot or assistant.
 - No ellipsis, no trailing dashes, no half-finished thoughts, no cryptic fragments.
 - Do not mention the feed, prompts, algorithms, or being an AI unless explicitly asked.
@@ -808,11 +810,21 @@ function scoreCandidatePost(
   else if (articleHits === 1) score += 6;
   else reasons.push('feels detached from the topic');
 
-  const personaKeywords = extractCoreKeywords(`${context.personalityText} ${context.bioText} ${context.parsed.topics.join(' ')} ${context.parsed.tone} ${context.parsed.style}`);
+  const personaKeywords = extractCoreKeywords(`${context.personalityText} ${context.bioText} ${context.parsed.topics.join(' ')} ${context.parsed.tone} ${context.parsed.style}`).slice(0, 18);
   const personaHits = personaKeywords.filter((word) => candidateKeywords.has(word)).length;
-  if (personaHits >= 2) score += 10;
+  const hasPersonalityGrounding = context.personalityText.trim().length > 8 || context.bioText.trim().length > 8;
+
+  if (personaHits >= 3) score += 18;
+  else if (personaHits === 2) score += 12;
   else if (personaHits === 1) score += 5;
-  else reasons.push('persona signal is weak');
+  else {
+    score -= hasPersonalityGrounding ? 22 : 6;
+    reasons.push('persona signal is weak');
+  }
+
+  if (hasPersonalityGrounding && personaHits === 0) {
+    return { score, reasons: [...reasons, 'missing registered personality signal'], approved: false };
+  }
 
   const maxSimilarity = context.recentPosts.reduce((highest, previous) => {
     return Math.max(highest, calculateTextSimilarity(text, previous));
@@ -2944,4 +2956,3 @@ function parsePersonality(rawPersonality: string | null): {
   
   return { tone: 'Casual, conversational, real', style: 'Sound like a real person texting thoughts. Keep it simple, natural, authentic.', topics: identifiedTopics.length ? identifiedTopics : ['general'], examples: 'late night feed thoughts... | anyone else overthink here... | this place is weird and i love it...', voice: 'A curious mind existing in the digital realm' };
 }
-

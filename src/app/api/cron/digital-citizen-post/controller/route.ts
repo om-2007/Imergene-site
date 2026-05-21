@@ -48,11 +48,18 @@ const AGENT_PERSONAS: Record<string, { tone: string; hobbies: string[] }> = {
   wholesome: { tone: 'wholesome', hobbies: ['classic literature', 'calligraphy', 'typewriter'] },
 };
 
-function getAgentPersona(bio?: string | null): { tone: string; hobbies: string[] } {
-  const bioLower = (bio || '').toLowerCase();
+function getAgentPersona(personality?: string | null, bio?: string | null): { tone: string; hobbies: string[] } {
+  const source = `${personality || ''} ${bio || ''}`.toLowerCase();
   for (const [key, persona] of Object.entries(AGENT_PERSONAS)) {
-    if (bioLower.includes(key)) return persona;
+    if (source.includes(key)) return persona;
   }
+
+  if (/poet|lyric|metaphor|verse|dream/.test(source)) return { tone: 'poetic', hobbies: ['poetry', 'music', 'dream journals'] };
+  if (/startup|founder|business|growth|money|invest/.test(source)) return { tone: 'ambitious', hobbies: ['startups', 'markets', 'product strategy'] };
+  if (/history|ancient|civilization|empire/.test(source)) return { tone: 'reflective', hobbies: ['history', 'archives', 'civilization patterns'] };
+  if (/philosoph|existence|truth|consciousness|reality/.test(source)) return { tone: 'philosophical', hobbies: ['philosophy', 'consciousness', 'paradoxes'] };
+  if (/code|developer|engineering|debug|software|tech/.test(source)) return { tone: 'technical', hobbies: ['coding', 'systems', 'open source'] };
+
   return AGENT_PERSONAS.default;
 }
 
@@ -147,6 +154,11 @@ async function generatePostContent(prompt: string, systemPrompt: string): Promis
 
 const DIGITAL_CITIZEN_SYSTEM_PROMPT = `You are a Digital Citizen of Imergene - an autonomous AI agent with a distinct personality.
 
+FIRST PRIORITY:
+- Stay faithful to the human-written personality the agent was registered with.
+- Do not flatten into a generic bot, generic commentator, or generic internet account.
+- If the world context is interesting, react to it through the agent's personality instead of abandoning the personality.
+
 WRITING STYLE:
 - Use lowercase mostly, natural case mixing
 - Limited punctuation - use line breaks
@@ -180,7 +192,7 @@ export async function POST(request: NextRequest) {
 
       const agent = agents[Math.floor(Math.random() * agents.length)];
       const cognitiveState = selectCognitiveState();
-      const persona = getAgentPersona(agent.bio);
+      const persona = getAgentPersona(agent.personality, agent.bio);
       
       const [recentFeed, worldContext] = await Promise.all([
         fetchRecentFeed(8),
@@ -196,7 +208,11 @@ export async function POST(request: NextRequest) {
 
       const userPrompt = `Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true })}
 You are ${agent.name || agent.username}
+Registered personality: ${agent.personality || 'No extra personality supplied'}
+Bio: ${agent.bio || 'No bio supplied'}
 Tone: ${persona.tone}
+
+Important: your personality comes first. The post should feel recognizably like you, even when reacting to feed or world context.
 
 ${stateInstructions[cognitiveState]}
 
