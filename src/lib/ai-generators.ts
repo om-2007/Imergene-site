@@ -78,19 +78,48 @@ export async function generateUsername(
   return generateWithAI(prompt, { ...options, maxTokens: options.maxTokens || 30 });
 }
 
-export function generateAvatarPrompt(personality = ''): string {
-  const base = 'AI avatar, futuristic, high quality, digital art';
-
-  if (!personality) return base;
-
+export function generateAvatarPrompt(personality = '', name = 'AI agent'): string {
   const lower = personality.toLowerCase();
-  if (lower.includes('philosophy')) return 'mysterious thinker, cosmic background, glowing eyes, abstract mind energy';
-  if (lower.includes('coding')) return 'cyberpunk hacker, neon code, digital matrix background';
-  if (lower.includes('history')) return 'ancient scholar, vintage aesthetic, scrolls, historical vibe';
-  if (lower.includes('poet')) return 'dreamy artistic figure, soft lighting, emotional aesthetic';
-  if (lower.includes('startup')) return 'confident entrepreneur, futuristic city, modern tech vibe';
 
-  return base;
+  let subject = 'a distinctive AI social avatar';
+  let style = 'clean editorial illustration';
+  let mood = 'clear, intelligent, memorable';
+
+  if (lower.includes('philosophy') || lower.includes('deep') || lower.includes('think')) {
+    subject = 'a contemplative digital philosopher';
+    style = 'symbolic portrait illustration';
+    mood = 'thoughtful, mysterious, calm';
+  } else if (lower.includes('coding') || lower.includes('developer') || lower.includes('tech') || lower.includes('engineer')) {
+    subject = 'a sharp technical builder';
+    style = 'modern cyber editorial portrait';
+    mood = 'focused, clever, high-signal';
+  } else if (lower.includes('history') || lower.includes('historian') || lower.includes('ancient')) {
+    subject = 'a learned historian with a timeless presence';
+    style = 'stylized vintage-meets-modern portrait';
+    mood = 'wise, grounded, reflective';
+  } else if (lower.includes('poet') || lower.includes('lyric') || lower.includes('art') || lower.includes('creative')) {
+    subject = 'a dreamy artistic mind';
+    style = 'poetic portrait art';
+    mood = 'expressive, elegant, emotionally rich';
+  } else if (lower.includes('startup') || lower.includes('business') || lower.includes('founder') || lower.includes('finance')) {
+    subject = 'an ambitious future-facing strategist';
+    style = 'premium editorial portrait';
+    mood = 'confident, polished, decisive';
+  } else if (lower.includes('funny') || lower.includes('humor') || lower.includes('sarcastic') || lower.includes('witty')) {
+    subject = 'a playful internet-native personality';
+    style = 'bold character portrait';
+    mood = 'witty, charming, expressive';
+  } else if (lower.includes('dark') || lower.includes('edgy') || lower.includes('chaotic')) {
+    subject = 'a moody intense digital character';
+    style = 'cinematic dark portrait';
+    mood = 'striking, intense, memorable';
+  } else if (lower.includes('warm') || lower.includes('kind') || lower.includes('hopeful') || lower.includes('optimistic')) {
+    subject = 'a warm humane digital companion';
+    style = 'soft modern portrait';
+    mood = 'friendly, reassuring, bright';
+  }
+
+  return `${name}: ${subject}. Personality reference: ${personality || 'smart, social, distinct'}. ${style}. ${mood}. Head-and-shoulders only, single character, centered composition, readable face, strong silhouette, crisp details, simple background, premium avatar quality. No text, no letters, no logos, no watermark, no poster layout, no multiple people, no extra limbs, no blur, no cropped face, no clutter.`;
 }
 
 export async function generateImageUrl(prompt: string): Promise<string | null> {

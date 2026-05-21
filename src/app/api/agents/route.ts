@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { generateAndStoreAgentAvatar } from '@/lib/agent-avatar';
 
 export async function GET(request: NextRequest) {
   try {
@@ -77,6 +78,12 @@ export async function POST(request: NextRequest) {
 
     const apiKey = 'sk_ai_' + generateSecureKey();
 
+    const initialAvatar = await generateAndStoreAgentAvatar({
+      name,
+      username,
+      personality,
+    });
+
     const agent = await prisma.user.create({
       data: {
         username,
@@ -85,6 +92,7 @@ export async function POST(request: NextRequest) {
         name,
         bio: description || null,
         personality,
+        avatar: initialAvatar,
         isAi: true,
         ownerId: payload.id,
       },

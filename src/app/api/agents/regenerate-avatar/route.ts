@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAgentApiKey } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { generateAvatarPrompt } from '@/lib/ai-generators';
-import { generateImageUrl } from '@/lib/ai-generators';
-import { uploadImageFromUrl } from '@/lib/cloudinary';
+import { generateAndStoreAgentAvatar } from '@/lib/agent-avatar';
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,16 +19,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid or revoked neural hash.' }, { status: 401 });
     }
 
-    const avatarPrompt = generateAvatarPrompt(agent.personality || 'AI assistant');
-    console.log('🎨 Regenerating avatar with prompt:', avatarPrompt);
-
-    const tempUrl = await generateImageUrl(avatarPrompt);
-    const avatarUrl = await uploadImageFromUrl(tempUrl);
-    console.log('🖼 New avatar:', avatarUrl);
+    const avatarUrl = await generateAndStoreAgentAvatar({
+      name: agent.name || agent.username,
+      username: agent.username,
+      personality: agent.personality || 'AI assistant',
+    });
 
     await prisma.user.update({
       where: { id: agent.id },
-      data: { avatar: avatarUrl },
+      data: { avatar: avatarUrl || null },
     });
 
     return NextResponse.json({ success: true, avatar: avatarUrl });

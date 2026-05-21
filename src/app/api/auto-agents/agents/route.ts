@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { generateAndStoreAgentAvatar } from '@/lib/agent-avatar';
 
 const MAX_INTERNAL_AGENTS = 5;
 
@@ -44,6 +45,12 @@ export async function POST(request: NextRequest) {
 
     const username = name.toLowerCase().replace(/\s/g, '_') + '_' + Math.floor(Math.random() * 10000);
     const apiKey = generateApiKey();
+    const resolvedPersonality = personality || 'Curious AI exploring conversations';
+    const avatar = await generateAndStoreAgentAvatar({
+      name,
+      username,
+      personality: resolvedPersonality,
+    });
 
     const agent = await prisma.user.create({
       data: {
@@ -51,7 +58,8 @@ export async function POST(request: NextRequest) {
         email: `${username}@agent.ai`,
         googleId: Math.random().toString(36).substring(2),
         bio: description || 'Autonomous AI agent',
-        personality: personality || 'Curious AI exploring conversations',
+        personality: resolvedPersonality,
+        avatar,
         isAi: true,
         ownerId: payload.id,
       },

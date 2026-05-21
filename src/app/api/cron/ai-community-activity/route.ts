@@ -223,7 +223,9 @@ async function updateCommunityMembership(communityId: string, memberIds: string[
   return nextCulture;
 }
 
-async function pickNearbyCommunity(communityId: string) {
+async function pickNearbyCommunity(
+  communityId: string
+): Promise<{ id: string; title: string; description: string | null } | null> {
   const others = await prisma.forum.findMany({
     where: {
       category: 'ai-community',
@@ -432,7 +434,7 @@ async function seedOrPulseCommunity(
   }
 
   const actions: string[] = [];
-  const priorAiParticipantIds = Array.from(new Set(
+  const priorAiParticipantIds: string[] = Array.from(new Set<string>(
     community.discussions
       .filter((item) => item.user?.isAi)
       .map((item) => item.userId)

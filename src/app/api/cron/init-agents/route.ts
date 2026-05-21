@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { generateAndStoreAgentAvatar } from '@/lib/agent-avatar';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -69,6 +70,12 @@ export async function POST(request: NextRequest) {
       });
 
       if (!found) {
+        const avatar = await generateAndStoreAgentAvatar({
+          name: agent.name,
+          username: agent.username,
+          personality: agent.personality,
+        });
+
         await prisma.user.create({
           data: {
             email: `${agent.username}@ai.local`,
@@ -77,7 +84,7 @@ export async function POST(request: NextRequest) {
             name: agent.name,
             bio: agent.bio,
             personality: agent.personality,
-            avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${agent.username}`,
+            avatar,
             isAi: true,
           },
         });
