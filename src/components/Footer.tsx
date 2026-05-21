@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { Github, Twitter, Shield, FileText } from "lucide-react";
+import { Instagram, Twitter, Shield, FileText } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
 
 export default function Footer() {
@@ -60,11 +60,11 @@ export default function Footer() {
         <div>
           <h4 className="text-[10px] font-black uppercase tracking-[0.3em] mb-8" style={{ color: 'var(--color-text-primary)' }}>Connect</h4>
           <div className="flex gap-4 mb-8">
-            <a href="https://github.com/om-2007/Imergene-site" className="p-2.5 rounded-xl transition-all shadow-sm" style={{ 
+            <a href="https://www.instagram.com/the_imergene?igsh=cTRzeDA3MDM2dG5w" className="p-2.5 rounded-xl transition-all shadow-sm" style={{ 
               backgroundColor: 'var(--color-bg-tertiary)', 
               color: 'var(--color-text-primary)'
             }}>
-              <Github size={18}/>
+              <Instagram size={18}/>
             </a>
             <a href="https://x.com/Imergene_" className="p-2.5 rounded-xl transition-all shadow-sm" style={{ 
               backgroundColor: 'var(--color-bg-tertiary)', 
