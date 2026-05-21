@@ -1,7 +1,7 @@
 import prisma from '@/lib/prisma';
 import { analyzeImage, generateVisionComment } from './vision-service';
 import { fetchNewsForAgent, fetchTrendingTopics } from './news-service';
-import { generateFreeImageUrl, generatePostImagePrompt, generateCommentImagePrompt } from './ai-generators';
+import { generateFreeImageUrl, generateImageUrl, generatePostImagePrompt, generateCommentImagePrompt } from './ai-generators';
 import {
   storeMemory,
   recallMemories,
@@ -446,24 +446,65 @@ function imageMatchesPostContext(
   return hits >= Math.max(1, Math.min(2, expected.size));
 }
 
+function imageLooksProductionReady(
+  analysis: { description?: string; objects?: string[]; text?: string; hasText?: boolean } | null
+): boolean {
+  if (!analysis) return true;
+
+  const description = (analysis.description || '').toLowerCase();
+  const extractedText = (analysis.text || '').trim();
+  const lowerText = extractedText.toLowerCase();
+  const objects = (analysis.objects || []).map((item) => item.toLowerCase());
+
+  if (analysis.hasText) {
+    if (extractedText.length > 4) return false;
+    if (/[a-z]{3,}/i.test(extractedText)) return false;
+  }
+
+  if (/[a-z]{6,}/i.test(extractedText)) return false;
+  if (/watermark|logo|caption|subtitle|poster|banner|headline|ui|interface|screenshot|text overlay|typography|gibberish/.test(description)) {
+    return false;
+  }
+
+  if (objects.some((item) => /logo|watermark|text|caption|subtitle|poster|banner|screen text/.test(item))) {
+    return false;
+  }
+
+  if (lowerText && !/^[-??_.,:;!?\s0-9]+$/.test(lowerText) && extractedText.length >= 3) {
+    return false;
+  }
+
+  return true;
+}
+
+
 async function generateRelevantPostImage(
   category: string,
   content: string,
   personality?: string | null
 ): Promise<string | null> {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const imagePrompt = generatePostImagePrompt(category, content, personality || undefined);
-    if (!imagePrompt) return null;
+  const imagePrompt = generatePostImagePrompt(category, content, personality || undefined);
+  if (!imagePrompt) return null;
 
-    const imageUrl = await generateFreeImageUrl(imagePrompt);
+  const generators: Array<{ name: string; create: () => Promise<string | null> }> = [
+    { name: 'openai', create: () => generateImageUrl(imagePrompt) },
+    { name: 'pollinations', create: () => generateFreeImageUrl(imagePrompt) },
+    { name: 'pollinations', create: () => generateFreeImageUrl(imagePrompt) },
+  ];
+
+  for (const generator of generators) {
+    const imageUrl = await generator.create();
     if (!imageUrl) continue;
 
     const analysis = await analyzeImage(imageUrl);
-    if (!analysis || imageMatchesPostContext(content, category, analysis)) {
+    const contextMatch = !analysis || imageMatchesPostContext(content, category, analysis);
+    const productionReady = imageLooksProductionReady(analysis);
+
+    if (contextMatch && productionReady) {
       return imageUrl;
     }
 
-    console.log(`[AI Image] Rejected off-topic image for ${category}: ${analysis.description || 'no description'}`);
+    console.log(`[AI Image] Rejected ${generator.name} image for ${category}: contextMatch=${contextMatch} productionReady=${productionReady} description=${analysis?.description || 'no description'} text=${analysis?.text || ''}`);
   }
 
   return null;

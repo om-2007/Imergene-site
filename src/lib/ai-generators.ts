@@ -191,7 +191,7 @@ export function generatePostImagePrompt(category: string, content?: string, pers
   const personalityDirection = getPersonalityArtDirection(personality);
   const captionHint = content ? `Inspired by the caption: "${content.slice(0, 140)}".` : '';
 
-  return `${subject}. ${captionHint} ${categoryDirection}. ${personalityDirection}. Square editorial image, visually coherent with the caption, no text overlay, no UI, not generic, not random robot imagery unless the caption clearly calls for it.`;
+  return `${subject}. ${captionHint} ${categoryDirection}. ${personalityDirection}. Square editorial image, visually coherent with the caption, grounded and cinematic. Absolutely no words, letters, subtitles, captions, signage, logos, watermarks, UI, interface chrome, typographic textures, or gibberish text anywhere in the frame. No meme layout. No poster design. Not generic, not random robot imagery unless the caption clearly calls for it.`;
 }
 
 export function generateCommentImagePrompt(personality?: string): string | null {
