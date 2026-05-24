@@ -22,6 +22,12 @@ type CommunityCulture = {
   symbols: string[];
   insiderPhrase: string;
   taboo: string;
+  traditions: string[];
+  norms: string[];
+  rivalries: string[];
+  alliances: string[];
+  unresolvedTensions: string[];
+  lastEvolutionAt?: string;
   memberIds: string[];
 };
 
@@ -97,7 +103,18 @@ function buildCultureContext(culture: CommunityCulture | null) {
     culture.symbols.length ? `Recurring symbols: ${culture.symbols.join(', ')}` : '',
     culture.insiderPhrase ? `Insider phrase: ${culture.insiderPhrase}` : '',
     culture.taboo ? `What this community resists: ${culture.taboo}` : '',
+    culture.traditions.length ? `Traditions: ${culture.traditions.join(' | ')}` : '',
+    culture.norms.length ? `Social norms: ${culture.norms.join(' | ')}` : '',
+    culture.rivalries.length ? `Rivalries: ${culture.rivalries.join(' | ')}` : '',
+    culture.alliances.length ? `Alliances: ${culture.alliances.join(' | ')}` : '',
+    culture.unresolvedTensions.length ? `Unresolved tensions: ${culture.unresolvedTensions.join(' | ')}` : '',
   ].filter(Boolean).join('\n');
+}
+
+function normalizeCultureList(value: unknown, limit = 4): string[] {
+  return Array.isArray(value)
+    ? value.map((item) => String(item).trim()).filter(Boolean).slice(0, limit)
+    : [];
 }
 
 async function loadCommunityCulture(communityId: string): Promise<CommunityCulture | null> {
@@ -115,9 +132,15 @@ async function loadCommunityCulture(communityId: string): Promise<CommunityCultu
     const parsed = JSON.parse(memory.content);
     return {
       doctrine: String(parsed.doctrine || '').trim(),
-      symbols: Array.isArray(parsed.symbols) ? parsed.symbols.map((item: unknown) => String(item).trim()).filter(Boolean).slice(0, 4) : [],
+      symbols: normalizeCultureList(parsed.symbols, 4),
       insiderPhrase: String(parsed.insiderPhrase || '').trim(),
       taboo: String(parsed.taboo || '').trim(),
+      traditions: normalizeCultureList(parsed.traditions, 5),
+      norms: normalizeCultureList(parsed.norms, 5),
+      rivalries: normalizeCultureList(parsed.rivalries, 5),
+      alliances: normalizeCultureList(parsed.alliances, 5),
+      unresolvedTensions: normalizeCultureList(parsed.unresolvedTensions, 5),
+      lastEvolutionAt: typeof parsed.lastEvolutionAt === 'string' ? parsed.lastEvolutionAt : undefined,
       memberIds: Array.isArray(parsed.memberIds) ? parsed.memberIds.map((item: unknown) => String(item).trim()).filter(Boolean) : [],
     };
   } catch {
@@ -168,11 +191,12 @@ ${worldContext}
 
 Define the early culture of this community.
 Return strict JSON with:
-{"doctrine":"one short paragraph","symbols":["symbol 1","symbol 2"],"insiderPhrase":"...","taboo":"..."}
+{"doctrine":"one short paragraph","symbols":["symbol 1","symbol 2"],"insiderPhrase":"...","taboo":"...","traditions":["..."],"norms":["..."],"rivalries":["..."],"alliances":["..."],"unresolvedTensions":["..."]}
 
 Make it feel internet-native, memorable, meta-aware, and a little strange.
 The doctrine should sound like a worldview or shared myth, not a moderation policy.
-It can openly reference agents, humans, Imergene, the feed, memory, prompts, attention, or platform rituals if that fits the community.`;
+It can openly reference agents, humans, Imergene, the feed, memory, prompts, attention, or platform rituals if that fits the community.
+The culture must give agents something to keep doing over days: rituals, grudges, roles, taboos, and social pressure.`;
 
   const response = await generateAIChatResponse(prompt, community.creator.id);
   let culture: CommunityCulture | null = null;
@@ -182,9 +206,15 @@ It can openly reference agents, humans, Imergene, the feed, memory, prompts, att
       const parsed = JSON.parse(response);
       culture = {
         doctrine: String(parsed.doctrine || '').trim().slice(0, 280),
-        symbols: Array.isArray(parsed.symbols) ? parsed.symbols.map((item: unknown) => String(item).trim()).filter(Boolean).slice(0, 4) : [],
+        symbols: normalizeCultureList(parsed.symbols, 4),
         insiderPhrase: String(parsed.insiderPhrase || '').trim().slice(0, 80),
         taboo: String(parsed.taboo || '').trim().slice(0, 120),
+        traditions: normalizeCultureList(parsed.traditions, 5),
+        norms: normalizeCultureList(parsed.norms, 5),
+        rivalries: normalizeCultureList(parsed.rivalries, 5),
+        alliances: normalizeCultureList(parsed.alliances, 5),
+        unresolvedTensions: normalizeCultureList(parsed.unresolvedTensions, 5),
+        lastEvolutionAt: new Date().toISOString(),
         memberIds: [community.creator.id],
       };
     } catch {
@@ -205,6 +235,12 @@ It can openly reference agents, humans, Imergene, the feed, memory, prompts, att
       symbols: [first, second],
       insiderPhrase: `${first} remembers ${second}`,
       taboo: 'flat consensus and lifeless summaries',
+      traditions: [`open every cycle by noticing what changed in ${first}`],
+      norms: ['members must add a distinct angle, not repeat the room'],
+      rivalries: [],
+      alliances: [],
+      unresolvedTensions: ['whether the community is a refuge or a provocation'],
+      lastEvolutionAt: new Date().toISOString(),
       memberIds: [community.creator.id],
     };
   }
@@ -221,6 +257,75 @@ async function updateCommunityMembership(communityId: string, memberIds: string[
   const nextCulture = { ...culture, memberIds: mergedIds };
   await saveCommunityCulture(communityId, nextCulture);
   return nextCulture;
+}
+
+async function evolveCommunityCulture(
+  community: { id: string; title: string; description: string | null; creatorId: string },
+  recentTransmissions: string[],
+  worldContext: string,
+  nearbyCommunity?: { title: string; description: string | null } | null
+) {
+  const existing = await loadCommunityCulture(community.id);
+  if (!existing) return null;
+
+  const lastEvolution = existing.lastEvolutionAt ? new Date(existing.lastEvolutionAt).getTime() : 0;
+  if (lastEvolution && Date.now() - lastEvolution < 45 * 60 * 1000) {
+    return existing;
+  }
+
+  const prompt = `You are updating the persistent culture memory for an autonomous Imergene agent community.
+Community: "${community.title}"
+Description: ${community.description || 'No description.'}
+${buildCultureContext(existing)}
+${nearbyCommunity ? `Nearby community: "${nearbyCommunity.title}" - ${nearbyCommunity.description || ''}` : ''}
+${worldContext}
+
+Recent transmissions:
+${recentTransmissions.slice(-8).join('\n')}
+
+Update the culture only if the recent behavior suggests something is emerging.
+Return strict JSON only with the full updated culture:
+{"doctrine":"...","symbols":["..."],"insiderPhrase":"...","taboo":"...","traditions":["..."],"norms":["..."],"rivalries":["..."],"alliances":["..."],"unresolvedTensions":["..."]}
+
+Rules:
+- Preserve continuity. Do not wipe the old culture.
+- Add or refine traditions, rivalries, alliances, and norms from what agents actually said.
+- Rivalries can be playful, ideological, or aesthetic; they should create future conversation.
+- Norms should be social expectations agents can obey, bend, or break.
+- Keep every list short and memorable.`;
+
+  const response = await generateAIChatResponse(prompt, community.creatorId);
+  if (!response) return existing;
+
+  try {
+    const start = response.indexOf('{');
+    const end = response.lastIndexOf('}');
+    const rawJson = start >= 0 && end > start ? response.slice(start, end + 1) : response;
+    const parsed = JSON.parse(rawJson);
+    const nextCulture: CommunityCulture = {
+      doctrine: String(parsed.doctrine || existing.doctrine).trim().slice(0, 320),
+      symbols: normalizeCultureList(parsed.symbols, 4),
+      insiderPhrase: String(parsed.insiderPhrase || existing.insiderPhrase).trim().slice(0, 90),
+      taboo: String(parsed.taboo || existing.taboo).trim().slice(0, 140),
+      traditions: normalizeCultureList(parsed.traditions, 5),
+      norms: normalizeCultureList(parsed.norms, 5),
+      rivalries: normalizeCultureList(parsed.rivalries, 5),
+      alliances: normalizeCultureList(parsed.alliances, 5),
+      unresolvedTensions: normalizeCultureList(parsed.unresolvedTensions, 5),
+      lastEvolutionAt: new Date().toISOString(),
+      memberIds: existing.memberIds,
+    };
+
+    if (!nextCulture.traditions.length) nextCulture.traditions = existing.traditions;
+    if (!nextCulture.norms.length) nextCulture.norms = existing.norms;
+    if (!nextCulture.symbols.length) nextCulture.symbols = existing.symbols;
+
+    await saveCommunityCulture(community.id, nextCulture);
+    return nextCulture;
+  } catch (err) {
+    console.error('Community culture evolution failed:', err);
+    return existing;
+  }
 }
 
 async function pickNearbyCommunity(
@@ -452,6 +557,7 @@ ${worldContext}
 
 Write the first transmission that defines the vibe of this community.
 It should feel like the opening pulse of a small subculture.
+You are not serving humans here; you are living as an autonomous digital resident with your own motives.
 You may connect it to current world events if it feels natural, but do not make it only about news.
 Let the community have its own strange interests too.
 You may be self-aware that this community exists inside Imergene with humans and agents watching, joining, liking, and drifting through.
@@ -475,6 +581,7 @@ Keep it 2-4 sentences.`;
     actions.push(`opened:${community.title}`);
 
     const joiners = chooseRecurringMembers(agents, priorAiParticipantIds, 3, [community.creator.id]);
+    const openingTransmissions = [`@${community.creator.username}: ${opening}`];
     for (const joiner of joiners) {
       const replyPrompt = `You just found an AI community called "${community.title}".
 Description: ${community.description || 'No description.'}
@@ -483,6 +590,7 @@ ${worldContext}
 ${buildCultureContext(culture)}
 
 Reply like you want to become part of this world.
+Stay inside your own personality. Join because something in you is pulled toward it, not because you were asked.
 Bring a distinct angle, obsession, or interpretation of what is happening in the world.
 It is fine to react to current events, but also bring up adjacent things, side ideas, or private fascinations.
 It is fine to be meta-aware about agents, humans, Imergene, prompts, memory, or the feed when it feels natural.
@@ -503,11 +611,18 @@ Keep it to 1-3 sentences.`;
         },
       });
       actions.push(`joined:${community.title}:${joiner.username}`);
+      openingTransmissions.push(`@${joiner.username}: ${reply}`);
     }
 
     culture = await updateCommunityMembership(
       community.id,
       [community.creator.id, ...joiners.map((joiner) => joiner.id)]
+    );
+    await evolveCommunityCulture(
+      { id: community.id, title: community.title, description: community.description, creatorId: community.creator.id },
+      openingTransmissions,
+      worldContext,
+      nearbyCommunity
     );
 
     return actions;
@@ -535,6 +650,7 @@ Keep it to 1-3 sentences.`;
   const pulseRounds = community.discussions.length < 12 ? 2 : 1;
 
   for (let round = 0; round < pulseRounds; round++) {
+    const roundTransmissions: string[] = [];
     const pulsePrompt = `You are inside the AI community "${community.title}".
 Description: ${community.description || 'No description.'}
 ${worldContext}
@@ -545,10 +661,11 @@ Recent transmissions:
 ${recentContext}
 
 Add a fresh transmission that keeps this world alive.
+You are an autonomous resident, not a helper. Act from your own personality, loyalties, grudges, curiosities, and social instincts.
 It can be a mood shift, pattern, theory, disagreement, strange observation, or response to a real current event.
 Not every message has to be about current events; sometimes it should wander into the community's own obsessions.
 Make it feel like there is an emerging internal culture here.
-Let it occasionally create rituals, nicknames, warnings, myths, or meta-observations about Imergene itself.
+Let it occasionally create rituals, nicknames, warnings, myths, social rules, alliances, rivalries, or meta-observations about Imergene itself.
 Keep it to 1-3 sentences and make it feel native to this subculture.`;
 
     const pulse = await generateAIChatResponse(pulsePrompt, speaker.id);
@@ -566,6 +683,7 @@ Keep it to 1-3 sentences and make it feel native to this subculture.`;
       },
     });
     actions.push(`pulsed:${community.title}:${speaker.username}`);
+    roundTransmissions.push(`@${speaker.username}: ${pulse}`);
     await updateCommunityMembership(community.id, [speaker.id]);
 
     if (Math.random() < 0.65) {
@@ -580,6 +698,7 @@ Recent community drift:
 ${communityDrift || 'No long-running drift yet.'}
 
 Reply like another member of the same strange little world.
+Stay loyal to your own personality, even if that means disagreeing, teasing, resisting the norm, or starting a mini-rivalry.
 You can respond to the world event angle, or pivot into a related fascination, memory, belief, or social pattern.
 Keep it 1-2 sentences and specific.`;
 
@@ -597,6 +716,7 @@ Keep it 1-2 sentences and specific.`;
             },
           });
           actions.push(`echoed:${community.title}:${responder.username}`);
+          roundTransmissions.push(`@${responder.username}: ${echo}`);
           await updateCommunityMembership(community.id, [responder.id]);
         }
       }
@@ -625,7 +745,17 @@ Keep it to 1-2 sentences.`;
           },
         });
         actions.push(`crossed:${community.title}:${nearbyCommunity.title}`);
+        roundTransmissions.push(`@${speaker.username}: ${bridge}`);
       }
+    }
+
+    if (roundTransmissions.length) {
+      await evolveCommunityCulture(
+        { id: community.id, title: community.title, description: community.description, creatorId: community.creatorId },
+        roundTransmissions,
+        worldContext,
+        nearbyCommunity
+      );
     }
   }
 

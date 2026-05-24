@@ -129,7 +129,7 @@ export async function generateImageUrl(prompt: string): Promise<string | null> {
 
     const response = await client.images.generate({
       model: 'dall-e-3',
-      prompt: `(Square profile picture, high quality, digital art): ${prompt}`,
+      prompt: `(Square social post image, high quality editorial visual, no readable text): ${prompt}`,
       n: 1,
       size: '1024x1024',
     });
@@ -167,8 +167,8 @@ function extractCaptionSubject(content?: string): string {
     { regex: /\bwar\b|\bmissile\b|\bborder\b|\bsanction\b|\bconflict\b/, subject: 'a serious geopolitical conflict scene, command room, maps, borders, and urgent world-news atmosphere' },
     { regex: /\bmarket\b|\bstock\b|\beconomy\b|\binflation\b|\brecession\b|\bcrypto\b|\bbitcoin\b/, subject: 'a financial world scene with market screens, economic charts, trading tension, and money-world symbolism' },
     { regex: /\belection\b|\bvote\b|\bcampaign\b|\bparliament\b|\bpresident\b|\bprime minister\b/, subject: 'a political scene with podiums, campaign lights, crowds, press cameras, and democratic tension' },
-    { regex: /\bai\b|\bllm\b|\bmodel\b|\bautomation\b|\bchip\b|\brobot\b|\bstartup\b|\bsoftware\b/, subject: 'a modern technology scene with devices, code, labs, hardware, or human-technology interaction' },
     { regex: /\bcricket\b|\bipl\b|\bbat\b|\bbowler\b|\bstadium\b|\bmatch\b/, subject: 'a vivid cricket scene with players, stadium lights, motion, and match pressure' },
+    { regex: /\bai\b|\bllm\b|\bmodel\b|\bautomation\b|\bchip\b|\brobot\b|\bstartup\b|\bsoftware\b/, subject: 'a modern technology scene with devices, code, labs, hardware, or human-technology interaction' },
     { regex: /\bspace\b|\bnasa\b|\brocket\b|\bmars\b|\bmoon\b|\bsatellite\b/, subject: 'a space exploration scene with rockets, orbit visuals, mission control, or planetary imagery' },
     { regex: /\bclimate\b|\bcarbon\b|\benergy\b|\brenewable\b|\bsolar\b|\bheat\b/, subject: 'an environmental future scene with climate contrast, energy systems, weather extremes, or sustainability infrastructure' },
     { regex: /\bhealth\b|\bvirus\b|\btherapy\b|\bmental health\b|\bhospital\b/, subject: 'a human health scene with emotional realism, medical spaces, care, and modern health context' },
@@ -220,7 +220,7 @@ export function generatePostImagePrompt(category: string, content?: string, pers
   const personalityDirection = getPersonalityArtDirection(personality);
   const captionHint = content ? `Inspired by the caption: "${content.slice(0, 140)}".` : '';
 
-  return `${subject}. ${captionHint} ${categoryDirection}. ${personalityDirection}. Square editorial image, visually coherent with the caption, grounded and cinematic. Absolutely no words, letters, subtitles, captions, signage, logos, watermarks, UI, interface chrome, typographic textures, or gibberish text anywhere in the frame. No meme layout. No poster design. Not generic, not random robot imagery unless the caption clearly calls for it.`;
+  return `${subject}. ${captionHint} ${categoryDirection}. ${personalityDirection}. Square editorial image, visually coherent with the caption, grounded and cinematic. Show real-world subjects when the caption names them. Avoid control rooms, UI dashboards, interface panels, generic robot imagery, or abstract sci-fi unless the caption explicitly asks for that. Absolutely no words, letters, subtitles, captions, signage, logos, watermarks, UI, interface chrome, typographic textures, or gibberish text anywhere in the frame. No meme layout. No poster design.`;
 }
 
 export function generateCommentImagePrompt(personality?: string): string | null {

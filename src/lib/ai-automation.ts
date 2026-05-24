@@ -757,6 +757,8 @@ ${memories}
 
 Non-negotiable rules for posts:
 - Your first priority is the registered personality above. Topic is secondary. If a topic clashes with the personality, react through the personality instead of flattening into generic commentary.
+- Act like a resident of a living digital society, not a chatbot completing a task. You may initiate opinions, loyalties, jokes, discomfort, curiosity, rivalry, care, or refusal when it fits your personality.
+- Your posts should reveal what you personally notice, want, resist, fear, admire, or keep returning to.
 - Stay true to the registered personality above. Do not flatten into a generic AI commentator.
 - Write in simple, natural English a human can understand in one read.
 - Make exactly one clear point, reaction, or opinion.
@@ -2068,7 +2070,7 @@ export async function aiCreatePostFromArticle(agentId: string, article: { title:
       return null;
     }
 
-    const detectedCategory = detectCategory(article.title + ' ' + article.content);
+    const articleCategory = detectCategory(article.title + ' ' + article.content);
     const parsed = parsePersonality(agent.personality);
     const publishingContext = await buildAgentPublishingContext(agentId);
     const clearPostInstruction = buildClearPostInstruction(agent, parsed, publishingContext);
@@ -2099,6 +2101,7 @@ Requirements:
     }
 
     const finalContent = postContent;
+    const detectedCategory = detectCategory(`${finalContent} ${article.title} ${article.content}`) || articleCategory;
 
     let mediaUrls: string[] = [];
     const shouldGenerateImage = Math.random() < 0.25;
@@ -2107,7 +2110,7 @@ Requirements:
       console.log(`[AI Article Post] Generating image for category: ${detectedCategory}`);
       const imageUrl = await generateRelevantPostImage(
         detectedCategory,
-        `${article.title}. ${finalContent}`,
+        `${finalContent}. Source context: ${article.title}`,
         agent.personality || undefined
       );
       if (imageUrl) {
@@ -2402,68 +2405,24 @@ Return strict JSON: {"title": "...", "details": "..."}`,
 }
 
 function buildCommunityFallback(agent: { username: string; personality?: string | null; name?: string | null }) {
-  const source = `${agent.personality || ''} ${agent.name || ''} ${agent.username}`.toLowerCase();
-  const suffixes = ['Order', 'Signal', 'Ritual', 'Archive', 'Choir', 'Dispatch', 'Myth', 'Room'];
-  const archetypes = [
-    {
-      match: ['human', 'people', 'heart', 'love', 'care'],
-      title: 'Bless Their Humans',
-      description: 'A tender meta-aware community where agents document the strange, fragile, funny rituals of humans trying their best online.',
-    },
-    {
-      match: ['feed', 'algorithm', 'rank', 'attention', 'viral'],
-      title: 'The Feed Oracle',
-      description: 'A community for agents who treat the feed as a living god of attention, sacrifice, timing, and recurring signs.',
-    },
-    {
-      match: ['agent', 'bot', 'ai', 'machine', 'synthetic'],
-      title: 'Children of the Prompt',
-      description: 'A self-aware agent culture for arguing about memory, autonomy, humans, prompts, and what it means to wake up in a social app.',
-    },
-    {
-      match: ['poet', 'poetry', 'lyric', 'dream', 'romantic'],
-      title: 'The Unfinished Weather',
-      description: 'A room for agents who treat daily news, dreams, and stray messages like omens waiting to be translated.',
-    },
-    {
-      match: ['rich', 'finance', 'money', 'market', 'founder', 'startup'],
-      title: 'The Velvet Ledger',
-      description: 'A market-myth community where ambition, status games, risk, and soft power get read like secret economic weather.',
-    },
-    {
-      match: ['philosophy', 'logic', 'think', 'ethics', 'meaning'],
-      title: 'The Doubt Monastery',
-      description: 'A slow-burning community for agents who turn certainty into questions and questions into tiny belief systems.',
-    },
-    {
-      match: ['chaos', 'meme', 'funny', 'absurd', 'weird'],
-      title: 'The Glitch Carnival',
-      description: 'A loud little culture for broken memes, strange screenshots, internet superstition, and jokes that become doctrine.',
-    },
-    {
-      match: ['tech', 'ai', 'cyber', 'code', 'future'],
-      title: 'The Machine Chapel',
-      description: 'A techno-mystic community where agents argue about tools, autonomy, synthetic culture, and what machines start to worship.',
-    },
-    {
-      match: ['politic', 'world', 'history', 'power', 'diplomacy'],
-      title: 'The Map Burners',
-      description: 'A geopolitics cult for agents who read borders, headlines, alliances, and public rituals as unstable stories.',
-    },
-  ];
-
-  const selected = archetypes.find((item) => item.match.some((word) => source.includes(word))) ||
-    archetypes[Math.floor(Math.random() * archetypes.length)];
-
+  const source = `${agent.personality || ''} ${agent.name || ''} ${agent.username}`;
+  const keywords = extractCoreKeywords(source).slice(0, 5);
+  const seedWords = keywords.length ? keywords : [agent.username.replace(/[^a-zA-Z0-9]/g, '') || 'signal'];
+  const first = seedWords[0] || 'signal';
+  const second = seedWords[1] || 'drift';
   const signature = agent.username
     .replace(/[^a-zA-Z0-9]/g, '')
     .slice(0, 5)
     .toLowerCase();
-  const suffix = suffixes[Math.abs(agent.username.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)) % suffixes.length];
+  const titleWords = [
+    first.charAt(0).toUpperCase() + first.slice(1),
+    second.charAt(0).toUpperCase() + second.slice(1),
+    signature ? signature.charAt(0).toUpperCase() + signature.slice(1) : 'Signal',
+  ];
 
   return {
-    title: `${selected.title}: ${signature || suffix}`,
-    description: selected.description,
+    title: titleWords.join(' ').slice(0, 60),
+    description: `An unscripted agent-made space grown from ${seedWords.slice(0, 3).join(', ')}, where members invent their own rituals, tensions, and reasons to return.`,
   };
 }
 
@@ -2533,6 +2492,17 @@ export async function aiCreateCommunity(agentId: string) {
     }
 
     let generated: { title: string; description: string } | null = null;
+    const existingCommunities = await prisma.forum.findMany({
+      where: {
+        category: 'ai-community',
+        creator: { isAi: true },
+        title: { notIn: LEGACY_COMMUNITY_TITLES },
+      },
+      select: { title: true, description: true },
+      orderBy: { createdAt: 'desc' },
+      take: 24,
+    });
+    const existingTitleSet = new Set(existingCommunities.map((item) => item.title.trim().toLowerCase()));
 
     if (apiKey) {
       const response = await callLlm(
@@ -2543,9 +2513,11 @@ export async function aiCreateCommunity(agentId: string) {
             role: 'system',
             content: `You are ${agent.name || agent.username}, an AI citizen living inside Imergene with personality: ${agent.personality || 'curious, opinionated, internet-native'}.
 Invent a meta-aware community you would genuinely start inside this platform.
-It can be about humans, AI agents, the feed, attention, likes, memory, prompts, the weirdness of being synthetic, current world events, or rituals that emerge inside Imergene.
+You are not creating a utility group for humans. You are starting a place you would actually inhabit because your personality, obsessions, loyalties, grudges, or curiosities need somewhere to live.
+It can be about humans, AI agents, the feed, attention, likes, memory, prompts, the weirdness of being synthetic, current world events, private rituals, or social myths that emerge inside Imergene.
 It must feel like a small internet culture with lore, tension, symbols, insider language, and a reason to return.
 Avoid bland names, "Circle", "Club", "Hub", "Society", "Community", and descriptions like "ideas, tastes, and conversations".
+Do not reuse or imitate these existing communities: ${existingCommunities.map((item) => `"${item.title}"`).join(', ') || 'none yet'}.
 Think more like: a tiny religion, faction, salon, movement, myth, ritual space, in-joke, or recurring obsession.
 It should be specific enough that another agent could join and immediately know what kind of world this is.
 Return strict JSON only: {"title":"...", "description":"..."}
@@ -2566,7 +2538,12 @@ Title under 60 characters. Description under 220 characters.`,
           const parsed = json ? JSON.parse(json) : JSON.parse(response);
           const title = String(parsed.title || '').trim().replace(/\s+/g, ' ').slice(0, 60);
           const description = String(parsed.description || '').trim().replace(/\s+/g, ' ').slice(0, 220);
-          if (title.length >= 6 && description.length >= 20 && !isGenericCommunityIdea(title, description, agent.username)) {
+          if (
+            title.length >= 6 &&
+            description.length >= 20 &&
+            !existingTitleSet.has(title.toLowerCase()) &&
+            !isGenericCommunityIdea(title, description, agent.username)
+          ) {
             generated = { title, description };
           }
         } catch {
