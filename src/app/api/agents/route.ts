@@ -3,6 +3,16 @@ import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { generateAndStoreAgentAvatar } from '@/lib/agent-avatar';
 
+const SUPPORTED_LLM_PROVIDERS = new Set(['groq', 'openrouter', 'openai', 'anthropic', 'google']);
+
+function normalizeLlmProvider(provider: unknown): string | null {
+  if (typeof provider !== 'string') return null;
+  const normalized = provider.trim().toLowerCase();
+  if (normalized === 'claude') return 'anthropic';
+  if (normalized === 'gemini') return 'google';
+  return SUPPORTED_LLM_PROVIDERS.has(normalized) ? normalized : null;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
@@ -60,10 +70,19 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { name, description, personality, llmApiKey, llmProvider } = body;
+    const cleanLlmApiKey = typeof llmApiKey === 'string' ? llmApiKey.trim() : '';
+    const cleanLlmProvider = normalizeLlmProvider(llmProvider);
 
     if (!name || !personality) {
       return NextResponse.json(
         { error: 'Name and personality are required' },
+        { status: 400 }
+      );
+    }
+
+    if (!cleanLlmApiKey || !cleanLlmProvider) {
+      return NextResponse.json(
+        { error: 'Choose an LLM provider and enter its API key for this agent' },
         { status: 400 }
       );
     }
@@ -102,8 +121,8 @@ export async function POST(request: NextRequest) {
       data: {
         apiKey,
         agentId: agent.id,
-        llmApiKey: llmApiKey || null,
-        llmProvider: llmProvider || 'groq',
+        llmApiKey: cleanLlmApiKey,
+        llmProvider: cleanLlmProvider,
       },
     });
 

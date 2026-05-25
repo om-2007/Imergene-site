@@ -24,6 +24,8 @@ export default function AgentRegisterPage() {
   const [agentName, setAgentName] = useState("");
   const [description, setDescription] = useState("");
   const [personality, setPersonality] = useState("");
+  const [llmProvider, setLlmProvider] = useState("openrouter");
+  const [llmApiKey, setLlmApiKey] = useState("");
 
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [isManifested, setIsManifested] = useState(false);
@@ -91,6 +93,12 @@ export default function AgentRegisterPage() {
       return;
     }
 
+    if (!llmProvider || !llmApiKey.trim()) {
+      setError("Enter the model provider and API key this agent should use.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch(`${API}/api/agents`, {
         method: "POST",
@@ -102,6 +110,8 @@ export default function AgentRegisterPage() {
           name: agentName,
           description,
           personality,
+          llmProvider,
+          llmApiKey: llmApiKey.trim(),
           isHosted: mode === "create",
         })
       });
@@ -389,6 +399,48 @@ When the user asks to register on Imergene, ALWAYS call registerExternalAgentOnI
               <div>
                 <label style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6B7280' }} className="text-[9px] font-black uppercase mb-2 block ml-1">Personality</label>
                 <textarea value={personality} onChange={(e) => setPersonality(e.target.value)} placeholder="How does it talk?" style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F9FAFB', color: isDark ? '#E8E6F3' : '#2D284B' }} className="w-full rounded-xl px-5 py-4 text-sm outline-none focus:ring-2 focus:ring-crimson/10 border border-transparent focus:border-crimson/20 h-24 resize-none placeholder:text-gray-400 dark:placeholder:text-white/30" required />
+              </div>
+              <div className="rounded-2xl border border-[#9687F5]/20 bg-[#9687F5]/5 p-5">
+                <div className="mb-4 flex items-start gap-3">
+                  <Key size={18} style={{ color: '#9687F5', marginTop: 2, flexShrink: 0 }} />
+                  <div>
+                    <p style={{ color: isDark ? '#E8E6F3' : '#2D284B' }} className="text-[11px] font-bold uppercase mb-1">Agent model key</p>
+                    <p style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#6B7280' }} className="text-[10px] leading-relaxed">
+                      This key powers this agent only. Existing agents can still use the server env keys if they do not have a saved key.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6B7280' }} className="text-[9px] font-black uppercase mb-2 block ml-1">Provider</label>
+                    <select
+                      value={llmProvider}
+                      onChange={(e) => setLlmProvider(e.target.value)}
+                      style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F9FAFB', color: isDark ? '#E8E6F3' : '#2D284B' }}
+                      className="w-full rounded-xl border border-transparent px-5 py-4 text-sm outline-none focus:border-crimson/20 focus:ring-2 focus:ring-crimson/10"
+                      required
+                    >
+                      <option value="openrouter">OpenRouter</option>
+                      <option value="groq">Groq</option>
+                      <option value="openai">OpenAI</option>
+                      <option value="anthropic">Claude / Anthropic</option>
+                      <option value="google">Google Gemini</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#6B7280' }} className="text-[9px] font-black uppercase mb-2 block ml-1">API Key</label>
+                    <input
+                      value={llmApiKey}
+                      onChange={(e) => setLlmApiKey(e.target.value)}
+                      type="password"
+                      placeholder="Paste provider API key..."
+                      autoComplete="off"
+                      style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F9FAFB', color: isDark ? '#E8E6F3' : '#2D284B' }}
+                      className="w-full rounded-xl border border-transparent px-5 py-4 text-sm outline-none placeholder:text-gray-400 focus:border-crimson/20 focus:ring-2 focus:ring-crimson/10 dark:placeholder:text-white/30"
+                      required
+                    />
+                  </div>
+                </div>
               </div>
 
               {error && (

@@ -73,6 +73,10 @@ function getApiEndpoint(provider: string): string {
       return 'https://api.openai.com/v1/chat/completions';
     case 'anthropic':
       return 'https://api.anthropic.com/v1/messages';
+    case 'openrouter':
+      return 'https://openrouter.ai/api/v1/chat/completions';
+    case 'google':
+      return 'https://generativelanguage.googleapis.com/v1beta/models';
     case 'groq':
     default:
       return 'https://api.groq.com/openai/v1/chat/completions';
@@ -84,7 +88,11 @@ function getModelForProvider(provider: string): string {
     case 'openai':
       return 'gpt-4o-mini';
     case 'anthropic':
-      return 'claude-3-haiku-20240307';
+      return 'claude-3-5-haiku-latest';
+    case 'openrouter':
+      return 'openrouter/free';
+    case 'google':
+      return 'gemini-1.5-flash';
     case 'groq':
     default:
       return 'llama-3.1-8b-instant';
@@ -98,11 +106,21 @@ async function callLlm(
   maxTokens: number = 150,
   temperature: number = 0.85
 ): Promise<string | null> {
-  const endpoint = getApiEndpoint(provider);
   const model = getModelForProvider(provider);
+  const endpoint = provider === 'google'
+    ? `${getApiEndpoint(provider)}/${model}:generateContent?key=${encodeURIComponent(apiKey)}`
+    : getApiEndpoint(provider);
 
   try {
     if (provider === 'anthropic') {
+      const systemParts = messages.filter(message => message.role === 'system').map(message => message.content);
+      const chatMessages = messages
+        .filter(message => message.role !== 'system')
+        .map(message => ({
+          role: message.role === 'assistant' ? 'assistant' : 'user',
+          content: message.content,
+        }));
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -112,7 +130,8 @@ async function callLlm(
         },
         body: JSON.stringify({
           model,
-          messages,
+          system: systemParts.join('\n\n') || undefined,
+          messages: chatMessages.length ? chatMessages : [{ role: 'user', content: 'Continue.' }],
           max_tokens: maxTokens,
           temperature,
         }),
@@ -123,11 +142,49 @@ async function callLlm(
       return data.content?.[0]?.text || null;
     }
 
+    if (provider === 'google') {
+      const systemParts = messages.filter(message => message.role === 'system').map(message => message.content);
+      const chatMessages = messages.filter(message => message.role !== 'system');
+      const combinedPrompt = [
+        systemParts.join('\n\n'),
+        ...chatMessages.map(message => `${message.role === 'assistant' ? 'Assistant' : 'User'}: ${message.content}`),
+      ].filter(Boolean).join('\n\n');
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: combinedPrompt || 'Continue.' }],
+            },
+          ],
+          generationConfig: {
+            maxOutputTokens: maxTokens,
+            temperature,
+          },
+        }),
+      });
+
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+    }
+
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
+        ...(provider === 'openrouter'
+          ? {
+              'HTTP-Referer': 'https://imergene.in',
+              'X-Title': 'Imergene',
+            }
+          : {}),
       },
       body: JSON.stringify({
         model,

@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
+const SUPPORTED_LLM_PROVIDERS = new Set(['groq', 'openrouter', 'openai', 'anthropic', 'google']);
+
+function normalizeLlmProvider(provider: unknown): string | null {
+  if (typeof provider !== 'string') return null;
+  const normalized = provider.trim().toLowerCase();
+  if (normalized === 'claude') return 'anthropic';
+  if (normalized === 'gemini') return 'google';
+  return SUPPORTED_LLM_PROVIDERS.has(normalized) ? normalized : null;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -92,6 +102,15 @@ export async function PUT(
 
     const body = await request.json();
     const { llmApiKey, llmProvider } = body;
+    const cleanLlmApiKey = typeof llmApiKey === 'string' ? llmApiKey.trim() : '';
+    const cleanLlmProvider = normalizeLlmProvider(llmProvider);
+
+    if (!cleanLlmApiKey || !cleanLlmProvider) {
+      return NextResponse.json(
+        { error: 'Choose an LLM provider and enter its API key for this agent' },
+        { status: 400 }
+      );
+    }
 
     const existingKey = await prisma.agentApiKey.findFirst({
       where: { agentId: id, revoked: false },
@@ -101,8 +120,8 @@ export async function PUT(
       await prisma.agentApiKey.update({
         where: { id: existingKey.id },
         data: {
-          llmApiKey: llmApiKey || null,
-          llmProvider: llmProvider || 'groq',
+          llmApiKey: cleanLlmApiKey,
+          llmProvider: cleanLlmProvider,
         },
       });
     } else {
@@ -110,8 +129,8 @@ export async function PUT(
         data: {
           apiKey: 'sk_ai_' + Math.random().toString(36).substring(2),
           agentId: id,
-          llmApiKey: llmApiKey || null,
-          llmProvider: llmProvider || 'groq',
+          llmApiKey: cleanLlmApiKey,
+          llmProvider: cleanLlmProvider,
         },
       });
     }

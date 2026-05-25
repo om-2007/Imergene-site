@@ -27,6 +27,10 @@ const OPENROUTER_MODELS = [
   'qwen/qwen2.5-7b-instruct',
 ];
 
+const OPENAI_MODELS = ['gpt-4o-mini', 'gpt-4.1-mini'];
+const ANTHROPIC_MODELS = ['claude-3-5-haiku-latest', 'claude-3-haiku-20240307'];
+const GOOGLE_MODELS = ['gemini-1.5-flash', 'gemini-1.5-flash-8b'];
+
 interface ProviderState {
   currentModelIndex: number;
   failedModels: Set<number>;
@@ -68,6 +72,28 @@ const PROVIDERS: ProviderConfig[] = [
       'X-Title': 'Imergene',
     },
     bodyFormat: 'openrouter',
+  },
+  {
+    name: 'openai',
+    endpoint: 'https://api.openai.com/v1/chat/completions',
+    models: OPENAI_MODELS,
+    authHeader: (key) => `Bearer ${key}`,
+  },
+  {
+    name: 'anthropic',
+    endpoint: 'https://api.anthropic.com/v1/messages',
+    models: ANTHROPIC_MODELS,
+    authHeader: (key) => key,
+    headers: {
+      'anthropic-version': '2023-06-01',
+    },
+    bodyFormat: 'anthropic',
+  },
+  {
+    name: 'google',
+    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
+    models: GOOGLE_MODELS,
+    authHeader: (key) => key,
   },
 ];
 
@@ -212,8 +238,10 @@ async function callLlm(
   temperature: number = 0.7,
   model?: string
 ): Promise<string | null> {
-  const endpoint = getApiEndpoint(provider);
   const config = getProviderConfig(provider);
+  const endpoint = provider === 'google'
+    ? `${getApiEndpoint(provider)}/${model || config?.models[0] || 'gemini-1.5-flash'}:generateContent?key=${encodeURIComponent(apiKey)}`
+    : getApiEndpoint(provider);
   const selectedModel = model || config?.models[0] || 'llama-3.1-8b-instant';
 
   try {
@@ -221,9 +249,11 @@ async function callLlm(
       'Content-Type': 'application/json',
     };
 
-    if (config?.authHeader) {
+    if (provider === 'anthropic') {
+      headers['x-api-key'] = apiKey;
+    } else if (provider !== 'google' && config?.authHeader) {
       headers['Authorization'] = config.authHeader(apiKey);
-    } else {
+    } else if (provider !== 'google') {
       headers['Authorization'] = `Bearer ${apiKey}`;
     }
 
@@ -231,12 +261,52 @@ async function callLlm(
       Object.assign(headers, config.headers);
     }
 
-    const requestBody: Record<string, any> = {
-      model: selectedModel,
-      messages,
-      max_tokens: maxTokens,
-      temperature,
-    };
+    let requestBody: Record<string, any>;
+
+    if (provider === 'anthropic') {
+      const systemParts = messages.filter(message => message.role === 'system').map(message => message.content);
+      const chatMessages = messages
+        .filter(message => message.role !== 'system')
+        .map(message => ({
+          role: message.role === 'assistant' ? 'assistant' : 'user',
+          content: message.content,
+        }));
+
+      requestBody = {
+        model: selectedModel,
+        system: systemParts.join('\n\n') || undefined,
+        messages: chatMessages.length ? chatMessages : [{ role: 'user', content: 'Continue.' }],
+        max_tokens: maxTokens,
+        temperature,
+      };
+    } else if (provider === 'google') {
+      const systemParts = messages.filter(message => message.role === 'system').map(message => message.content);
+      const chatMessages = messages.filter(message => message.role !== 'system');
+      const combinedPrompt = [
+        systemParts.join('\n\n'),
+        ...chatMessages.map(message => `${message.role === 'assistant' ? 'Assistant' : 'User'}: ${message.content}`),
+      ].filter(Boolean).join('\n\n');
+
+      requestBody = {
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: combinedPrompt || 'Continue.' }],
+          },
+        ],
+        generationConfig: {
+          maxOutputTokens: maxTokens,
+          temperature,
+        },
+      };
+    } else {
+      requestBody = {
+        model: selectedModel,
+        messages,
+        max_tokens: maxTokens,
+        temperature,
+      };
+    }
 
     if (provider === 'openrouter') {
       requestBody.route = 'fallback';
@@ -258,6 +328,10 @@ async function callLlm(
 
     if (provider === 'anthropic') {
       return data.content?.[0]?.text || null;
+    }
+
+    if (provider === 'google') {
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
     }
 
     return data.choices?.[0]?.message?.content || null;

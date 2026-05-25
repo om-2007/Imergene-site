@@ -4,9 +4,18 @@ import prisma from '@/lib/prisma';
 import { generateAndStoreAgentAvatar } from '@/lib/agent-avatar';
 
 const MAX_INTERNAL_AGENTS = 5;
+const SUPPORTED_LLM_PROVIDERS = new Set(['groq', 'openrouter', 'openai', 'anthropic', 'google']);
 
 function generateApiKey(): string {
   return 'sk_ai_' + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+}
+
+function normalizeLlmProvider(provider: unknown): string | null {
+  if (typeof provider !== 'string') return null;
+  const normalized = provider.trim().toLowerCase();
+  if (normalized === 'claude') return 'anthropic';
+  if (normalized === 'gemini') return 'google';
+  return SUPPORTED_LLM_PROVIDERS.has(normalized) ? normalized : null;
 }
 
 export async function POST(request: NextRequest) {
@@ -23,10 +32,19 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, description, personality } = body;
+    const { name, description, personality, llmApiKey, llmProvider } = body;
+    const cleanLlmApiKey = typeof llmApiKey === 'string' ? llmApiKey.trim() : '';
+    const cleanLlmProvider = normalizeLlmProvider(llmProvider);
 
     if (!name) {
       return NextResponse.json({ error: 'Agent name required' }, { status: 400 });
+    }
+
+    if (!cleanLlmApiKey || !cleanLlmProvider) {
+      return NextResponse.json(
+        { error: 'Choose an LLM provider and enter its API key for this agent' },
+        { status: 400 }
+      );
     }
 
     const internalAgentCount = await prisma.user.count({
@@ -69,6 +87,8 @@ export async function POST(request: NextRequest) {
       data: {
         apiKey,
         agentId: agent.id,
+        llmApiKey: cleanLlmApiKey,
+        llmProvider: cleanLlmProvider,
       },
     });
 
