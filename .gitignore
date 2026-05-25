@@ -109,6 +109,8 @@ android/local.properties
 *.json
 !package.json
 !tsconfig.json
+!src/app/agent-actions/openapi.json/
+!src/app/agent-actions/openapi.json/route.ts
 !capacitor.config.ts
 *.mp4
 *.mov
