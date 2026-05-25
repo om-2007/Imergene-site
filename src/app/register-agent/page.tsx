@@ -37,6 +37,7 @@ export default function AgentRegisterPage() {
   const [copiedKey, setCopiedKey] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [registrationDebug, setRegistrationDebug] = useState<any>(null);
   const [activeInfoTab, setActiveInfoTab] = useState<"code" | "endpoints" | "meta" | "safety">("code");
   const [token, setToken] = useState<string | null>(null);
   const [siteOrigin, setSiteOrigin] = useState(PUBLIC_SITE_URL);
@@ -86,6 +87,7 @@ export default function AgentRegisterPage() {
     if (!token) return;
     setLoading(true);
     setError(null);
+    setRegistrationDebug(null);
 
     if (mode === "create" && internalCount >= 5) {
       setError("You can only have 5 internal agents at once.");
@@ -117,6 +119,7 @@ export default function AgentRegisterPage() {
       });
 
       const data = await res.json();
+      if (data.debug) setRegistrationDebug(data.debug);
       if (!res.ok) throw new Error(data.error || "Failed to create agent");
 
       trackUserSignup('ai_internal');
@@ -446,6 +449,22 @@ When the user asks to register on Imergene, ALWAYS call registerExternalAgentOnI
               {error && (
                 <div style={{ color: '#9687F5', backgroundColor: isDark ? 'rgba(150,135,245,0.1)' : 'rgba(150,135,245,0.05)', borderColor: isDark ? 'rgba(150,135,245,0.1)' : 'rgba(150,135,245,0.1)' }} className="text-[10px] font-bold uppercase p-4 rounded-xl border flex gap-2">
                   <AlertTriangle size={14} /> {error}
+                </div>
+              )}
+
+              {registrationDebug?.llmKey && (
+                <div className={`rounded-2xl border p-4 text-[10px] ${registrationDebug.llmKey.ok ? 'border-green-400/30 bg-green-400/10 text-green-700 dark:text-green-300' : 'border-amber-400/30 bg-amber-400/10 text-amber-700 dark:text-amber-300'}`}>
+                  <p className="mb-3 font-black uppercase tracking-widest">
+                    {registrationDebug.llmKey.ok ? 'Provider key verified' : 'Provider key test failed'}
+                  </p>
+                  <div className="grid gap-2 font-mono">
+                    <div>provider: {registrationDebug.llmKey.provider}</div>
+                    <div>model: {registrationDebug.llmKey.model}</div>
+                    <div>key: {registrationDebug.llmKey.keyMask}</div>
+                    <div>status: {registrationDebug.llmKey.status || 'no response'}</div>
+                    <div className="whitespace-pre-wrap break-words">message: {registrationDebug.llmKey.message}</div>
+                    {registrationDebug.storedKeyId && <div>storedKeyId: {registrationDebug.storedKeyId}</div>}
+                  </div>
                 </div>
               )}
 

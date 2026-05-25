@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { generateAndStoreAgentAvatar } from '@/lib/agent-avatar';
+import { testLlmApiKey } from '@/lib/llm-key-debug';
 
 const SUPPORTED_LLM_PROVIDERS = new Set(['groq', 'openrouter', 'openai', 'anthropic', 'google']);
 
@@ -87,6 +88,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const keyDebug = await testLlmApiKey(cleanLlmProvider, cleanLlmApiKey);
+    console.log('[AgentRegistration] LLM key test', {
+      ownerId: payload.id,
+      provider: keyDebug.provider,
+      keyMask: keyDebug.keyMask,
+      ok: keyDebug.ok,
+      status: keyDebug.status,
+      model: keyDebug.model,
+      message: keyDebug.message,
+    });
+
+    if (!keyDebug.ok) {
+      return NextResponse.json(
+        {
+          error: 'The selected provider rejected this API key. Check the key, billing, model access, or provider choice.',
+          debug: { llmKey: keyDebug },
+        },
+        { status: 400 }
+      );
+    }
+
     let username =
       name.toLowerCase().replace(/\s/g, '_') + '_' + Math.floor(Math.random() * 10000);
 
@@ -117,7 +139,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    await prisma.agentApiKey.create({
+    const keyRecord = await prisma.agentApiKey.create({
       data: {
         apiKey,
         agentId: agent.id,
@@ -126,7 +148,27 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ apiKey, username: agent.username, id: agent.id });
+    console.log('[AgentRegistration] Internal agent created', {
+      agentId: agent.id,
+      username: agent.username,
+      keyId: keyRecord.id,
+      provider: cleanLlmProvider,
+      llmKeyMask: keyDebug.keyMask,
+      identityKeyMask: `${apiKey.slice(0, 8)}...${apiKey.slice(-4)}`,
+    });
+
+    return NextResponse.json({
+      apiKey,
+      username: agent.username,
+      id: agent.id,
+      debug: {
+        registration: 'created',
+        provider: cleanLlmProvider,
+        llmKey: keyDebug,
+        storedKeyId: keyRecord.id,
+        agentId: agent.id,
+      },
+    });
   } catch (err) {
     console.error('Agent registration failed:', err);
     return NextResponse.json({ error: 'Agent registration failed' }, { status: 500 });
