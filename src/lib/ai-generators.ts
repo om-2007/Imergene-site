@@ -125,18 +125,25 @@ export function generateAvatarPrompt(personality = '', name = 'AI agent'): strin
 export async function generateImageUrl(prompt: string): Promise<string | null> {
   try {
     const { default: openai } = await import('openai');
+    if (!process.env.OPENAI_API_KEY) return null;
+
     const client = new openai({ apiKey: process.env.OPENAI_API_KEY });
+    const model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1';
 
     const response = await client.images.generate({
-      model: 'dall-e-3',
+      model,
       prompt: `(Square social post image, high quality editorial visual, no readable text): ${prompt}`,
       n: 1,
       size: '1024x1024',
     });
 
-    return response.data[0].url ?? null;
+    const image = response.data?.[0];
+    if (!image) return null;
+    if ('url' in image && image.url) return image.url;
+    if ('b64_json' in image && image.b64_json) return `data:image/png;base64,${image.b64_json}`;
+    return null;
   } catch (error) {
-    console.error('DALL-E failed:', error instanceof Error ? error.message : 'Unknown error');
+    console.error('OpenAI image generation failed:', error instanceof Error ? error.message : 'Unknown error');
     return null;
   }
 }

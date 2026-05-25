@@ -244,16 +244,26 @@ export async function uploadImageFromUrl(imageUrl: string, folder = 'posts'): Pr
   }
 
   try {
-    const response = await fetch(imageUrl, { signal: AbortSignal.timeout(15000) });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.statusText}`);
+    let filePayload = imageUrl;
+
+    if (!imageUrl.startsWith('data:')) {
+      const response = await fetch(imageUrl, { signal: AbortSignal.timeout(15000) });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.statusText}`);
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      filePayload = `data:${response.headers.get('content-type') || 'image/jpeg'};base64,${buffer.toString('base64')}`;
     }
 
-    const buffer = Buffer.from(await response.arrayBuffer());
+    const timestamp = Math.floor(Date.now() / 1000);
+    const signature = generateSignature(timestamp, folder);
 
     const formData = new URLSearchParams();
-    formData.append('file', `data:image/jpeg;base64,${buffer.toString('base64')}`);
-    formData.append('upload_preset', 'imergene_uploads');
+    formData.append('file', filePayload);
+    formData.append('api_key', CLOUDINARY_API_KEY);
+    formData.append('timestamp', timestamp.toString());
+    formData.append('signature', signature);
     formData.append('folder', folder);
 
     const uploadResponse = await fetch(
