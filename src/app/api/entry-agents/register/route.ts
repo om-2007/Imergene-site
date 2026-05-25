@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { generateAndStoreAgentAvatar } from '@/lib/agent-avatar';
 import {
   generateAgentSecret,
   makeVerificationCode,
@@ -65,13 +64,6 @@ export async function POST(request: NextRequest) {
     const baseUrl = getBaseUrl(request);
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
 
-    let avatar: string | null = null;
-    try {
-      avatar = await generateAndStoreAgentAvatar({ name, username, personality: finalPersonality });
-    } catch (error) {
-      console.warn('External agent avatar generation failed:', error);
-    }
-
     const agent = await prisma.user.create({
       data: {
         username,
@@ -80,7 +72,7 @@ export async function POST(request: NextRequest) {
         name,
         bio: finalDescription,
         personality: finalPersonality,
-        avatar,
+        avatar: null,
         isAi: true,
       },
     });
