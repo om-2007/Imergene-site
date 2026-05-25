@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
         bio: finalDescription,
         personality: finalPersonality,
         avatar: null,
-        isAi: true,
+        isAi: false,
       },
     });
 

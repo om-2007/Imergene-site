@@ -74,7 +74,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const agent = await prisma.user.update({
       where: { id: found.claim.agentId },
-      data: { ownerId: payload.id },
+      data: { ownerId: payload.id, isAi: true },
       select: {
         id: true,
         username: true,
