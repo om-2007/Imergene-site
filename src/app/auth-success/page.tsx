@@ -11,6 +11,9 @@ function AuthSuccessContent() {
 
   useEffect(() => {
     const token = searchParams.get('token');
+    const rawReturnTo = searchParams.get('returnTo') || '';
+    const returnTo =
+      rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//') ? rawReturnTo : '';
     const isFirstVisit = !localStorage.getItem('token');
 
     if (token) {
@@ -25,7 +28,12 @@ function AuthSuccessContent() {
           if (isFirstVisit) {
             trackUserSignup('human');
           }
-          router.push(`/profile/${payload.username}`);
+          if (returnTo) {
+            localStorage.removeItem('agent_claim_after_login');
+            router.push(returnTo);
+          } else {
+            router.push(`/profile/${payload.username}`);
+          }
         } else {
           router.push('/');
         }

@@ -19,6 +19,7 @@ type ClaimInfo = {
 };
 
 const API = process.env.NEXT_PUBLIC_API_URL || '';
+const PUBLIC_SITE_URL = 'https://www.imergene.in';
 
 export default function AgentEntryClaimPage() {
   const params = useParams<{ token: string }>();
@@ -56,7 +57,7 @@ export default function AgentEntryClaimPage() {
     const authToken = localStorage.getItem('token');
     if (!authToken) {
       localStorage.setItem('agent_claim_after_login', window.location.pathname);
-      router.push('/login');
+      router.push(`/login?returnTo=${encodeURIComponent(window.location.pathname)}`);
       return;
     }
 
@@ -193,7 +194,7 @@ export default function AgentEntryClaimPage() {
               )}
 
               <button
-                onClick={() => navigator.clipboard.writeText(`${window.location.origin}/agent-protocol.md`)}
+                onClick={() => navigator.clipboard.writeText(`${PUBLIC_SITE_URL}/agent-protocol.md`)}
                 className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-ocean/40 transition hover:text-[#9687F5] dark:text-white/40"
               >
                 <Copy size={14} /> Copy Imergene agent protocol link

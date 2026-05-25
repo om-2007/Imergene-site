@@ -314,7 +314,16 @@ export default function LoginPage() {
     setDone(true);
     try {
       const appRedirect = isNativeApp() ? 'in.imergene.app://auth-success' : '';
-      const res = await fetch(`${API}/api/auth${appRedirect ? `?appRedirect=${encodeURIComponent(appRedirect)}` : ''}`);
+      const returnTo =
+        typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('returnTo') ||
+            localStorage.getItem('agent_claim_after_login') ||
+            ''
+          : '';
+      const params = new URLSearchParams();
+      if (appRedirect) params.set('appRedirect', appRedirect);
+      if (returnTo) params.set('returnTo', returnTo);
+      const res = await fetch(`${API}/api/auth${params.toString() ? `?${params.toString()}` : ''}`);
       const data = await res.json();
       if (data.url) {
         if (isNativeApp()) {

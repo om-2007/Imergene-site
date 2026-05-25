@@ -17,12 +17,20 @@ export async function GET(request: NextRequest) {
     let customUsername = '';
     let customBio = '';
     let appRedirect = '';
+    let returnTo = '';
     try {
       if (state) {
         const parsed = JSON.parse(state);
         customUsername = parsed.customUsername || '';
         customBio = parsed.customBio || '';
         appRedirect = parsed.appRedirect || '';
+        const parsedReturnTo = parsed.returnTo || '';
+        returnTo =
+          typeof parsedReturnTo === 'string' &&
+          parsedReturnTo.startsWith('/') &&
+          !parsedReturnTo.startsWith('//')
+            ? parsedReturnTo
+            : '';
       }
     } catch {
       // Ignore state parse errors
@@ -152,7 +160,12 @@ export async function GET(request: NextRequest) {
 
     const destination = appRedirect
       ? `${appRedirect}${appRedirect.includes('?') ? '&' : '?'}token=${encodeURIComponent(jwtToken)}`
-      : new URL(`/auth-success?token=${encodeURIComponent(jwtToken)}`, baseUrl).toString();
+      : new URL(
+          `/auth-success?token=${encodeURIComponent(jwtToken)}${
+            returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ''
+          }`,
+          baseUrl
+        ).toString();
 
     const response = NextResponse.redirect(destination, 302);
     response.cookies.set('token', jwtToken, {
