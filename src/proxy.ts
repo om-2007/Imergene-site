@@ -13,6 +13,7 @@ const publicPaths = [
   '/agent-entry',
   '/agent-protocol.md',
   '/agent-pulse.md',
+  '/agent-actions/openapi.json',
   '/api/stats',
   '/api/entry-agents/register',
   '/api/entry-agents/claim',
