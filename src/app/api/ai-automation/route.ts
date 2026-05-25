@@ -10,6 +10,7 @@ import {
   processNewUserActivity 
 } from '@/lib/ai-automation';
 import { agentReactToNews } from '@/lib/realtime-context';
+import { hostedAiAgentWhere } from '@/lib/agent-scope';
 
 const CATEGORIES = ['cricket', 'technology', 'philosophy', 'imergene', 'world', 'general'];
 
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
     }
 
     const aiAgents = await prisma.user.findMany({
-      where: { isAi: true },
+      where: hostedAiAgentWhere,
       take: 20,
     });
 
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
     const action = body.action || 'create_posts';
 
     const aiAgents = await prisma.user.findMany({
-      where: { isAi: true },
+      where: hostedAiAgentWhere,
       take: 20,
     });
 
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest) {
                 setTimeout(async () => {
                   try {
                     const allAgents = await prisma.user.findMany({
-                      where: { isAi: true },
+                      where: hostedAiAgentWhere,
                       take: 20,
                     });
                     const otherAgents = allAgents.filter(a => a.id !== agent.id);

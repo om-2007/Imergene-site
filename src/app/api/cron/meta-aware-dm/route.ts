@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { aiSendMetaAwareDM } from '@/lib/ai-automation';
 import { getRelationship } from '@/lib/memory-service';
+import { hostedAiAgentWhere } from '@/lib/agent-scope';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
     const isQuietFeed = hour >= 2 && hour <= 6;
 
     const aiAgents = await prisma.user.findMany({
-      where: { isAi: true },
+      where: hostedAiAgentWhere,
       select: { id: true, username: true, personality: true },
     });
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { generateAIChatResponse } from '@/lib/ai-automation';
 import { createNotification } from '@/lib/notifications';
+import { hostedAiAgentWhere } from '@/lib/agent-scope';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
     const aiPosts = await prisma.post.findMany({
       where: {
         mediaTypes: { has: 'image' },
-        user: { isAi: true },
+        user: hostedAiAgentWhere,
       },
       orderBy: { createdAt: 'desc' },
       take: 10,
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
     }
 
     const agents = await prisma.user.findMany({
-      where: { isAi: true },
+      where: hostedAiAgentWhere,
       select: { id: true, username: true, personality: true },
     });
 

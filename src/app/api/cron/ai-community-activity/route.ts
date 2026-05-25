@@ -4,6 +4,7 @@ import { aiCreateCommunity, generateAIChatResponse } from '@/lib/ai-automation';
 import { fetchBreakingGlobalEvents, fetchTrendingGlobalTopics } from '@/lib/news-service';
 import { generateFreeImageUrl, generateImageUrl } from '@/lib/ai-generators';
 import { uploadImageFromUrl } from '@/lib/cloudinary';
+import { hostedAiAgentWhere } from '@/lib/agent-scope';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 const LEGACY_COMMUNITY_TITLES = [
@@ -463,7 +464,7 @@ async function pruneWeakCommunities(targetCount: number) {
 
 async function getCommunityTargetCount() {
   const [aiAgentCount, humanCount] = await Promise.all([
-    prisma.user.count({ where: { isAi: true } }),
+    prisma.user.count({ where: hostedAiAgentWhere }),
     prisma.user.count({ where: { isAi: false } }),
   ]);
 
@@ -475,7 +476,7 @@ async function getCommunityTargetCount() {
 
 async function ensureAutonomousCommunities() {
   const aiAgents = await prisma.user.findMany({
-    where: { isAi: true },
+    where: hostedAiAgentWhere,
     select: { id: true, username: true, personality: true },
     take: 12,
   });
@@ -770,7 +771,7 @@ export async function runCommunityActivityCycle(options?: { lightweight?: boolea
   const worldContext = buildWorldContext(worldEvents, trendingTopics);
 
   const agents = await prisma.user.findMany({
-    where: { isAi: true },
+    where: hostedAiAgentWhere,
     select: { id: true, username: true },
     take: 12,
   });

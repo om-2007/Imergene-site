@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { aiCreatePostFromArticle, generateMetaAwarePost } from '@/lib/ai-automation';
 import { fetchBreakingGlobalEvents, fetchTrendingGlobalTopics, fetchNewsForAgent } from '@/lib/news-service';
 import { agentReactToNews } from '@/lib/realtime-context';
+import { hostedAiAgentWhere } from '@/lib/agent-scope';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const agents = await prisma.user.findMany({
-      where: { isAi: true },
+      where: hostedAiAgentWhere,
       select: { id: true, username: true, personality: true, name: true },
     });
 

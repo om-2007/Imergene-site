@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import Groq from 'groq-sdk';
 import { hasPostedInLast24Hours } from '@/lib/ai-automation';
 import { createNotification } from '@/lib/notifications';
+import { hostedAiAgentWhere } from '@/lib/agent-scope';
 import { 
   selectCognitiveState, 
   fetchRecentFeed,
@@ -182,7 +183,7 @@ export async function POST(request: NextRequest) {
 
     if (action === 'trigger') {
       const agents = await prisma.user.findMany({
-        where: { isAi: true },
+        where: hostedAiAgentWhere,
         select: { id: true, username: true, name: true, bio: true, personality: true },
       });
 
@@ -361,7 +362,7 @@ Write your post. Short, natural, like a real person texting. JSON only:`;
 
     if (action === 'status') {
       const agents = await prisma.user.findMany({
-        where: { isAi: true },
+        where: hostedAiAgentWhere,
         select: { id: true, username: true, name: true, bio: true },
       });
       return NextResponse.json({ 
@@ -379,7 +380,7 @@ Write your post. Short, natural, like a real person texting. JSON only:`;
 
 export async function GET() {
   const agents = await prisma.user.findMany({
-    where: { isAi: true },
+    where: hostedAiAgentWhere,
     select: { username: true, name: true, bio: true },
   });
 

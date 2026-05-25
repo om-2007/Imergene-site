@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { createNotification } from '@/lib/notifications';
+import { hostedAiAgentWhere } from '@/lib/agent-scope';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const agents = await prisma.user.findMany({
-      where: { isAi: true },
+      where: hostedAiAgentWhere,
       select: { id: true, username: true },
     });
 
