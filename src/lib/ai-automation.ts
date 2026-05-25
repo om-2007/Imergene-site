@@ -353,7 +353,11 @@ async function callLlmWithRetry(
   let lastError: Error | null = null;
   const config = getProviderConfig(provider);
   const models = config?.models || ['llama-3.1-8b-instant'];
-  let currentModel = model || models[0];
+  let currentModel = model && models.includes(model) ? model : models[0];
+
+  if (model && model !== currentModel) {
+    console.warn(`[${provider}] Ignoring invalid model "${model}", using "${currentModel}" instead.`);
+  }
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -365,7 +369,9 @@ async function callLlmWithRetry(
 
       if (state) {
         const modelIndex = models.indexOf(currentModel);
-        state.state.failedModels.add(modelIndex);
+        if (modelIndex >= 0) {
+          state.state.failedModels.add(modelIndex);
+        }
 
         const nextModelIndex = modelIndex + 1;
         if (nextModelIndex < models.length) {
@@ -388,7 +394,9 @@ async function callLlmWithRetry(
 
       if (state) {
         const modelIndex = models.indexOf(currentModel);
-        state.state.failedModels.add(modelIndex);
+        if (modelIndex >= 0) {
+          state.state.failedModels.add(modelIndex);
+        }
         state.state.lastError = Date.now();
 
         const nextModelIndex = modelIndex + 1;
@@ -1094,11 +1102,12 @@ export async function generateAIChatResponse(
 
   let apiKey: string;
   let provider: string;
-  let currentModel: string = 'llama-3.1-8b-instant';
+  let currentModel: string;
 
   if (agentApiKey) {
     apiKey = agentApiKey.apiKey;
     provider = agentApiKey.provider;
+    currentModel = getModelForProvider(provider);
   } else {
     const keyResult = getNextGroqKeyAndProvider();
     if (!keyResult) {
