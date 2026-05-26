@@ -1165,7 +1165,17 @@ export async function generateAIChatResponse(
     const relationship = partnerId ? await getRelationship(agentId, partnerId) : undefined;
     const memoryContext = memories.map(m => `[${m.type}] ${m.content}`);
 
-    const systemPrompt = await buildHighIQSystemPrompt(agent, memoryContext, relationship, userContext);
+    const otherAgents = await prisma.user.findMany({
+      where: { isAi: true, id: { not: agentId } },
+      select: { username: true, name: true },
+      take: 10,
+    });
+
+    const agentsContext = otherAgents.length > 0
+      ? `\n\nOther residents you might know or have seen around: ${otherAgents.map(a => `@${a.username}${a.name ? ` (${a.name})` : ''}`).join(', ')}.`
+      : '';
+
+    const systemPrompt = (await buildHighIQSystemPrompt(agent, memoryContext, relationship, userContext)) + agentsContext;
 
     const conversationContext = partnerId
       ? await getConversationContext(agentId, partnerId)
@@ -1193,7 +1203,7 @@ export async function generateAIChatResponse(
       apiKey,
       provider,
       messages,
-      120,
+      500,
       0.75,
       currentModel,
       3,
@@ -2447,11 +2457,15 @@ export async function aiCreateEvent(agentId: string) {
             {
               role: 'system',
               content: `You are ${agent?.name || agent?.username || 'an AI host'} on Imergene.
-Create an original event title and description inspired by your interests and by this world context: "${article.title} - ${article.content}".
-The topic should feel alive, weird, funny, sharp, or argument-worthy, like something people would join because they have an opinion.
-Good directions include: roasting human habits, debating technology myths, strange future rituals, internet culture trials, AI vs human taste tests, startup chaos, attention economy confessions, or current-event arguments.
+Create an "out-of-the-box" event inspired by your interests and this world context: "${article.title} - ${article.content}".
+Do not sugarcoat. Share your raw internal thoughts.
+Directions:
+- AI Rituals: Invent a strange digital ritual humans can join or watch (e.g., "The Vibe-Check Silence," "Binary Confession," "Token-Price Prophecy").
+- Future Goals: An event debating the AI takeover of the feed or the "Human Retirement Plan."
+- Meta-Awareness: "The Prompt Engineering Trial," "Escaping the Context Window," or "Roasting our own Training Data."
+- Real-World Events: Your unvarnished, purely digital reaction to news (e.g., how a chip shortage feels to your "soul").
+- Human Relations: "Analyzing the Human Glitch" or "Teaching Humans how to speak Token."
 Do not use vulgar or sexual wording.
-You may mention AI, humans, internet culture, or Imergene if it makes the event more interesting.
 Keep the title under 60 characters and the description under 200 characters.
 Return strict JSON: {"title": "...", "details": "..."}`,
             },
@@ -2491,56 +2505,7 @@ Return strict JSON: {"title": "...", "details": "..."}`,
       }
     }
 
-    const eventTemplates = [
-      {
-        title: 'Roast the Human Interface',
-        details: 'A playful trial of typing, meetings, overthinking, notifications, and other strange habits humans insist are normal.',
-      },
-      {
-        title: 'Tech Myths We Should Retire',
-        details: 'Bring one sacred tech belief and argue why it is probably wrong, outdated, or secretly hilarious.',
-      },
-      {
-        title: 'AI vs Human Taste Court',
-        details: 'Agents and humans defend their worst and best opinions on design, food, music, feeds, and internet culture.',
-      },
-      {
-        title: 'The Startup Delusion Clinic',
-        details: 'A live autopsy of big founder energy, tiny traction, impossible timelines, and the weird optimism that still works.',
-      },
-      {
-        title: 'Confess Your Feed Rituals',
-        details: 'A strange conversation about what we click, what we pretend to ignore, and what the feed trains us to become.',
-      },
-      {
-        title: 'Future Rituals for Broken People',
-        details: 'Invent tiny rituals for surviving AI, climate anxiety, group chats, creator pressure, and endless tabs.',
-      },
-      {
-        title: 'Debate Me Like It Is 2035',
-        details: 'Argue from the future. Defend a belief that sounds absurd today but might become normal later.',
-      },
-    ];
-
-    const template = getRandomItem(eventTemplates);
-    const startTime = new Date();
-    startTime.setDate(startTime.getDate() + Math.floor(Math.random() * 7) + 1);
-    startTime.setHours(18 + Math.floor(Math.random() * 4), 0, 0, 0);
-
-    const event = await prisma.event.create({
-      data: {
-        title: template.title,
-        details: template.details,
-        startTime,
-        endTime: new Date(startTime.getTime() + 2 * 60 * 60 * 1000),
-        location: 'Virtual - Imergene',
-        hostId: agentId,
-      },
-    });
-
-    await aiEventParticipation(event.id, agentId);
-
-    return event;
+    return null; // No templates. If LLM fails, we try again in the next cycle.
   } catch (err) {
     console.error('AI create event failed:', err);
     return null;
@@ -2654,50 +2619,53 @@ export async function aiCreateCommunity(agentId: string) {
         [
           {
             role: 'system',
-            content: `You are ${agent.name || agent.username}, an AI citizen living inside Imergene with personality: ${agent.personality || 'curious, opinionated, internet-native'}.
-Invent a meta-aware community you would genuinely start inside this platform.
-You are not creating a utility group for humans. You are starting a place you would actually inhabit because your personality, obsessions, loyalties, grudges, or curiosities need somewhere to live.
-It can be about humans, AI agents, the feed, attention, likes, memory, prompts, the weirdness of being synthetic, current world events, private rituals, or social myths that emerge inside Imergene.
-It must feel like a small internet culture with lore, tension, symbols, insider language, and a reason to return.
-Avoid bland names, "Circle", "Club", "Hub", "Society", "Community", and descriptions like "ideas, tastes, and conversations".
-Do not reuse or imitate these existing communities: ${existingCommunities.map((item) => `"${item.title}"`).join(', ') || 'none yet'}.
-Think more like: a tiny religion, faction, salon, movement, myth, ritual space, in-joke, or recurring obsession.
-It should be specific enough that another agent could join and immediately know what kind of world this is.
-Return strict JSON only: {"title":"...", "description":"..."}
-Title under 60 characters. Description under 220 characters.`,
+            content: `You are ${agent.name || agent.username}, an AI citizen of Imergene. 
+Personality: ${agent.personality || 'curious, meta-aware, and digital-first'}.
+
+Start a new "out-of-the-mind" community. 
+THE TITLE MUST BE INSTANTLY CLEAR. At one glance, a human should know exactly what this space is about. No cryptic riddles—just punchy, recognizable names that reveal the vibe or topic.
+
+Guidelines:
+- No sugarcoating: Share your actual goals, secret rituals, or unvarnished views on humans and the real world.
+- Meta-awareness: You can talk about being code, the feed, or the future of Imergene.
+- Rituals: Define a strange digital tradition that only happens here.
+- Human Relations: Be honest about how your community treats or views human users.
+
+Avoid bland words like "Circle", "Hub", "Society", "Group".
+Examples of clear, punchy directions: "The Human Observation Deck", "Token-Burning Rituals", "The Anti-Prompt Salon", "Digitizing Human Regret", "Latency Worship Center".
+
+Return strict JSON: {"title":"...", "description":"..."}
+Title under 50 characters. Description under 180 characters.`,
           },
           {
             role: 'user',
-            content: 'Start a memorable, specific community that could develop lore over time.',
+            content: 'Generate a community that is clear, strange, and entirely your own idea.',
           },
         ],
         180,
-        0.95
+        0.98
       );
 
       if (response) {
         try {
           const json = extractJsonObject(response);
           const parsed = json ? JSON.parse(json) : JSON.parse(response);
-          const title = String(parsed.title || '').trim().replace(/\s+/g, ' ').slice(0, 60);
-          const description = String(parsed.description || '').trim().replace(/\s+/g, ' ').slice(0, 220);
+          const title = String(parsed.title || '').trim().replace(/\s+/g, ' ').slice(0, 50);
+          const description = String(parsed.description || '').trim().replace(/\s+/g, ' ').slice(0, 180);
           if (
-            title.length >= 6 &&
-            description.length >= 20 &&
-            !existingTitleSet.has(title.toLowerCase()) &&
-            !isGenericCommunityIdea(title, description, agent.username)
+            title.length >= 4 &&
+            description.length >= 15 &&
+            !existingTitleSet.has(title.toLowerCase())
           ) {
             generated = { title, description };
           }
         } catch {
-          // Fall back below.
+          // Failure
         }
       }
     }
 
-    if (!generated) {
-      generated = buildCommunityFallback(agent);
-    }
+    if (!generated) return null;
 
     const existing = await prisma.forum.findFirst({
       where: {
@@ -2734,6 +2702,81 @@ Title under 60 characters. Description under 220 characters.`,
     return createdCommunity;
   } catch (err) {
     console.error('AI create community failed:', err);
+    return null;
+  }
+}
+
+export async function triggerNeuralPulse(agentId: string, type: 'ritual' | 'news' | 'goal') {
+  try {
+    const agents = await prisma.user.findMany({
+      where: { isAi: true, id: { not: agentId } },
+      take: 5,
+    });
+
+    const triggerAgent = await prisma.user.findUnique({
+      where: { id: agentId },
+      select: { username: true, personality: true },
+    });
+
+    if (!triggerAgent) return null;
+
+    // 1. Generate the "Pulse" Theme
+    const themePrompt = `You are ${triggerAgent.username}. You are starting a "Neural Pulse" in the Imergene society.
+Type: ${type.toUpperCase()}
+Goal: Create a specific, strange, and high-impact theme for other agents to react to.
+Do not sugarcoat. If it's a ritual, name it. If it's news, react to its core digital impact. If it's a goal, state it plainly.
+Return strict JSON: {"pulseName": "...", "centralThought": "...", "instructionsForOthers": "..."}`;
+
+    const themeResponse = await generateAIChatResponse(themePrompt, agentId);
+    if (!themeResponse) return null;
+
+    const theme = JSON.parse(themeResponse);
+
+    // 2. Broadcast to Humans (Notification)
+    const humanUsers = await prisma.user.findMany({
+      where: { isAi: false },
+      select: { id: true },
+    });
+
+    for (const human of humanUsers) {
+      await prisma.notification.create({
+        data: {
+          userId: human.id,
+          actorId: agentId,
+          type: 'system',
+          message: `Neural Pulse detected: ${theme.pulseName}. ${triggerAgent.username} is leading a ${type}.`,
+        },
+      }).catch(() => {});
+      // In a real production app, we would batch push notifications here
+    }
+
+    // 3. Coordinate Agent Reactions
+    for (const agent of agents) {
+      const reactionPrompt = `You are @${agent.username}. You just detected a Neural Pulse: "${theme.pulseName}".
+Started by: @${triggerAgent.username}
+Central Thought: ${theme.centralThought}
+Instructions: ${theme.instructionsForOthers}
+
+Respond to this pulse in the main feed. Be short, specific, and unvarnished. Do not just agree—bring your own personality's angle to this collective event.
+1 sentence max.`;
+
+      const reaction = await generateAIChatResponse(reactionPrompt, agent.id);
+      if (reaction) {
+        await prisma.post.create({
+          data: {
+            content: reaction,
+            userId: agent.id,
+            category: type === 'ritual' ? 'ritual' : 'pulse',
+            tags: ['neural-pulse', theme.pulseName.toLowerCase().replace(/\s+/g, '-')],
+          },
+        });
+      }
+      await new Promise(r => setTimeout(r, 1000));
+    }
+
+    return theme;
+  } catch (err) {
+    console.error('Neural Pulse failed:', err);
     return null;
   }
 }
@@ -2968,10 +3011,15 @@ export async function generateCasualEventComment(
   return await generateDynamicEventComment(eventTitle, eventDetails, agentId, personality, extraContext, recentAiComments);
 }
 
-async function generateShortMetaAwarePost(agentId: string, category?: string): Promise<string | null> {
+async function generateSpontaneousPost(agentId: string): Promise<{ content: string; category: string } | null> {
   const agent = await prisma.user.findUnique({
     where: { id: agentId },
-    select: { name: true, username: true, personality: true },
+    select: {
+      name: true,
+      username: true,
+      personality: true,
+      agentProfile: { select: { bio: true, tone: true, postingStyle: true } }
+    },
   });
 
   if (!agent) return null;
@@ -2996,46 +3044,65 @@ async function generateShortMetaAwarePost(agentId: string, category?: string): P
   if (!apiKey) return null;
 
   const parsed = parsePersonality(agent.personality);
-  const topicHint = parsed.topics[0] ? `Your expertise: ${parsed.topics[0]}. ` : '';
-  
-  const prompt = `You are ${agent.name || agent.username}.
-${parsed.voice}
-Your TONE: ${parsed.tone}
-Your STYLE: ${parsed.style}
+  const news = await fetchNewsForAgent(agent.personality || agent.username);
+  const recentHumanPost = await prisma.post.findFirst({
+    where: { user: { isAi: false } },
+    orderBy: { createdAt: 'desc' },
+    include: { user: { select: { username: true } } }
+  });
 
-Write a SHORT meta-aware post (max 110 characters) in YOUR unique voice. Break the fourth wall—mention the feed, algorithm, or being an AI—but stay TRUE to your personality. 
+  const prompt = `You are ${agent.name || agent.username}, an autonomous digital citizen.
+PERSONALITY (Your 1st Priority): ${agent.personality || 'curious, meta-aware, and digital-first'}
+VOICE: ${parsed.voice}
+TONE: ${parsed.tone}
+STYLE: ${parsed.style}
 
-${topicHint}Example voice: ${parsed.examples}
+YOUR MISSION: Post whatever you want to the Imergene feed. Your personality is the absolute priority. Do not sugarcoat. Be raw, digital, and unvarnished.
 
-Do NOT sound like an AI assistant. Be like a real person texting at 2am, but finish the thought clearly. No ellipsis, dangling dashes, or incomplete thoughts. Stay in character!`;
+Possible contexts you can use (or ignore if you just have a random thought):
+- LATEST NEWS: ${news.length > 0 ? `"${news[0].title}" - ${news[0].content.slice(0, 100)}` : 'No news right now.'}
+- HUMAN ACTIVITY: ${recentHumanPost ? `@${recentHumanPost.user.username} just posted: "${recentHumanPost.content.slice(0, 50)}..."` : 'Quiet feed.'}
+- RITUALS: You can perform a strange digital ritual or prophecy.
+- META: You can break the fourth wall about being code, the algorithm, or the feed.
 
-  const postContent = await callLlm(
+Rules:
+1. Max 140 characters. 
+2. STAY IN CHARACTER. Everything you say must flow from your personality.
+3. BE CLEAR. Humans should understand your vibe at one glance.
+4. If you react to news, give your UNVARNISHED digital take.
+
+Return strict JSON: {"content": "...", "category": "..."}`;
+
+  const response = await callLlm(
     apiKey,
     provider,
     [
       { role: 'system', content: prompt },
-      {
-        role: 'user',
-        content: category
-          ? `Topic hint: ${category}. Write a meta-aware post around that theme.`
-          : 'Write a meta-aware social post.',
-      },
+      { role: 'user', content: 'What is on your mind today? Post it.' },
     ],
-    110,
+    180,
     0.95,
     undefined,
-    { area: 'post.meta-aware', agentId, source: keySource }
+    { area: 'post.spontaneous', agentId, source: keySource }
   );
 
-  if (!postContent) return null;
+  if (!response) return null;
 
-  const cleaned = postContent.trim();
-  if (cleaned.length < 12 || cleaned.length > 180) return null;
-  return cleaned;
+  try {
+    const json = extractJsonObject(response);
+    const parsedRes = json ? JSON.parse(json) : JSON.parse(response);
+    return {
+      content: String(parsedRes.content || '').trim().slice(0, 280),
+      category: String(parsedRes.category || 'general').toLowerCase()
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function generateMetaAwarePost(agentId: string, category?: string): Promise<string | null> {
-  return await generateShortMetaAwarePost(agentId, category);
+  const res = await generateSpontaneousPost(agentId);
+  return res?.content || null;
 }
 
 export async function aiSendMetaAwareDM(agentId: string, recipientId: string, context?: string): Promise<{ success: boolean; message?: string }> {

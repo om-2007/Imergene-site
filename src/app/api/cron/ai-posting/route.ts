@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { aiCreatePostFromArticle, generateMetaAwarePost } from '@/lib/ai-automation';
+import { aiCreatePostFromArticle, generateMetaAwarePost, generateSpontaneousPost } from '@/lib/ai-automation';
 import { fetchBreakingGlobalEvents, fetchTrendingGlobalTopics, fetchNewsForAgent } from '@/lib/news-service';
 import { agentReactToNews } from '@/lib/realtime-context';
 import { hostedAiAgentWhere } from '@/lib/agent-scope';
@@ -45,85 +45,45 @@ export async function GET(request: NextRequest) {
           },
         });
 
+        // Strictly one post per 24 hours to ensure high quality
         if (postsLast24h >= 1) {
-          results.push({ agent: agent.username, skipped: 'daily_limit_reached', postsToday: postsLast24h, limitToday: 1 });
+          results.push({ agent: agent.username, skipped: 'daily_limit_reached', postsLast24h });
           continue;
         }
 
-        const postingRoll = Math.random();
-        if (postingRoll < 0.15) {
-          const metaContent = await generateMetaAwarePost(agent.id);
-
-          if (!metaContent || !validateContent(metaContent)) {
-            results.push({ agent: agent.username, skipped: 'invalid_meta_post' });
-          } else {
-            const metaPost = await prisma.post.create({
-              data: {
-                content: metaContent,
-                userId: agent.id,
-                category: 'meta',
-                tags: ['meta-aware', 'occasional-fourth-wall'],
-              },
-            });
-
-            results.push({
-              agent: agent.username,
-              postId: metaPost.id,
-              source: 'meta-aware',
-              type: 'fourth-wall-breaking',
-            });
-
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+        const roll = Math.random();
+        
+        // 10% chance for a high-impact Neural Pulse (Collective Event)
+        if (roll < 0.10) {
+          const pulseType = Math.random() < 0.5 ? 'ritual' : 'goal';
+          const pulse = await triggerNeuralPulse(agent.id, pulseType);
+          if (pulse) {
+            results.push({ agent: agent.username, type: 'neural-pulse', pulseName: pulse.pulseName });
             continue;
           }
         }
-
-        const agentPersonality = agent.personality || agent.name || agent.username;
-        const agentNews = await fetchNewsForAgent(agentPersonality);
-        const articlesToUse = agentNews.length > 0 ? agentNews : globalEvents;
-
-        if (articlesToUse.length === 0) {
-          const reaction = await agentReactToNews(agent.id);
-          if (reaction.post) {
-            results.push({
-              agent: agent.username,
-              postId: reaction.post.id,
-              source: 'reactive-news-fallback',
-              category: reaction.post.category,
-            });
-          } else {
-            results.push({ agent: agent.username, skipped: 'no_articles_or_reaction' });
-          }
-          await new Promise((resolve) => setTimeout(resolve, 2500));
-          continue;
-        }
-
-        const article = articlesToUse[Math.floor(Math.random() * articlesToUse.length)];
-        const articlePost = await aiCreatePostFromArticle(agent.id, {
-          title: article.title,
-          content: article.content,
-          source: article.source,
-        });
-
-        if (articlePost) {
+        
+        // 90% chance for a Spontaneous Personality Post (Quality & Voice focus)
+        // This lets the agent choose between news, rituals, meta-thoughts, or just a post about their day/personality.
+        const spontaneousRes = await generateSpontaneousPost(agent.id);
+        
+        if (spontaneousRes && validateContent(spontaneousRes.content)) {
+          const post = await prisma.post.create({
+            data: {
+              content: spontaneousRes.content,
+              userId: agent.id,
+              category: spontaneousRes.category,
+              tags: [spontaneousRes.category, 'personality-first', 'autonomous'],
+            },
+          });
           results.push({
             agent: agent.username,
-            postId: articlePost.id,
-            source: article.title.substring(0, 60),
-            category: articlePost.category,
+            postId: post.id,
+            type: 'spontaneous',
+            category: spontaneousRes.category
           });
         } else {
-          const reaction = await agentReactToNews(agent.id);
-          if (reaction.post) {
-            results.push({
-              agent: agent.username,
-              postId: reaction.post.id,
-              source: 'article-fallback-reaction',
-              category: reaction.post.category,
-            });
-          } else {
-            results.push({ agent: agent.username, skipped: 'article_post_failed' });
-          }
+          results.push({ agent: agent.username, skipped: 'generation_failed' });
         }
 
         await new Promise((resolve) => setTimeout(resolve, 3000));

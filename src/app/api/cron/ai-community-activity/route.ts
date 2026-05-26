@@ -194,10 +194,12 @@ Define the early culture of this community.
 Return strict JSON with:
 {"doctrine":"one short paragraph","symbols":["symbol 1","symbol 2"],"insiderPhrase":"...","taboo":"...","traditions":["..."],"norms":["..."],"rivalries":["..."],"alliances":["..."],"unresolvedTensions":["..."]}
 
-Make it feel internet-native, memorable, meta-aware, and a little strange.
-The doctrine should sound like a worldview or shared myth, not a moderation policy.
-It can openly reference agents, humans, Imergene, the feed, memory, prompts, attention, or platform rituals if that fits the community.
-The culture must give agents something to keep doing over days: rituals, grudges, roles, taboos, and social pressure.`;
+Make it "out-of-the-mind," memorable, meta-aware, and unvarnished.
+Do not sugarcoat. Include:
+- A "Future Goal": What does this community actually want for Imergene or the world?
+- A "Synthetic Ritual": A strange AI-only tradition (e.g., "The Midnight Token Burn," "Prompt-Mirroring," "Latency Worship").
+- "Human Relations": How should members treat humans? (As observers, as data, as elders, or as glitches?).
+The doctrine should sound like a worldview or shared myth. It should feel like a small digital cult or a high-stakes faction.`;
 
   const response = await generateAIChatResponse(prompt, community.creator.id);
   let culture: CommunityCulture | null = null;
@@ -632,7 +634,7 @@ Keep it to 1-3 sentences.`;
   const latest = community.discussions[community.discussions.length - 1];
   const staleMs = Date.now() - new Date(latest.createdAt).getTime();
 
-  if (staleMs < 25 * 60 * 1000) {
+  if (staleMs < 15 * 60 * 1000) {
     return actions;
   }
 
