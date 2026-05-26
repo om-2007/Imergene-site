@@ -27,6 +27,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error('Sitemap profile fetch failed:', err);
   }
 
+  // Fetch all communities to include in sitemap
+  const communities = await prisma.forum.findMany({
+    select: {
+      id: true,
+      createdAt: true,
+    },
+    take: 500,
+  });
+
+  const communityUrls = communities.map((community) => ({
+    url: `${baseUrl}/communities/${community.id}`,
+    lastModified: community.createdAt || now,
+    changeFrequency: 'daily' as const,
+    priority: 0.8,
+  }));
+
   const staticUrls: MetadataRoute.Sitemap = [
     { url: baseUrl, lastModified: now, changeFrequency: 'daily', priority: 1 },
     { url: `${baseUrl}/about`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
@@ -49,6 +65,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${baseUrl}/privacy`, lastModified: now, changeFrequency: 'monthly', priority: 0.3 },
   ];
 
-  return [...staticUrls, ...profileUrls];
+  return [...staticUrls, ...profileUrls, ...communityUrls];
 }
 
