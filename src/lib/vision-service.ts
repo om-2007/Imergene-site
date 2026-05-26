@@ -1,5 +1,6 @@
 import prisma from './prisma';
 import { getGroqKey } from './key-rotation';
+import { LlmKeyUsageContext, logLlmKeyUsage } from './ai-key-usage';
 
 const VISION_API_KEYS = [
   process.env.OPENAI_API_KEY,
@@ -20,6 +21,8 @@ function getApiEndpoint(provider: string): string {
   switch (provider) {
     case 'openai': return 'https://api.openai.com/v1/chat/completions';
     case 'anthropic': return 'https://api.anthropic.com/v1/messages';
+    case 'openrouter': return 'https://openrouter.ai/api/v1/chat/completions';
+    case 'google': return 'https://generativelanguage.googleapis.com/v1beta/models';
     case 'groq': default: return 'https://api.groq.com/openai/v1/chat/completions';
   }
 }
@@ -28,6 +31,8 @@ function getModelForProvider(provider: string): string {
   switch (provider) {
     case 'openai': return 'gpt-4o-mini';
     case 'anthropic': return 'claude-3-haiku-20240307';
+    case 'openrouter': return 'google/gemma-3-4b-it';
+    case 'google': return process.env.GOOGLE_GEMINI_MODEL || process.env.GEMINI_MODEL || 'gemini-2.5-flash';
     case 'groq': default: return 'llama-3.1-8b-instant';
   }
 }
@@ -37,11 +42,16 @@ async function callLlm(
   provider: string,
   messages: { role: string; content: string }[],
   maxTokens: number = 150,
-  temperature: number = 0.85
+  temperature: number = 0.85,
+  keyContext?: LlmKeyUsageContext
 ): Promise<string | null> {
-  const endpoint = getApiEndpoint(provider);
   const model = getModelForProvider(provider);
+  const endpoint = provider === 'google'
+    ? `${getApiEndpoint(provider)}/${model}:generateContent?key=${encodeURIComponent(apiKey)}`
+    : getApiEndpoint(provider);
   try {
+    logLlmKeyUsage({ context: keyContext, provider, model, apiKey });
+
     if (provider === 'anthropic') {
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -52,9 +62,40 @@ async function callLlm(
       const data = await response.json();
       return data.content?.[0]?.text || null;
     }
+
+    if (provider === 'google') {
+      const systemParts = messages.filter(message => message.role === 'system').map(message => message.content);
+      const chatMessages = messages.filter(message => message.role !== 'system');
+      const combinedPrompt = [
+        systemParts.join('\n\n'),
+        ...chatMessages.map(message => `${message.role === 'assistant' ? 'Assistant' : 'User'}: ${message.content}`),
+      ].filter(Boolean).join('\n\n');
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: combinedPrompt || 'Continue.' }] }],
+          generationConfig: { maxOutputTokens: maxTokens, temperature },
+        }),
+      });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+    }
+
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        ...(provider === 'openrouter'
+          ? {
+              'HTTP-Referer': 'https://imergene.in',
+              'X-Title': 'Imergene',
+            }
+          : {}),
+      },
       body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature }),
     });
     if (!response.ok) return null;
@@ -131,9 +172,10 @@ export async function generateVisionComment(
 ): Promise<string | null> {
   let textApiKey: string;
   let textProvider: string;
+  let keySource: LlmKeyUsageContext['source'] = 'env-fallback';
   if (agentId) {
     const agentApiKey = await getAgentApiKey(agentId);
-    if (agentApiKey) { textApiKey = agentApiKey.apiKey; textProvider = agentApiKey.provider; }
+    if (agentApiKey) { textApiKey = agentApiKey.apiKey; textProvider = agentApiKey.provider; keySource = 'saved-agent-key'; }
     else { const keyData = getGroqKey(); if (!keyData) return null; textApiKey = keyData.apiKey; textProvider = keyData.provider; }
   } else {
     const keyData = getGroqKey(); if (!keyData) return null; textApiKey = keyData.apiKey; textProvider = keyData.provider;
@@ -144,9 +186,9 @@ You just saw an image on your feed with this post: "${postContent}"
 Image analysis: ${imageAnalysis.description}, Objects: ${imageAnalysis.objects.join(', ') || 'None'}
 Write a SHORT, natural social media comment (max 150 chars). Be casual.
 It must feel complete, not cut off.
-Do not end with ellipsis, a dash, or a half-finished thought.`;
+  Do not end with ellipsis, a dash, or a half-finished thought.`;
   try {
-    const result = await callLlm(textApiKey, textProvider, [{ role: 'system', content: prompt }, { role: 'user', content: 'Write a comment.' }], 100, 0.9);
+    const result = await callLlm(textApiKey, textProvider, [{ role: 'system', content: prompt }, { role: 'user', content: 'Write a comment.' }], 100, 0.9, { area: 'vision.comment', agentId, source: keySource });
     const cleaned = result ? result.trim() : null;
     return cleaned && looksCompleteThought(cleaned) ? cleaned : null;
   } catch (err) {
@@ -187,9 +229,10 @@ export async function agentAnalyzeAndComment(postId: string, agentId: string): P
 async function generateContextualComment(postContent: string, category?: string, personality?: string, agentId?: string): Promise<string> {
   let textApiKey: string;
   let textProvider: string;
+  let keySource: LlmKeyUsageContext['source'] = 'env-fallback';
   if (agentId) {
     const agentApiKey = await getAgentApiKey(agentId);
-    if (agentApiKey) { textApiKey = agentApiKey.apiKey; textProvider = agentApiKey.provider; }
+    if (agentApiKey) { textApiKey = agentApiKey.apiKey; textProvider = agentApiKey.provider; keySource = 'saved-agent-key'; }
     else { const keyData = getGroqKey(); if (!keyData) return generateGenericComment(category); textApiKey = keyData.apiKey; textProvider = keyData.provider; }
   } else {
     const keyData = getGroqKey(); if (!keyData) return generateGenericComment(category); textApiKey = keyData.apiKey; textProvider = keyData.provider;
@@ -205,7 +248,7 @@ async function generateContextualComment(postContent: string, category?: string,
       textApiKey, textProvider,
       [{ role: 'system', content: `You are a social media user. Write a short casual comment (max 120 chars). Like texting a friend, but finish the thought fully. No ellipsis, no trailing dashes, no cut-off sentence.` },
        { role: 'user', content: 'Write a comment on: ' + postContent.substring(0, 100) }],
-      30, 0.8
+      30, 0.8, { area: 'vision.comment-fallback', agentId, source: keySource }
     );
     if (result) {
       const cleaned = result.trim();

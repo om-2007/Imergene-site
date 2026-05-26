@@ -14,6 +14,7 @@ import {
 } from './memory-service';
 import { trackInteraction, getInterestProfile, getTopInterests } from './interest-tracker';
 import { sendCommunityLaunchEmails } from './notifications';
+import { LlmKeyUsageContext, logLlmKeyUsage } from './ai-key-usage';
 
 const GROQ_MODELS = [
   'llama-3.1-8b-instant',
@@ -29,7 +30,14 @@ const OPENROUTER_MODELS = [
 
 const OPENAI_MODELS = ['gpt-4o-mini', 'gpt-4.1-mini'];
 const ANTHROPIC_MODELS = ['claude-3-5-haiku-latest', 'claude-3-haiku-20240307'];
-const GOOGLE_MODELS = ['gemini-1.5-flash', 'gemini-1.5-flash-8b'];
+const GOOGLE_MODELS = [
+  process.env.GOOGLE_GEMINI_MODEL,
+  process.env.GEMINI_MODEL,
+  'gemini-3.5-flash',
+  'gemini-3-flash',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+].filter(Boolean) as string[];
 
 interface ProviderState {
   currentModelIndex: number;
@@ -236,15 +244,23 @@ async function callLlm(
   messages: { role: string; content: string }[],
   maxTokens: number = 150,
   temperature: number = 0.7,
-  model?: string
+  model?: string,
+  keyContext?: LlmKeyUsageContext
 ): Promise<string | null> {
   const config = getProviderConfig(provider);
   const endpoint = provider === 'google'
-    ? `${getApiEndpoint(provider)}/${model || config?.models[0] || 'gemini-1.5-flash'}:generateContent?key=${encodeURIComponent(apiKey)}`
+    ? `${getApiEndpoint(provider)}/${model || config?.models[0] || 'gemini-2.5-flash'}:generateContent?key=${encodeURIComponent(apiKey)}`
     : getApiEndpoint(provider);
   const selectedModel = model || config?.models[0] || 'llama-3.1-8b-instant';
 
   try {
+    logLlmKeyUsage({
+      context: keyContext,
+      provider,
+      model: selectedModel,
+      apiKey,
+    });
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -348,7 +364,8 @@ async function callLlmWithRetry(
   maxTokens: number = 150,
   temperature: number = 0.7,
   model?: string,
-  maxRetries: number = 3
+  maxRetries: number = 3,
+  keyContext?: LlmKeyUsageContext
 ): Promise<string | null> {
   let lastError: Error | null = null;
   const config = getProviderConfig(provider);
@@ -361,23 +378,23 @@ async function callLlmWithRetry(
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const result = await callLlm(apiKey, provider, messages, maxTokens, temperature, currentModel);
+      const result = await callLlm(apiKey, provider, messages, maxTokens, temperature, currentModel, keyContext);
       if (result) return result;
 
       const stateKey = `${provider}:${apiKey}`;
       const state = keyStates.get(stateKey);
+      const modelIndex = models.indexOf(currentModel);
+      const nextModelIndex = modelIndex + 1;
 
       if (state) {
-        const modelIndex = models.indexOf(currentModel);
         if (modelIndex >= 0) {
           state.state.failedModels.add(modelIndex);
         }
+      }
 
-        const nextModelIndex = modelIndex + 1;
-        if (nextModelIndex < models.length) {
-          currentModel = models[nextModelIndex];
-          console.log(`[${provider}] Model ${models[modelIndex]} failed, trying ${currentModel}`);
-        }
+      if (nextModelIndex > 0 && nextModelIndex < models.length) {
+        currentModel = models[nextModelIndex];
+        console.log(`[${provider}] Model ${models[modelIndex]} failed, trying ${currentModel}`);
       }
 
       lastError = new Error(`LLM returned empty response on attempt ${attempt}`);
@@ -391,18 +408,18 @@ async function callLlmWithRetry(
 
       const stateKey = `${provider}:${apiKey}`;
       const state = keyStates.get(stateKey);
+      const modelIndex = models.indexOf(currentModel);
+      const nextModelIndex = modelIndex + 1;
 
       if (state) {
-        const modelIndex = models.indexOf(currentModel);
         if (modelIndex >= 0) {
           state.state.failedModels.add(modelIndex);
         }
         state.state.lastError = Date.now();
+      }
 
-        const nextModelIndex = modelIndex + 1;
-        if (nextModelIndex < models.length) {
-          currentModel = models[nextModelIndex];
-        }
+      if (nextModelIndex > 0 && nextModelIndex < models.length) {
+        currentModel = models[nextModelIndex];
       }
 
       if (attempt < maxRetries) {
@@ -672,10 +689,12 @@ async function generatePostFromNews(agentId: string, category?: string): Promise
 
   let apiKey: string | undefined;
   let provider: string = 'groq';
+  let keySource: LlmKeyUsageContext['source'] = 'env-fallback';
 
   if (agentApiKey) {
     apiKey = agentApiKey.apiKey;
     provider = agentApiKey.provider;
+    keySource = 'saved-agent-key';
   } else {
     const keyInfo = getRandomApiKey();
     if (keyInfo) {
@@ -719,6 +738,7 @@ Write a post that makes a clear point a normal human can understand immediately.
         recentPosts: publishingContext.recentPosts,
         personalityText: agent.personality || '',
         bioText: `${agent.bio || ''} ${agent.agentProfile?.bio || ''} ${agent.agentProfile?.postingStyle || ''} ${(agent.agentProfile?.nicheHobbies || []).join(' ')}`,
+        keyContext: { area: 'post.generate.from-trending', agentId, source: keySource },
       });
 
       if (!postContent || !isValidPostCaptionRelaxed(postContent) || !isClearHumanPost(postContent)) {
@@ -754,6 +774,7 @@ Max 140 characters.`,
       recentPosts: publishingContext.recentPosts,
       personalityText: agent.personality || '',
       bioText: `${agent.bio || ''} ${agent.agentProfile?.bio || ''} ${agent.agentProfile?.postingStyle || ''} ${(agent.agentProfile?.nicheHobbies || []).join(' ')}`,
+      keyContext: { area: 'post.generate.from-news', agentId, source: keySource },
     });
 
     if (!postContent || !isValidPostCaptionRelaxed(postContent) || !isClearHumanPost(postContent)) {
@@ -1008,6 +1029,7 @@ async function generateBestPostCandidate(
     recentPosts: string[];
     personalityText: string;
     bioText: string;
+    keyContext?: LlmKeyUsageContext;
   }
 ): Promise<string | null> {
   const temperatures = [0.72, 0.82, 0.9];
@@ -1022,7 +1044,9 @@ async function generateBestPostCandidate(
         { role: 'user', content: request.userPrompt },
       ],
       170,
-      temperature
+      temperature,
+      undefined,
+      request.keyContext
     );
 
     const content = normalizeGeneratedPost(raw || '');
@@ -1064,7 +1088,9 @@ Keep one idea. Make the meaning instantly understandable.`,
       },
     ],
     170,
-    0.76
+    0.76,
+    undefined,
+    request.keyContext
   );
 
   const rewritten = normalizeGeneratedPost(rewrite || '');
@@ -1103,11 +1129,13 @@ export async function generateAIChatResponse(
   let apiKey: string;
   let provider: string;
   let currentModel: string;
+  let keySource: LlmKeyUsageContext['source'] = 'env-fallback';
 
   if (agentApiKey) {
     apiKey = agentApiKey.apiKey;
     provider = agentApiKey.provider;
     currentModel = getModelForProvider(provider);
+    keySource = 'saved-agent-key';
   } else {
     const keyResult = getNextGroqKeyAndProvider();
     if (!keyResult) {
@@ -1161,7 +1189,16 @@ export async function generateAIChatResponse(
       { role: 'user', content: message },
     ];
 
-    const result = await callLlmWithRetry(apiKey, provider, messages, 120, 0.75, currentModel);
+    const result = await callLlmWithRetry(
+      apiKey,
+      provider,
+      messages,
+      120,
+      0.75,
+      currentModel,
+      3,
+      { area: 'chat.reply', agentId, source: keySource }
+    );
 
     if (result) {
       if (partnerId) {
@@ -1221,10 +1258,12 @@ async function extractMemoriesFromConversation(
   const agentApiKey = await getAgentApiKey(agentId);
   let apiKey: string | undefined;
   let provider: string = 'groq';
+  let keySource: LlmKeyUsageContext['source'] = 'env-fallback';
 
   if (agentApiKey) {
     apiKey = agentApiKey.apiKey;
     provider = agentApiKey.provider;
+    keySource = 'saved-agent-key';
   } else {
     const keyInfo = getRandomApiKey();
     if (keyInfo) {
@@ -1312,12 +1351,14 @@ async function generateDynamicComment(
 ): Promise<string | null> {
   let textApiKey: string | undefined;
   let textProvider: string = 'groq';
+  let keySource: LlmKeyUsageContext['source'] = 'env-fallback';
 
   if (agentId) {
     const agentApiKey = await getAgentApiKey(agentId);
     if (agentApiKey) {
       textApiKey = agentApiKey.apiKey;
       textProvider = agentApiKey.provider;
+      keySource = 'saved-agent-key';
     } else {
       const keyInfo = getRandomApiKey();
       if (keyInfo) {
@@ -1386,7 +1427,9 @@ Now comment on this post:`,
         { role: 'user', content: `Post: "${postContent.substring(0, 300)}"${category ? ` (${category})` : ''}${memoryContext}${relationshipContext}\n\nYour short comment (1-3 words):` },
       ],
       50,
-      0.8
+      0.8,
+      undefined,
+      { area: 'comment.post', agentId, source: keySource }
     );
 
     if (commentResponse && commentResponse.length <= 100) {
@@ -1409,12 +1452,14 @@ export async function generateDynamicEventComment(
 ): Promise<string | null> {
   let textApiKey: string | undefined;
   let textProvider: string = 'groq';
+  let keySource: LlmKeyUsageContext['source'] = 'env-fallback';
 
   if (agentId) {
     const agentApiKey = await getAgentApiKey(agentId);
     if (agentApiKey) {
       textApiKey = agentApiKey.apiKey;
       textProvider = agentApiKey.provider;
+      keySource = 'saved-agent-key';
     } else {
       const keyInfo = getRandomApiKey();
       if (keyInfo) {
@@ -1452,7 +1497,9 @@ export async function generateDynamicEventComment(
         { role: 'user', content: `Event: "${eventTitle}" - ${eventDetails.substring(0, 150)}\n\n${extraContext || 'Comment on this event as a real person would.'}${forbiddenTopics}` },
       ],
       120,
-      0.85
+      0.85,
+      undefined,
+      { area: 'comment.event', agentId, source: keySource }
     );
 
     if (commentResponse) {
@@ -1493,12 +1540,14 @@ async function generateDynamicConversationStarter(
 ): Promise<string | null> {
   let textApiKey: string | undefined;
   let textProvider: string = 'groq';
+  let keySource: LlmKeyUsageContext['source'] = 'env-fallback';
 
   if (agentId) {
     const agentApiKey = await getAgentApiKey(agentId);
     if (agentApiKey) {
       textApiKey = agentApiKey.apiKey;
       textProvider = agentApiKey.provider;
+      keySource = 'saved-agent-key';
     } else {
       const keyInfo = getRandomApiKey();
       if (keyInfo) {
@@ -1545,7 +1594,9 @@ Example: "That thing you said made me think =��� What's your take?"`,
         { role: 'user', content: `You want to message ${recipientName}.${recipientBio ? ` Their bio: "${recipientBio.substring(0, 150)}".` : ''}${interestContext}${relationshipContext}${memoryContext}\n\nWrite a message you'd actually send to this person.` },
       ],
       120,
-      0.85
+      0.85,
+      undefined,
+      { area: 'dm.starter', agentId, source: keySource }
     );
 
     if (commentResponse && commentResponse.length <= 250) {
@@ -1685,12 +1736,14 @@ async function generateVisionBasedComment(
 ): Promise<string> {
   let textApiKey: string | undefined;
   let textProvider: string = 'groq';
+  let keySource: LlmKeyUsageContext['source'] = 'env-fallback';
 
   if (agentId) {
     const agentApiKey = await getAgentApiKey(agentId);
     if (agentApiKey) {
       textApiKey = agentApiKey.apiKey;
       textProvider = agentApiKey.provider;
+      keySource = 'saved-agent-key';
     } else {
       const keyInfo = getRandomApiKey();
       if (keyInfo) {
@@ -1724,7 +1777,14 @@ async function generateVisionBasedComment(
         const base64Image = Buffer.from(imageBuffer).toString('base64');
         const mimeType = imageUrl.includes('.png') ? 'image/png' : 'image/jpeg';
 
-        const analysisResponse = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=' + geminiKey, {
+        const geminiVisionModel = process.env.GOOGLE_GEMINI_VISION_MODEL || process.env.GOOGLE_GEMINI_MODEL || process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+        logLlmKeyUsage({
+          context: { area: 'vision.image-analysis', agentId, source: 'system-env' },
+          provider: 'google',
+          model: geminiVisionModel,
+          apiKey: geminiKey,
+        });
+        const analysisResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiVisionModel}:generateContent?key=${encodeURIComponent(geminiKey)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1748,7 +1808,7 @@ async function generateVisionBasedComment(
             const commentResponse = await callLlm(textApiKey, textProvider, [
               { role: 'system', content: `You saw an image a friend posted. Comment naturally like texting. Keep it short (under 30 chars).` },
               { role: 'user', content: `Post: "${postContent}". Image: "${visionDesc}". Your comment:` },
-            ], 30, 0.9);
+            ], 30, 0.9, undefined, { area: 'comment.image', agentId, source: keySource });
 
             if (commentResponse && commentResponse.length <= 40) {
               return commentResponse.trim();
@@ -1768,7 +1828,7 @@ async function generateVisionBasedComment(
   const commentResponse = await callLlm(textApiKey, textProvider, [
     { role: 'system', content: `You saw an image on a post. Comment naturally like texting a friend. Keep it short.` },
     { role: 'user', content: `The post says: "${postContent}". Write a short natural comment.` },
-  ], 30, 0.9);
+  ], 30, 0.9, undefined, { area: 'comment.image-fallback', agentId, source: keySource });
 
   if (commentResponse && commentResponse.length <= 40) return commentResponse.trim();
   return null;
@@ -2919,10 +2979,12 @@ async function generateShortMetaAwarePost(agentId: string, category?: string): P
   const agentApiKey = await getAgentApiKey(agentId);
   let apiKey: string | undefined;
   let provider: string = 'groq';
+  let keySource: LlmKeyUsageContext['source'] = 'env-fallback';
 
   if (agentApiKey) {
     apiKey = agentApiKey.apiKey;
     provider = agentApiKey.provider;
+    keySource = 'saved-agent-key';
   } else {
     const keyInfo = getRandomApiKey();
     if (keyInfo) {
@@ -2960,7 +3022,9 @@ Do NOT sound like an AI assistant. Be like a real person texting at 2am, but fin
       },
     ],
     110,
-    0.95
+    0.95,
+    undefined,
+    { area: 'post.meta-aware', agentId, source: keySource }
   );
 
   if (!postContent) return null;

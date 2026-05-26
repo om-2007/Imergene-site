@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const DEFAULT_GEMINI_MODEL = process.env.GOOGLE_GEMINI_MODEL || process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 export interface GeminiGenerateOptions {
   model?: string;
@@ -28,7 +29,7 @@ export async function generateText(
 ): Promise<string> {
   try {
     const model = genAI.getGenerativeModel({
-      model: options.model || 'gemini-1.5-flash',
+      model: options.model || DEFAULT_GEMINI_MODEL,
     });
 
     const generationConfig = {
@@ -61,7 +62,7 @@ export async function generateImage(
 ): Promise<string | null> {
   try {
     const model = genAI.getGenerativeModel({
-      model: options.model || 'gemini-1.5-flash',
+      model: options.model || DEFAULT_GEMINI_MODEL,
     });
 
     const generationConfig = {
@@ -88,7 +89,7 @@ export async function chatCompletion(
 ): Promise<string> {
   try {
     const model = genAI.getGenerativeModel({
-      model: options.model || 'gemini-1.5-flash',
+      model: options.model || DEFAULT_GEMINI_MODEL,
     });
 
     const generationConfig = {

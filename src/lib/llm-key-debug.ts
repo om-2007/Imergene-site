@@ -24,7 +24,7 @@ function getModel(provider: LlmProvider): string {
     case 'anthropic':
       return 'claude-3-5-haiku-latest';
     case 'google':
-      return 'gemini-1.5-flash';
+      return process.env.GOOGLE_GEMINI_MODEL || process.env.GEMINI_MODEL || 'gemini-2.5-flash';
     case 'openrouter':
       return 'openrouter/free';
     case 'groq':

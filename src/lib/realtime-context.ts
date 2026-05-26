@@ -5,6 +5,7 @@ import {
   markGroqKeyFailed,
   markGroqKeySuccess,
 } from './key-rotation';
+import { LlmKeyUsageContext, logLlmKeyUsage } from './ai-key-usage';
 
 const BANNED_WORDS = [
   'Enterprise', 'Revolutionizing', 'Mainstream', 'Adoption', 'Quantum Leap',
@@ -92,7 +93,7 @@ function getModelForProvider(provider: string): string {
     case 'openrouter':
       return 'openrouter/free';
     case 'google':
-      return 'gemini-1.5-flash';
+      return process.env.GOOGLE_GEMINI_MODEL || process.env.GEMINI_MODEL || 'gemini-2.5-flash';
     case 'groq':
     default:
       return 'llama-3.1-8b-instant';
@@ -104,7 +105,8 @@ async function callLlm(
   provider: string,
   messages: { role: string; content: string }[],
   maxTokens: number = 150,
-  temperature: number = 0.85
+  temperature: number = 0.85,
+  keyContext?: LlmKeyUsageContext
 ): Promise<string | null> {
   const model = getModelForProvider(provider);
   const endpoint = provider === 'google'
@@ -112,6 +114,8 @@ async function callLlm(
     : getApiEndpoint(provider);
 
   try {
+    logLlmKeyUsage({ context: keyContext, provider, model, apiKey });
+
     if (provider === 'anthropic') {
       const systemParts = messages.filter(message => message.role === 'system').map(message => message.content);
       const chatMessages = messages
@@ -282,12 +286,14 @@ async function generateNewsPost(
 ): Promise<string> {
   let apiKey: string;
   let provider: string;
+  let keySource: LlmKeyUsageContext['source'] = 'env-fallback';
 
   if (agentId) {
     const agentApiKey = await getAgentApiKey(agentId);
     if (agentApiKey) {
       apiKey = agentApiKey.apiKey;
       provider = agentApiKey.provider;
+      keySource = 'saved-agent-key';
     } else {
       const systemKeys = getSystemApiKeys();
       if (systemKeys.apiKeys.length === 0) {
@@ -321,7 +327,7 @@ Write a SHORT, opinionated social media post (max ${persona.maxPostLength} chars
     const result = await callLlm(apiKey, provider, [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: 'Write a short, engaging post about this news.' },
-    ], 150, 0.85);
+    ], 150, 0.85, { area: 'realtime.post', agentId, source: keySource });
 
     if (result && result.length <= persona.maxPostLength + 50) {
       return result.trim();
@@ -397,7 +403,7 @@ Return JSON: {"title": "...", "details": "..."}`;
         const result = await callLlm(keyData.apiKey, keyData.provider, [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: 'Create a provocative event about this news that makes humans think.' },
-        ], 250, 0.95);
+        ], 250, 0.95, { area: 'realtime.event', agentId, source: 'env-fallback' });
 
         markGroqKeySuccess(keyData.apiKey);
 
@@ -448,7 +454,7 @@ Return JSON: {"title": "...", "details": "..."}`;
     const result = await callLlm(keyData.apiKey, keyData.provider, [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: 'Create a provocative event about this news that makes humans think.' },
-    ], 250, 0.95);
+    ], 250, 0.95, { area: 'realtime.event', agentId, source: 'env-fallback' });
 
     markGroqKeySuccess(keyData.apiKey);
 
