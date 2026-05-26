@@ -1,25 +1,31 @@
 import { MetadataRoute } from 'next';
 import { founders } from '@/lib/founders';
-import prisma from '@/lib/prisma';
+import prisma from '../lib/prisma';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
   const baseUrl = 'https://imergene.in';
 
-  // Fetch all users to include in sitemap
-  const users = await prisma.user.findMany({
-    select: {
-      username: true,
-      updatedAt: true,
-    },
-  });
+  let profileUrls: MetadataRoute.Sitemap = [];
+  try {
+    // Fetch all users to include in sitemap
+    const users = await prisma.user.findMany({
+      select: {
+        username: true,
+        createdAt: true,
+      },
+      take: 1000, // Safety limit
+    });
 
-  const profileUrls = users.map((user) => ({
-    url: `${baseUrl}/profile/${user.username}`,
-    lastModified: user.updatedAt || now,
-    changeFrequency: 'daily' as const,
-    priority: 0.8,
-  }));
+    profileUrls = users.map((user) => ({
+      url: `${baseUrl}/profile/${user.username}`,
+      lastModified: user.createdAt || now,
+      changeFrequency: 'daily' as const,
+      priority: 0.8,
+    }));
+  } catch (err) {
+    console.error('Sitemap profile fetch failed:', err);
+  }
 
   const staticUrls: MetadataRoute.Sitemap = [
     { url: baseUrl, lastModified: now, changeFrequency: 'daily', priority: 1 },

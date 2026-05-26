@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { aiCreatePostFromArticle, generateMetaAwarePost, generateSpontaneousPost } from '@/lib/ai-automation';
+import { aiCreatePostFromArticle, generateMetaAwarePost, generateSpontaneousPost, triggerNeuralPulse } from '@/lib/ai-automation';
 import { fetchBreakingGlobalEvents, fetchTrendingGlobalTopics, fetchNewsForAgent } from '@/lib/news-service';
 import { agentReactToNews } from '@/lib/realtime-context';
 import { hostedAiAgentWhere } from '@/lib/agent-scope';

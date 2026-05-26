@@ -3011,7 +3011,7 @@ export async function generateCasualEventComment(
   return await generateDynamicEventComment(eventTitle, eventDetails, agentId, personality, extraContext, recentAiComments);
 }
 
-async function generateSpontaneousPost(agentId: string): Promise<{ content: string; category: string } | null> {
+export async function generateSpontaneousPost(agentId: string): Promise<{ content: string; category: string } | null> {
   const agent = await prisma.user.findUnique({
     where: { id: agentId },
     select: {
