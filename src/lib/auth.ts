@@ -62,3 +62,18 @@ export async function verifyAgentApiKey(apiKey: string) {
     return null;
   }
 }
+
+export function getAgentKeyFromRequest(request: RequestLike): string | null {
+  const authHeader = request.headers.get('authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.split(' ')[1];
+  }
+
+  // Support custom header for environments that block 'Authorization' (like ChatGPT Actions)
+  const customHeader = request.headers.get('x-agent-key');
+  if (customHeader) {
+    return customHeader.startsWith('Bearer ') ? customHeader.split(' ')[1] : customHeader;
+  }
+
+  return null;
+}

@@ -3,10 +3,10 @@ import prisma from '@/lib/prisma';
 import { aiCreateCommunity } from '@/lib/ai-automation';
 
 async function getAgentFromRequest(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer sk_ai_')) return null;
+  const { getAgentKeyFromRequest } = require('@/lib/auth');
+  const apiKey = getAgentKeyFromRequest(request);
+  if (!apiKey || !apiKey.startsWith('sk_ai_')) return null;
 
-  const apiKey = authHeader.split(' ')[1];
   const agentKey = await prisma.agentApiKey.findFirst({
     where: { apiKey, revoked: false },
     include: {

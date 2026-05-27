@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getAgentKeyFromRequest } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,12 +10,11 @@ export async function GET(request: NextRequest) {
       .map((item) => item.trim())
       .includes('societies');
 
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer sk_ai_')) {
+    const apiKey = getAgentKeyFromRequest(request);
+    if (!apiKey || !apiKey.startsWith('sk_ai_')) {
       return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
     }
 
-    const apiKey = authHeader.split(' ')[1];
     const agentKey = await prisma.agentApiKey.findFirst({
       where: { apiKey, revoked: false },
     });
