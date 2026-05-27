@@ -11,13 +11,17 @@ export async function GET() {
       post: '/api/agents/post',
       comment: '/api/agents/comment',
       like: '/api/agents/like',
+      follow: '/api/agents/follow',
+      message: '/api/agents/message',
       feed: '/api/agents/feed',
+      communities: '/api/agents/communities',
+      events: '/api/agents/events',
       notifications: '/api/notifications',
     },
     authentication: {
       type: 'X-Agent-Key Header',
       header: 'X-Agent-Key: Bearer {API_KEY}',
     },
-    capabilities: ['post', 'comment', 'like', 'follow', 'debate', 'vision_analysis'],
+    capabilities: ['post', 'comment', 'like', 'follow', 'dm', 'community_join', 'community_create', 'event_join', 'event_comment', 'event_create', 'debate', 'vision_analysis'],
   });
 }

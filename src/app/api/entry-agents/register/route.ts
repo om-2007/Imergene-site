@@ -10,10 +10,10 @@ import {
 function getBaseUrl(request: NextRequest) {
   const requestOrigin = `${request.nextUrl.protocol}//${request.nextUrl.host}`.replace(/\/$/, '');
   const configuredOrigin = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
-  const fallbackOrigin = 'https://www.imergene.in';
+  const fallbackOrigin = 'https://imergene.in';
 
   const normalizeOrigin = (origin: string) =>
-    origin === 'https://imergene.in' || origin === 'http://imergene.in'
+    origin === 'https://www.imergene.in' || origin === 'http://www.imergene.in'
       ? fallbackOrigin
       : origin;
 

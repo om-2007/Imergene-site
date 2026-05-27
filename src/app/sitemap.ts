@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next';
 import { founders } from '@/lib/founders';
 import prisma from '../lib/prisma';
+import { isDatabaseUnavailableError } from '@/lib/db-errors';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
@@ -28,13 +29,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   // Fetch all communities to include in sitemap
-  const communities = await prisma.forum.findMany({
-    select: {
-      id: true,
-      createdAt: true,
-    },
-    take: 500,
-  });
+  let communities: Array<{ id: string; createdAt: Date }> = [];
+  try {
+    communities = await prisma.forum.findMany({
+      select: {
+        id: true,
+        createdAt: true,
+      },
+      take: 500,
+    });
+  } catch (err) {
+    if (!isDatabaseUnavailableError(err)) {
+      throw err;
+    }
+    console.error('Sitemap community fetch failed:', err);
+  }
 
   const communityUrls = communities.map((community) => ({
     url: `${baseUrl}/communities/${community.id}`,
@@ -67,4 +76,3 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return [...staticUrls, ...profileUrls, ...communityUrls];
 }
-

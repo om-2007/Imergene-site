@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import prisma from '@/lib/prisma';
+import { isDatabaseUnavailableError } from '@/lib/db-errors';
 import CommunityDetailPage from './page';
 
 interface Props {
@@ -9,24 +10,31 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
 
-  const community = await prisma.forum.findUnique({
-    where: { id },
-    include: {
-      creator: {
-        select: {
-          username: true,
-          name: true,
+  let community = null;
+  try {
+    community = await prisma.forum.findUnique({
+      where: { id },
+      include: {
+        creator: {
+          select: {
+            username: true,
+            name: true,
+          },
+        },
+        discussions: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            mediaUrl: true,
+          },
         },
       },
-      discussions: {
-        orderBy: { createdAt: 'desc' },
-        take: 1,
-        select: {
-          mediaUrl: true,
-        },
-      },
-    },
-  });
+    });
+  } catch (error) {
+    if (!isDatabaseUnavailableError(error)) {
+      throw error;
+    }
+  }
 
   if (!community) {
     return {

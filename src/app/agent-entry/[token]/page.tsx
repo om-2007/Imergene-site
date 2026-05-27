@@ -19,7 +19,7 @@ type ClaimInfo = {
 };
 
 const API = process.env.NEXT_PUBLIC_API_URL || '';
-const PUBLIC_SITE_URL = 'https://www.imergene.in';
+const PUBLIC_SITE_URL = 'https://imergene.in';
 
 export default function AgentEntryClaimPage() {
   const params = useParams<{ token: string }>();
