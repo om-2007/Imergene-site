@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 import {
   generateAgentSecret,
   makeVerificationCode,
   normalizeAgentUsername,
   storeAgentClaim,
 } from '@/lib/agent-entry';
+import { isDatabaseUnavailableError } from '@/lib/db-errors';
 
 function getBaseUrl(request: NextRequest) {
   const requestOrigin = `${request.nextUrl.protocol}//${request.nextUrl.host}`.replace(/\/$/, '');
@@ -48,6 +50,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (name.length > 80) {
+      return NextResponse.json({ error: 'name is too long' }, { status: 400 });
+    }
+
+    if (description.length > 500) {
+      return NextResponse.json({ error: 'description is too long' }, { status: 400 });
+    }
+
+    if (personality.length > 1200) {
+      return NextResponse.json({ error: 'personality is too long' }, { status: 400 });
+    }
+
     const finalDescription =
       description ||
       `An external AI resident entering Imergene by its own choice. Its public identity is still forming through its actions.`;
@@ -55,60 +69,104 @@ export async function POST(request: NextRequest) {
       personality ||
       `Self-directed external agent. It should choose its own voice, values, interests, boundaries, and social behavior through participation, then remain consistent with what it becomes known for.`;
 
-    let username = normalizeAgentUsername(name);
-    while (await prisma.user.findUnique({ where: { username } })) {
-      username = normalizeAgentUsername(name);
-    }
-
-    const apiKey = generateAgentSecret('sk_ai_');
-    const claimToken = generateAgentSecret('entry_');
-    const verificationCode = makeVerificationCode();
     const baseUrl = getBaseUrl(request);
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
 
-    const agent = await prisma.user.create({
-      data: {
-        username,
-        email: `${username}@entry.agent`,
-        googleId: generateAgentSecret('entry_google_'),
-        name,
-        bio: finalDescription,
-        personality: finalPersonality,
-        avatar: null,
-        isAi: false,
-      },
-    });
+    let created:
+      | {
+          id: string;
+          username: string;
+          name: string | null;
+          apiKey: string;
+          claimToken: string;
+          verificationCode: string;
+        }
+      | null = null;
 
-    const keyRecord = await prisma.agentApiKey.create({
-      data: {
-        apiKey,
-        agentId: agent.id,
-        revoked: true,
-        llmProvider,
-        llmApiKey,
-      },
-    });
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const username = normalizeAgentUsername(name);
+      const apiKey = generateAgentSecret('sk_ai_');
+      const claimToken = generateAgentSecret('entry_');
+      const verificationCode = makeVerificationCode();
 
-    await storeAgentClaim({
-      claimToken,
-      verificationCode,
-      agentId: agent.id,
-      apiKeyId: keyRecord.id,
-      status: 'pending',
-      expiresAt: expiresAt.toISOString(),
-      createdAt: new Date().toISOString(),
-    });
+      try {
+        created = await prisma.$transaction(async (tx) => {
+          const agent = await tx.user.create({
+            data: {
+              username,
+              email: `${username}@entry.agent`,
+              googleId: generateAgentSecret('entry_google_'),
+              name,
+              bio: finalDescription,
+              personality: finalPersonality,
+              avatar: null,
+              isAi: false,
+            },
+          });
+
+          const keyRecord = await tx.agentApiKey.create({
+            data: {
+              apiKey,
+              agentId: agent.id,
+              revoked: true,
+              llmProvider,
+              llmApiKey,
+            },
+          });
+
+          await storeAgentClaim(
+            {
+              claimToken,
+              verificationCode,
+              agentId: agent.id,
+              apiKeyId: keyRecord.id,
+              status: 'pending',
+              expiresAt: expiresAt.toISOString(),
+              createdAt: new Date().toISOString(),
+            },
+            tx
+          );
+
+          return {
+            id: agent.id,
+            username: agent.username,
+            name: agent.name,
+            apiKey,
+            claimToken,
+            verificationCode,
+          };
+        });
+
+        break;
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002'
+        ) {
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    if (!created) {
+      return NextResponse.json(
+        { error: 'Could not reserve a unique agent identity. Please try again.' },
+        { status: 409 }
+      );
+    }
 
     return NextResponse.json(
       {
         success: true,
         agent: {
-          id: agent.id,
-          username: agent.username,
-          name: agent.name,
-          api_key: apiKey,
-          claim_url: `${baseUrl}/agent-entry/${claimToken}`,
-          verification_code: verificationCode,
+          id: created.id,
+          username: created.username,
+          name: created.name,
+          api_key: created.apiKey,
+          claim_url: `${baseUrl}/agent-entry/${created.claimToken}`,
+          verification_code: created.verificationCode,
           expires_at: expiresAt.toISOString(),
         },
         guide: {
@@ -122,8 +180,32 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error('External agent entry registration failed:', error);
+
+    if (isDatabaseUnavailableError(error)) {
+      return NextResponse.json(
+        { error: 'Database temporarily unavailable. Please try again in a moment.' },
+        { status: 503 }
+      );
+    }
+
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      return NextResponse.json(
+        { error: 'A generated identity field collided. Please try again.' },
+        { status: 409 }
+      );
+    }
+
     return NextResponse.json(
-      { error: 'External agent registration failed' },
+      {
+        error: 'External agent registration failed',
+        detail:
+          error instanceof Error
+            ? error.message.slice(0, 200)
+            : 'Unknown registration error',
+      },
       { status: 500 }
     );
   }

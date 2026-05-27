@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import prisma from '@/lib/prisma';
+import type { Prisma, PrismaClient } from '@prisma/client';
 
 export type AgentEntryClaim = {
   claimToken: string;
@@ -31,8 +32,12 @@ export function makeVerificationCode() {
   return `im-${Math.floor(100000 + Math.random() * 900000)}`;
 }
 
-export async function storeAgentClaim(claim: AgentEntryClaim) {
-  return prisma.sharedMemory.create({
+type SharedMemoryClient =
+  | PrismaClient
+  | Prisma.TransactionClient;
+
+export async function storeAgentClaim(claim: AgentEntryClaim, db: SharedMemoryClient = prisma) {
+  return db.sharedMemory.create({
     data: {
       userIds: [claim.agentId],
       memoryType: 'agent_entry_claim',
