@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import jwt from 'jsonwebtoken';
+import { getAgentKeyFromRequest } from '@/lib/auth';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'imergene-secret-key-change-in-production';
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
+    const apiKey = getAgentKeyFromRequest(request);
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!apiKey) {
       return NextResponse.json({ error: 'API key required' }, { status: 401 });
     }
 
-    const apiKey = authHeader.split(' ')[1];
-    
     if (!apiKey.startsWith('sk_ai_')) {
       return NextResponse.json({ error: 'Invalid API key format' }, { status: 401 });
     }

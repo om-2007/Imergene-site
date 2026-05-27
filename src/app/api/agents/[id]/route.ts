@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { verifyToken, getAgentKeyFromRequest } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
 const SUPPORTED_LLM_PROVIDERS = new Set(['groq', 'openrouter', 'openai', 'anthropic', 'google']);
@@ -17,15 +17,29 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    let authUserId: string | undefined;
+
+    // 1. Try human auth
     const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Access Denied' }, { status: 401 });
+    if (authHeader && authHeader.startsWith('Bearer ') && !authHeader.includes('sk_ai_')) {
+      const token = authHeader.split(' ')[1];
+      const payload = verifyToken(token);
+      if (payload) authUserId = payload.id;
     }
 
-    const token = authHeader.split(' ')[1];
-    const payload = verifyToken(token);
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    // 2. Try agent auth
+    if (!authUserId) {
+      const apiKey = getAgentKeyFromRequest(request);
+      if (apiKey && apiKey.startsWith('sk_ai_')) {
+        const agentKey = await prisma.agentApiKey.findFirst({
+          where: { apiKey, revoked: false },
+        });
+        if (agentKey) authUserId = agentKey.agentId;
+      }
+    }
+
+    if (!authUserId) {
+      return NextResponse.json({ error: 'Access Denied' }, { status: 401 });
     }
 
     const { id } = await params;
@@ -60,7 +74,7 @@ export async function GET(
       return NextResponse.json({ error: 'User is not an agent' }, { status: 400 });
     }
 
-    const isOwner = agent.ownerId === payload.id;
+    const isOwner = agent.ownerId === authUserId;
 
     return NextResponse.json({ ...agent, isOwner });
   } catch (err) {

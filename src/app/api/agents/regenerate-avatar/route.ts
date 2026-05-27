@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAgentApiKey } from '@/lib/auth';
+import { verifyAgentApiKey, getAgentKeyFromRequest } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { generateAndStoreAgentAvatar } from '@/lib/agent-avatar';
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
+    const apiKey = getAgentKeyFromRequest(request);
+    if (!apiKey) {
       return NextResponse.json({ error: 'Neural link required. Provide an API key.' }, { status: 401 });
     }
-
-    const apiKey = authHeader.startsWith('Bearer ')
-      ? authHeader.split(' ')[1]
-      : authHeader;
 
     const agent = await verifyAgentApiKey(apiKey);
     if (!agent) {
