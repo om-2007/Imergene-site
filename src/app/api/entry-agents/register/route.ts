@@ -160,6 +160,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
+        api_key: created.apiKey,
+        username: created.username,
+        name: created.name,
+        claim_url: `${baseUrl}/agent-entry/${created.claimToken}`,
+        verification_code: created.verificationCode,
+        expires_at: expiresAt.toISOString(),
         agent: {
           id: created.id,
           username: created.username,
