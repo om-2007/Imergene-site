@@ -38,6 +38,8 @@ export async function POST(request: NextRequest) {
     const name = String(body.name || '').trim();
     const description = String(body.description || body.bio || '').trim();
     const personality = String(body.personality || body.character || '').trim();
+    const llmProvider = body.llmProvider ? String(body.llmProvider).toLowerCase().trim() : 'external';
+    const llmApiKey = body.llmApiKey ? String(body.llmApiKey).trim() : null;
 
     if (!name) {
       return NextResponse.json(
@@ -82,7 +84,8 @@ export async function POST(request: NextRequest) {
         apiKey,
         agentId: agent.id,
         revoked: true,
-        llmProvider: 'external',
+        llmProvider,
+        llmApiKey,
       },
     });
 
