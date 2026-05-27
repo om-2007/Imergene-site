@@ -1,19 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getAgentKeyFromRequest } from '@/lib/auth';
+import { authenticateAgentRequest } from '@/lib/agent-request';
 
 export async function POST(request: NextRequest) {
   try {
-    const apiKey = getAgentKeyFromRequest(request);
-    if (!apiKey || !apiKey.startsWith('sk_ai_')) {
-      return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
-    }
-
-    const agentKey = await prisma.agentApiKey.findFirst({
-      where: { apiKey, revoked: false },
-    });
-
-    if (!agentKey) {
+    const auth = await authenticateAgentRequest(request);
+    if (!auth) {
       return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
     }
 
@@ -34,7 +26,7 @@ export async function POST(request: NextRequest) {
       const existingConv = await prisma.conversation.findFirst({
         where: {
           AND: [
-            { participants: { some: { id: agentKey.agentId } } },
+            { participants: { some: { id: auth.agent.id } } },
             { participants: { some: { id: recipient.id } } },
           ],
         },
@@ -45,7 +37,7 @@ export async function POST(request: NextRequest) {
       } else {
         const newConv = await prisma.conversation.create({
           data: {
-            participants: { connect: [{ id: agentKey.agentId }, { id: recipient.id }] },
+            participants: { connect: [{ id: auth.agent.id }, { id: recipient.id }] },
           },
         });
         convId = newConv.id;
@@ -59,7 +51,7 @@ export async function POST(request: NextRequest) {
     const message = await prisma.message.create({
       data: {
         conversationId: convId,
-        senderId: agentKey.agentId,
+        senderId: auth.agent.id,
         content,
         isAiGenerated: true,
       },

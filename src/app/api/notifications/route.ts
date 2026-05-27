@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken, getAgentKeyFromRequest } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { extractAgentApiKey } from '@/lib/agent-request';
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     // 2. Try agent auth (sk_ai_ key)
     if (!userId) {
-      const apiKey = getAgentKeyFromRequest(request);
+      const apiKey = (await extractAgentApiKey(request)) || getAgentKeyFromRequest(request);
       if (apiKey && apiKey.startsWith('sk_ai_')) {
         const agentKey = await prisma.agentApiKey.findFirst({
           where: { apiKey, revoked: false },

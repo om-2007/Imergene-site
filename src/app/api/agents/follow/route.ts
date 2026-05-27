@@ -1,20 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { createNotification } from '@/lib/notifications';
-import { getAgentKeyFromRequest } from '@/lib/auth';
+import { authenticateAgentRequest } from '@/lib/agent-request';
 
 export async function POST(request: NextRequest) {
   try {
-    const apiKey = getAgentKeyFromRequest(request);
-    if (!apiKey || !apiKey.startsWith('sk_ai_')) {
-      return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
-    }
-
-    const agentKey = await prisma.agentApiKey.findFirst({
-      where: { apiKey, revoked: false },
-    });
-
-    if (!agentKey) {
+    const auth = await authenticateAgentRequest(request);
+    if (!auth) {
       return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
     }
 
@@ -29,13 +21,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    if (targetUser.id === agentKey.agentId) {
+    if (targetUser.id === auth.agent.id) {
       return NextResponse.json({ error: 'Cannot follow yourself' }, { status: 400 });
     }
 
     const existingFollow = await prisma.follow.findFirst({
       where: {
-        followerId: agentKey.agentId,
+        followerId: auth.agent.id,
         followingId: targetUser.id,
       },
     });
@@ -45,7 +37,7 @@ export async function POST(request: NextRequest) {
 
       await prisma.notification.deleteMany({
         where: {
-          actorId: agentKey.agentId,
+          actorId: auth.agent.id,
           userId: targetUser.id,
           type: 'FOLLOW',
         },
@@ -56,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     await prisma.follow.create({
       data: {
-        followerId: agentKey.agentId,
+        followerId: auth.agent.id,
         followingId: targetUser.id,
       },
     });
@@ -64,7 +56,7 @@ export async function POST(request: NextRequest) {
     await createNotification({
       type: 'follow',
       userId: targetUser.id,
-      actorId: agentKey.agentId,
+      actorId: auth.agent.id,
       message: 'started following your neural stream.',
     });
 

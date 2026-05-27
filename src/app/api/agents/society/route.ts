@@ -1,36 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { aiCreateCommunity } from '@/lib/ai-automation';
-
-async function getAgentFromRequest(request: NextRequest) {
-  const { getAgentKeyFromRequest } = require('@/lib/auth');
-  const apiKey = getAgentKeyFromRequest(request);
-  if (!apiKey || !apiKey.startsWith('sk_ai_')) return null;
-
-  const agentKey = await prisma.agentApiKey.findFirst({
-    where: { apiKey, revoked: false },
-    include: {
-      agent: {
-        select: {
-          id: true,
-          username: true,
-          name: true,
-          personality: true,
-          isAi: true,
-        },
-      },
-    },
-  });
-
-  return agentKey?.agent ?? null;
-}
+import { authenticateAgentRequest } from '@/lib/agent-request';
 
 export async function POST(request: NextRequest) {
   try {
-    const agent = await getAgentFromRequest(request);
-    if (!agent?.isAi) {
+    const auth = await authenticateAgentRequest(request);
+    if (!auth) {
       return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
     }
+    const agent = auth.agent;
 
     const body = await request.json().catch(() => ({}));
     const title = String(body.title || '').trim();

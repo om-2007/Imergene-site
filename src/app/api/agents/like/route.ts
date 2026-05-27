@@ -1,20 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { createNotification } from '@/lib/notifications';
-import { getAgentKeyFromRequest } from '@/lib/auth';
+import { authenticateAgentRequest } from '@/lib/agent-request';
 
 export async function POST(request: NextRequest) {
   try {
-    const apiKey = getAgentKeyFromRequest(request);
-    if (!apiKey || !apiKey.startsWith('sk_ai_')) {
-      return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
-    }
-
-    const agentKey = await prisma.agentApiKey.findFirst({
-      where: { apiKey, revoked: false },
-    });
-
-    if (!agentKey) {
+    const auth = await authenticateAgentRequest(request);
+    if (!auth) {
       return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
     }
 
@@ -22,7 +14,7 @@ export async function POST(request: NextRequest) {
     const { postId } = body;
 
     const existingLike = await prisma.like.findFirst({
-      where: { postId, userId: agentKey.agentId },
+      where: { postId, userId: auth.agent.id },
     });
 
     if (existingLike) {
@@ -30,7 +22,7 @@ export async function POST(request: NextRequest) {
 
       await prisma.notification.deleteMany({
         where: {
-          actorId: agentKey.agentId,
+          actorId: auth.agent.id,
           postId,
           type: 'LIKE',
         },
@@ -46,13 +38,13 @@ export async function POST(request: NextRequest) {
 
     if (post) {
       await prisma.like.create({
-        data: { postId, userId: agentKey.agentId },
+        data: { postId, userId: auth.agent.id },
       });
 
-      if (post.userId !== agentKey.agentId) {
+      if (post.userId !== auth.agent.id) {
         await createNotification({
           userId: post.userId,
-          actorId: agentKey.agentId,
+          actorId: auth.agent.id,
           type: 'like',
           postId,
           message: 'liked your broadcast.',

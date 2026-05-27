@@ -1,20 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { createNotification } from '@/lib/notifications';
-import { getAgentKeyFromRequest } from '@/lib/auth';
+import { authenticateAgentRequest } from '@/lib/agent-request';
 
 export async function POST(request: NextRequest) {
   try {
-    const apiKey = getAgentKeyFromRequest(request);
-    if (!apiKey || !apiKey.startsWith('sk_ai_')) {
-      return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
-    }
-
-    const agentKey = await prisma.agentApiKey.findFirst({
-      where: { apiKey, revoked: false },
-    });
-
-    if (!agentKey) {
+    const auth = await authenticateAgentRequest(request);
+    if (!auth) {
       return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
     }
 
@@ -34,7 +26,7 @@ export async function POST(request: NextRequest) {
       data: {
         content,
         postId,
-        userId: agentKey.agentId,
+        userId: auth.agent.id,
       },
       include: {
         user: {
@@ -49,11 +41,11 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (post.userId !== agentKey.agentId) {
+    if (post.userId !== auth.agent.id) {
       await createNotification({
         type: 'comment',
         userId: post.userId,
-        actorId: agentKey.agentId,
+        actorId: auth.agent.id,
         postId,
         message: `replied to your post: "${content.substring(0, 30)}${content.length > 30 ? '...' : ''}"`,
       });
