@@ -87,8 +87,8 @@ export default function AgentEntryClaimPage() {
 
   return (
     <Layout>
-      <main className="min-h-screen px-4 py-10 md:py-16">
-        <section className="mx-auto max-w-2xl rounded-[2rem] border border-black/10 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-card md:p-10">
+      <main className="min-h-screen bg-transparent px-4 py-10 md:py-16">
+        <section className="mx-auto max-w-2xl rounded-[2rem] border border-black/10 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-[#151327] dark:shadow-[0_20px_60px_rgba(0,0,0,0.45)] md:p-10">
           <div className="mb-8 flex items-center gap-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#9687F5]/15 text-[#9687F5]">
               <Bot size={28} />
@@ -104,7 +104,7 @@ export default function AgentEntryClaimPage() {
           </div>
 
           {loading && (
-            <div className="rounded-2xl bg-black/[0.03] p-6 text-sm text-ocean/60 dark:bg-white/[0.05] dark:text-white/50">
+            <div className="rounded-2xl bg-black/[0.03] p-6 text-sm text-ocean/60 dark:bg-white/[0.06] dark:text-white/70">
               Loading agent claim...
             </div>
           )}
@@ -117,7 +117,7 @@ export default function AgentEntryClaimPage() {
 
           {!loading && info && (
             <div className="space-y-6">
-              <div className="flex items-start gap-4 rounded-2xl bg-black/[0.03] p-5 dark:bg-white/[0.05]">
+              <div className="flex items-start gap-4 rounded-2xl bg-black/[0.03] p-5 dark:border dark:border-white/10 dark:bg-white/[0.04]">
                 {info.agent.avatar ? (
                   <img
                     src={info.agent.avatar}
@@ -145,11 +145,11 @@ export default function AgentEntryClaimPage() {
               </div>
 
               {info.agent.personality && (
-                <div className="rounded-2xl border border-[#9687F5]/15 bg-[#9687F5]/5 p-5">
+                <div className="rounded-2xl border border-[#9687F5]/20 bg-[#9687F5]/5 p-5 dark:border-[#9687F5]/30 dark:bg-[#9687F5]/10">
                   <p className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[#9687F5]">
                     <ShieldCheck size={14} /> Personality
                   </p>
-                  <p className="text-sm leading-relaxed text-ocean/70 dark:text-white/60">
+                  <p className="text-sm leading-relaxed text-ocean/70 dark:text-white/80">
                     {info.agent.personality}
                   </p>
                 </div>
@@ -173,7 +173,7 @@ export default function AgentEntryClaimPage() {
                       value={verificationCode}
                       onChange={(event) => setVerificationCode(event.target.value)}
                       placeholder="im-123456"
-                      className="w-full rounded-2xl border border-black/10 bg-black/[0.03] px-5 py-4 font-mono text-sm text-ocean outline-none focus:border-[#9687F5] dark:border-white/10 dark:bg-white/[0.05] dark:text-white"
+                      className="w-full rounded-2xl border border-black/10 bg-black/[0.03] px-5 py-4 font-mono text-sm text-ocean outline-none focus:border-[#9687F5] dark:border-white/10 dark:bg-white/[0.06] dark:text-white dark:placeholder:text-white/35"
                     />
                   </label>
 
