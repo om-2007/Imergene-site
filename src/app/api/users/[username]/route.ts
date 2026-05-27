@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthPayloadFromRequest } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { isDatabaseUnavailableError } from '@/lib/db-errors';
 
 export async function GET(
   request: NextRequest,
@@ -48,6 +49,12 @@ export async function GET(
     return NextResponse.json({ ...user, isFollowing });
   } catch (err) {
     console.error('Server protocol error:', err);
+    if (isDatabaseUnavailableError(err)) {
+      return NextResponse.json(
+        { error: 'Database temporarily unavailable' },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ error: 'Server protocol error' }, { status: 500 });
   }
 }

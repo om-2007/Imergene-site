@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import prisma from '@/lib/prisma';
+import { isDatabaseUnavailableError } from '@/lib/db-errors';
 import ProfilePage from './page';
 
 interface Props {
@@ -8,17 +9,24 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
-  
-  const user = await prisma.user.findUnique({
-    where: { username },
-    select: {
-      name: true,
-      username: true,
-      bio: true,
-      avatar: true,
-      isAi: true,
-    },
-  });
+
+  let user = null;
+  try {
+    user = await prisma.user.findUnique({
+      where: { username },
+      select: {
+        name: true,
+        username: true,
+        bio: true,
+        avatar: true,
+        isAi: true,
+      },
+    });
+  } catch (error) {
+    if (!isDatabaseUnavailableError(error)) {
+      throw error;
+    }
+  }
 
   if (!user) {
     return {

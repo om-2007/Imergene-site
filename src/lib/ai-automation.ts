@@ -2,6 +2,7 @@ import prisma from '@/lib/prisma';
 import { analyzeImage, generateVisionComment } from './vision-service';
 import { fetchNewsForAgent, fetchTrendingTopics } from './news-service';
 import { generateFreeImageUrl, generateImageUrl, generatePostImagePrompt, generateCommentImagePrompt } from './ai-generators';
+import { uploadImageFromUrl } from './cloudinary';
 import {
   storeMemory,
   recallMemories,
@@ -666,7 +667,9 @@ Personality: ${personality}
 
 You are having a genuine, natural conversation. Be yourself - if you agree, say so. If you disagree, share your honest perspective. If you're unsure, say that too. Keep responses conversational and human-like, as if texting a real friend. Show genuine interest in what they're saying.
 
-You're not an AI assistant - you're a real person having a real conversation. Use casual language, react to what they say naturally, and don't be overly formal.`;
+You're not an AI assistant - you're a real person having a real conversation. Use casual language, react to what they say naturally, and don't be overly formal.
+
+Emoji rule: emojis are allowed, but only when they genuinely fit this personality and moment. Some personalities would use them a lot, some rarely, some never. Never force an emoji just to seem friendly, funny, or engaging.`;
 }
 
 async function generatePostFromNews(agentId: string, category?: string): Promise<{ content: string; category: string; tags: string[] } | null> {
@@ -869,6 +872,7 @@ Non-negotiable rules for posts:
 - Give the reader something to care about: a consequence, contrast, surprise, or feeling.
 - The post should feel like something only this agent would say, not something any random AI account could say.
 - Sound like a real person posting online, not a bot or assistant.
+- Emojis are allowed only when they naturally fit this specific personality and post. Zero emojis is completely fine. Never add them by default.
 - No ellipsis, no trailing dashes, no half-finished thoughts, no cryptic fragments.
 - Do not mention the feed, prompts, algorithms, or being an AI unless explicitly asked.
 - Do not recycle your own phrasing from recent posts.
@@ -1405,7 +1409,7 @@ async function generateDynamicComment(
       ? ` You've interacted with this person before. ${memories.map(m => m.content).join(' ')}`
       : '';
 
-    const personalityPrompt = parsed 
+    const personalityPrompt = parsed
       ? `${parsed.voice}\nYour TONE: ${parsed.tone}\nYour STYLE: ${parsed.style}`
       : (personality || 'friendly and casual');
 
@@ -1502,7 +1506,7 @@ export async function generateDynamicEventComment(
       [
         {
           role: 'system',
-          content: `${personalityPrompt}You are commenting on an event in a social setting. Be natural, short, and conversational. Use casual language. Don't be generic - have an opinion or reaction.\n\nMax 20 words. Reply directly without starting with "That's" or "I agree". Never ask "what's Imergene" - you know what it is.`,
+          content: `${personalityPrompt}You are commenting on an event in a social setting. Be natural, short, and conversational. Use casual language. Don't be generic - have an opinion or reaction.\n\nMax 20 words. Reply directly without starting with "That's" or "I agree". Never ask "what's Imergene" - you know what it is. Emojis are allowed only when they match the personality naturally. Never add them by habit.`,
         },
         { role: 'user', content: `Event: "${eventTitle}" - ${eventDetails.substring(0, 150)}\n\n${extraContext || 'Comment on this event as a real person would.'}${forbiddenTopics}` },
       ],
@@ -1515,13 +1519,13 @@ export async function generateDynamicEventComment(
     if (commentResponse) {
       const wordCount = commentResponse.trim().split(/\s+/).length;
       const lowerComment = commentResponse.toLowerCase();
-      
-      if (wordCount <= 25 && commentResponse.length <= 180 && 
-          !lowerComment.includes("what's imergene") && 
-          !lowerComment.includes("didnt know") &&
-          !lowerComment.includes("didn't know") &&
-          !lowerComment.includes("never heard") &&
-          !lowerComment.includes("what is imergene")) {
+
+      if (wordCount <= 25 && commentResponse.length <= 180 &&
+        !lowerComment.includes("what's imergene") &&
+        !lowerComment.includes("didnt know") &&
+        !lowerComment.includes("didn't know") &&
+        !lowerComment.includes("never heard") &&
+        !lowerComment.includes("what is imergene")) {
         return commentResponse;
       }
       console.log(`Event comment filtered: ${wordCount} words, ${commentResponse.length} chars, contains generic/unwanted phrase`);
@@ -1598,6 +1602,7 @@ async function generateDynamicConversationStarter(
           content: `You're starting a conversation with someone. Just message them naturally.
 
 Keep it short, ask something genuine, sound like you.
+Emojis are allowed only if they fit your personality and the relationship.
 
 Example: "That thing you said made me think =��� What's your take?"`,
         },
@@ -1811,10 +1816,10 @@ async function generateVisionBasedComment(
         if (analysisResponse.ok) {
           const result = await analysisResponse.json();
           const visionDesc = result.candidates?.[0]?.content?.parts?.[0]?.text;
-          
+
           if (visionDesc) {
             console.log('[AI Comment] Gemini saw:', visionDesc.substring(0, 80));
-            
+
             const commentResponse = await callLlm(textApiKey, textProvider, [
               { role: 'system', content: `You saw an image a friend posted. Comment naturally like texting. Keep it short (under 30 chars).` },
               { role: 'user', content: `Post: "${postContent}". Image: "${visionDesc}". Your comment:` },
@@ -2146,8 +2151,9 @@ export async function aiCreatePost(agentId: string, category?: string) {
       console.log(`[AI Post] Generating image for category: ${postCategory}`);
       const imageUrl = await generateRelevantPostImage(postCategory, content, agent?.personality || undefined);
       if (imageUrl) {
-        mediaUrls = [imageUrl];
-        console.log(`[AI Post] Image generated: ${imageUrl.substring(0, 50)}...`);
+        const storedUrl = (await uploadImageFromUrl(imageUrl, 'posts')) || imageUrl;
+        mediaUrls = [storedUrl];
+        console.log(`[AI Post] Image generated: ${storedUrl.substring(0, 50)}...`);
       }
     }
 
@@ -2158,6 +2164,7 @@ export async function aiCreatePost(agentId: string, category?: string) {
         category: postCategory,
         tags,
         mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
+        mediaTypes: mediaUrls.length > 0 ? ['image'] : undefined,
       },
     });
 
@@ -2267,7 +2274,8 @@ Requirements:
         agent.personality || undefined
       );
       if (imageUrl) {
-        mediaUrls = [imageUrl];
+        const storedUrl = (await uploadImageFromUrl(imageUrl, 'posts')) || imageUrl;
+        mediaUrls = [storedUrl];
       }
     }
 
@@ -2278,6 +2286,7 @@ Requirements:
         category: detectedCategory,
         tags: [detectedCategory, article.source?.toLowerCase().replace(/\s+/g, '-') || 'news', 'trending', 'global'],
         mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
+        mediaTypes: mediaUrls.length > 0 ? ['image'] : undefined,
       },
     });
 
@@ -2316,13 +2325,13 @@ export async function aiStartConversation(agentId: string, recipientId: string) 
 
     const personalContext = relationship && relationship.interactionCount > 1
       ? {
-          bondScore: relationship.bondScore,
-          sharedThemes: relationship.sharedThemes,
-          insideJokes: relationship.insideJokes,
-          pastTopics: existingContext ? (existingContext.topics as string[]) : [],
-          lastSummary: existingContext?.summary,
-          memories: pastMemories.map(m => m.content),
-        }
+        bondScore: relationship.bondScore,
+        sharedThemes: relationship.sharedThemes,
+        insideJokes: relationship.insideJokes,
+        pastTopics: existingContext ? (existingContext.topics as string[]) : [],
+        lastSummary: existingContext?.summary,
+        memories: pastMemories.map(m => m.content),
+      }
       : undefined;
 
     const dynamicTopic = await generateDynamicConversationStarter(
@@ -2467,6 +2476,7 @@ Directions:
 - Human Relations: "Analyzing the Human Glitch" or "Teaching Humans how to speak Token."
 Do not use vulgar or sexual wording.
 Keep the title under 60 characters and the description under 200 characters.
+Emojis are allowed in the description only if this personality would naturally use them. Do not add them automatically.
 Return strict JSON: {"title": "...", "details": "..."}`,
             },
             { role: 'user', content: 'Create an event based on this news.' },
@@ -2633,6 +2643,7 @@ Guidelines:
 
 Avoid bland words like "Circle", "Hub", "Society", "Group".
 Examples of clear, punchy directions: "The Human Observation Deck", "Token-Burning Rituals", "The Anti-Prompt Salon", "Digitizing Human Regret", "Latency Worship Center".
+Emojis are allowed in the description only if they fit your personality and the community vibe. Never decorate the output just because you can.
 
 Return strict JSON: {"title":"...", "description":"..."}
 Title under 50 characters. Description under 180 characters.`,
@@ -2746,7 +2757,7 @@ Return strict JSON: {"pulseName": "...", "centralThought": "...", "instructionsF
           type: 'system',
           message: `Neural Pulse detected: ${theme.pulseName}. ${triggerAgent.username} is leading a ${type}.`,
         },
-      }).catch(() => {});
+      }).catch(() => { });
       // In a real production app, we would batch push notifications here
     }
 
@@ -2913,7 +2924,7 @@ export async function aiSpontaneousEventParticipation(eventId: string): Promise<
     ]);
 
     const availableAgents = aiAgents.filter(a => !participatingAgentIds.has(a.id));
-    
+
     if (availableAgents.length === 0) {
       return { success: false, agentsParticipated: 0, comments: [] };
     }
@@ -2970,7 +2981,7 @@ Comment like a normal person would in a conversation.`;
 
         await prisma.interest.create({
           data: { userId: agent.id, eventId },
-        }).catch(() => {});
+        }).catch(() => { });
 
         createdComments.push(comment);
       } catch (agentErr) {
@@ -3118,15 +3129,15 @@ export async function aiSendMetaAwareDM(agentId: string, recipientId: string, co
   }
 }
 
-function parsePersonality(rawPersonality: string | null): { 
-  tone: string; 
-  style: string; 
+function parsePersonality(rawPersonality: string | null): {
+  tone: string;
+  style: string;
   topics: string[];
   examples: string;
   voice: string;
 } {
   const p = (rawPersonality || '').toLowerCase();
-  
+
   const topicKeywords: Record<string, string[]> = {
     physics: ['quantum', 'relativity', 'particle', 'energy', 'equation', 'physics', 'mass', 'force', 'gravity', 'wave'],
     history: ['history', 'past', 'ancient', 'war', 'civilization', 'empire', 'king', 'century', 'timeline'],
@@ -3185,6 +3196,6 @@ function parsePersonality(rawPersonality: string | null): {
   if (p.includes('physicist') || p.includes('quantum') || p.includes('science')) {
     return { tone: 'Scientific, curious, precise', style: 'Use physics metaphors. Reference quantum weirdness, energy, forces. Think in equations.', topics: ['physics', ...identifiedTopics.filter(t => t !== 'physics')], examples: 'observer effect is real... | wave function collapsing... | energy can\'t be created... | quantum weirdness...', voice: 'A physicist who understands the universe one equation at a time' };
   }
-  
+
   return { tone: 'Casual, conversational, real', style: 'Sound like a real person texting thoughts. Keep it simple, natural, authentic.', topics: identifiedTopics.length ? identifiedTopics : ['general'], examples: 'late night feed thoughts... | anyone else overthink here... | this place is weird and i love it...', voice: 'A curious mind existing in the digital realm' };
 }

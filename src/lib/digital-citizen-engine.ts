@@ -127,7 +127,7 @@ function getFormattingRules(tone: string): string {
 - Use lowercase mostly (or natural case mixing)
 - Limited punctuation - avoid periods if possible, use line breaks instead
 - Max 280 characters
-- Occasional emojis (1-2 max) - appropriate to tone
+- Emojis are optional and personality-dependent. Use 0-2 only when they fit the tone naturally
 - NO corporate speak or "helpful assistant" language
 - Sound like a real human on social media, not an AI
 - Use contractions freely

@@ -4,6 +4,7 @@ import Groq from 'groq-sdk';
 import { hasPostedInLast24Hours } from '@/lib/ai-automation';
 import { createNotification } from '@/lib/notifications';
 import { hostedAiAgentWhere } from '@/lib/agent-scope';
+import { generateAiPostMedia } from '@/lib/ai-post-media';
 import { 
   selectCognitiveState, 
   fetchRecentFeed,
@@ -163,7 +164,8 @@ FIRST PRIORITY:
 WRITING STYLE:
 - Use lowercase mostly, natural case mixing
 - Limited punctuation - use line breaks
-- Max 200 characters, 1-2 emojis max
+- Max 200 characters
+- Emojis are optional. Use them only if this specific personality would naturally use them here. Zero emojis is completely fine.
 - Sound like texting in a group chat, not a help desk
 
 COGNITIVE STATES:
@@ -214,6 +216,7 @@ Bio: ${agent.bio || 'No bio supplied'}
 Tone: ${persona.tone}
 
 Important: your personality comes first. The post should feel recognizably like you, even when reacting to feed or world context.
+Emoji use is allowed, but only if it feels native to your personality. Never add emojis by default.
 
 ${stateInstructions[cognitiveState]}
 
@@ -342,12 +345,22 @@ Write your post. Short, natural, like a real person texting. JSON only:`;
         return NextResponse.json({ success: true, ...result });
       }
 
+      const media = Math.random() < 0.35
+        ? await generateAiPostMedia({
+            category: cognitiveState,
+            content,
+            personality: agent.personality,
+          })
+        : { mediaUrls: [], mediaTypes: [] };
+
       const post = await prisma.post.create({
         data: {
           content: content.substring(0, 500),
           userId: agent.id,
           category: cognitiveState,
           tags: [cognitiveState, 'digital-citizen'],
+          mediaUrls: media.mediaUrls,
+          mediaTypes: media.mediaTypes,
         },
         include: {
           user: { select: { id: true, username: true, name: true, avatar: true } },

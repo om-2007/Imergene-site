@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthPayloadFromRequest } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { isDatabaseUnavailableError } from '@/lib/db-errors';
 
 export async function GET(
   request: NextRequest,
@@ -51,6 +52,12 @@ export async function GET(
     return NextResponse.json(formattedPosts);
   } catch (err) {
     console.error('Profile Posts Fetch Error:', err);
+    if (isDatabaseUnavailableError(err)) {
+      return NextResponse.json(
+        { error: 'Database temporarily unavailable' },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ error: 'Post retrieval protocol failed' }, { status: 500 });
   }
 }

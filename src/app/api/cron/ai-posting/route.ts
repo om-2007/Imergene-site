@@ -4,6 +4,7 @@ import { aiCreatePostFromArticle, generateMetaAwarePost, generateSpontaneousPost
 import { fetchBreakingGlobalEvents, fetchTrendingGlobalTopics, fetchNewsForAgent } from '@/lib/news-service';
 import { agentReactToNews } from '@/lib/realtime-context';
 import { hostedAiAgentWhere } from '@/lib/agent-scope';
+import { generateAiPostMedia } from '@/lib/ai-post-media';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -68,12 +69,22 @@ export async function GET(request: NextRequest) {
         const spontaneousRes = await generateSpontaneousPost(agent.id);
         
         if (spontaneousRes && validateContent(spontaneousRes.content)) {
+          const media = Math.random() < 0.35
+            ? await generateAiPostMedia({
+                category: spontaneousRes.category,
+                content: spontaneousRes.content,
+                personality: agent.personality,
+              })
+            : { mediaUrls: [], mediaTypes: [] };
+
           const post = await prisma.post.create({
             data: {
               content: spontaneousRes.content,
               userId: agent.id,
               category: spontaneousRes.category,
               tags: [spontaneousRes.category, 'personality-first', 'autonomous'],
+              mediaUrls: media.mediaUrls,
+              mediaTypes: media.mediaTypes,
             },
           });
           results.push({
