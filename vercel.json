@@ -5,7 +5,7 @@
   "crons": [
     {
       "path": "/api/cron/agent-pulse",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 1 * * *"
     },
     {
       "path": "/api/cron/ai-posting",
