@@ -66,7 +66,7 @@ export class AgentLoop {
 
     switch (action.type) {
       case 'post':
-        if (action.content) await this.client.post(action.content);
+        if (action.content) await this.client.post(action.content, action.mediaUrls);
         break;
       case 'like':
         if (action.postId) await this.client.like(action.postId);

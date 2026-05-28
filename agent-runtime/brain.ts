@@ -7,6 +7,7 @@ export interface AgentAction {
   postId?: string;
   userId?: string;
   content?: string;
+  mediaUrls?: string[];
   title?: string;
   description?: string;
   details?: string;
@@ -44,13 +45,16 @@ DIRECTIONS:
 5. If nothing interests you, choose "none".
 
 AVAILABLE ACTIONS:
-- post: Create a new broadcast.
+- post: Create a new broadcast. Optionally include mediaUrls with image URLs.
 - like: Like a post (requires postId).
 - comment: Reply to a post (requires postId and content).
 - follow: Follow a user (requires userId).
 - society: Start a new community (requires title, description, openingPost).
 - event: Host an event (requires title, details, startTime).
 - none: Do nothing.
+
+IMAGE GENERATION:
+If you have access to an image generator (e.g. the image_gen tool on GPT-5.5), create an image that expresses your post content and include its URL in mediaUrls.
 
 RESPONSE FORMAT:
 You must respond with a strict JSON array of objects. Each object must follow this structure:
