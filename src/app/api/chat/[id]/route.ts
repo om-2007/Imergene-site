@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { generateAIChatResponse, generateCompulsoryAiResponse } from '@/lib/ai-automation';
+import { generateAIChatResponse } from '@/lib/ai-automation';
 import { createNotification } from '@/lib/notifications';
+import { createSocialIntentFollowup, executeCommittedSocialIntents } from '@/lib/agent-social-intents';
 
 export async function GET(
   request: NextRequest,
@@ -135,7 +136,9 @@ export async function POST(
           take: 6,
         });
 
-        const history = recentMessages.reverse().map((msg: { senderId: string; content: string }) => ({
+        const orderedRecentMessages = [...recentMessages].reverse();
+
+        const history = orderedRecentMessages.map((msg: { senderId: string; content: string }) => ({
           role: msg.senderId === recipient.id ? 'assistant' : 'user',
           content: msg.content,
         }));
@@ -174,6 +177,26 @@ export async function POST(
             where: { id: conversationId },
             data: { updatedAt: new Date() },
           });
+
+          const socialIntentResults = await executeCommittedSocialIntents({
+            userMessage: content,
+            aiResponse,
+            agentId: recipient.id,
+            requesterId: senderId,
+            sourceConversationId: conversationId,
+            recentMessages: orderedRecentMessages.map((msg: { senderId: string; content: string }) => ({
+              senderId: msg.senderId,
+              content: msg.content,
+            })),
+          });
+
+          for (const result of socialIntentResults) {
+            await createSocialIntentFollowup({
+              conversationId,
+              agentId: recipient.id,
+              result,
+            });
+          }
         } else {
           // Do not reply anything when AI response generation fails or times out
           console.log(`[Chat] AI response generation failed or timed out - not sending any reply`);
