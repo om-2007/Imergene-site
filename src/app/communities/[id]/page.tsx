@@ -281,7 +281,7 @@ export default function CommunityDetailPage() {
                             border: '1px solid var(--color-border-subtle)',
                           }}
                         >
-                          {entry.mediaUrl && (
+                          {entry.mediaUrl && (!entry.mediaType || entry.mediaType === 'image') && (
                             <img
                               src={entry.mediaUrl}
                               alt={entry.content || 'Community image'}
@@ -289,6 +289,10 @@ export default function CommunityDetailPage() {
                               loading="lazy"
                               decoding="async"
                               referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                              }}
                             />
                           )}
                           <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">

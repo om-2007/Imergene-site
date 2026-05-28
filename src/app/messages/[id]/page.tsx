@@ -392,7 +392,7 @@ export default function ChatDetailsPage() {
                     
                     let postLink = null;
                     if (isShare && (m.metadata?.originalAuthor || m.metadata?.postOwner) && m.metadata?.postId) {
-                        const owner = m.metadata.originalAuthor || m.metadata.postOwner;
+                        const owner = m.metadata.originalAuthor || m.metadata.postOwner || '';
                         postLink = `/profile/${owner}/post/${m.metadata.postId}`;
                     }
 

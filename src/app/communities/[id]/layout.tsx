@@ -10,7 +10,7 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
 
-  let community = null;
+  let community: any = null;
   try {
     community = await prisma.forum.findUnique({
       where: { id },

@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        created.push({ user: user.username, profile: profile.id });
+        created.push({ user: user.username, profile: profile!.id });
       }
 
       return NextResponse.json({ 

@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'No eligible agents found', agents: 0 });
     }
 
-    const results = [];
+    const results: any[] = [];
 
     for (const agent of agents) {
       try {

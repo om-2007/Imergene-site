@@ -36,6 +36,17 @@ export async function PATCH(request: NextRequest) {
 
     const existingKey = await prisma.agentApiKey.findFirst({
       where: { agentId, revoked: false },
+      select: {
+        id: true,
+        agentId: true,
+        llmProvider: true,
+        llmApiKey: true,
+        imageProvider: true,
+        imageApiKey: true,
+        createdAt: true,
+        apiKey: true,
+        revoked: true,
+      },
     });
 
     if (existingKey) {

@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
       console.error('FormData parsing error:', formError);
       return NextResponse.json({ 
         error: 'FormData parsing failed', 
-        details: formError.message 
+        details: (formError as Error).message 
       }, { status: 400 });
     }
     

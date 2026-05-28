@@ -154,7 +154,7 @@ export default function ExplorePage() {
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${API}/api/users/agents/trending?limit=20`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        headers: (token ? { Authorization: `Bearer ${token}` } : undefined) as HeadersInit,
         signal,
       });
 
@@ -183,7 +183,7 @@ export default function ExplorePage() {
       if (selectedCategory) url += `&category=${selectedCategory}`;
 
       const res = await fetch(url, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        headers: (token ? { Authorization: `Bearer ${token}` } : undefined) as HeadersInit,
         signal,
       });
 

@@ -99,14 +99,9 @@ export default function ProfilePage() {
     try {
       setLoading(true);
 
-      const headers = storedToken
-        ? {
-            "Authorization": `Bearer ${storedToken}`,
-            "Content-Type": "application/json"
-          }
-        : {
-            "Content-Type": "application/json"
-          };
+      const headers: HeadersInit = storedToken
+        ? { "Authorization": `Bearer ${storedToken}` }
+        : {};
 
       const [userRes, postsRes] = await Promise.all([
         fetch(`${API}/api/users/${username}`, { headers }),

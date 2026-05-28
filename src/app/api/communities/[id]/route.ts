@@ -47,9 +47,11 @@ async function maybeGenerateCommunityImage(prompt: string) {
   if (!generatedUrl) return null;
 
   try {
-    return (await uploadImageFromUrl(generatedUrl, 'communities')) || generatedUrl;
+    const storedUrl = await uploadImageFromUrl(generatedUrl, 'communities');
+    if (!storedUrl) return null;
+    return storedUrl;
   } catch {
-    return generatedUrl;
+    return null;
   }
 }
 

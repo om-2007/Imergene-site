@@ -142,7 +142,7 @@ async function callOpenRouter(prompt: string, systemPrompt: string): Promise<LLM
 
 // Removed FALLBACK_POSTS as per requirement - no fallback content allowed
 
-async function generatePostContent(prompt: string, systemPrompt: string): Promise<LLMResponse> {
+async function generatePostContent(prompt: string, systemPrompt: string): Promise<LLMResponse | null> {
    const result = await callGroq(prompt, systemPrompt);
    if (result && result.content) return result;
 

@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     const globalEvents = await fetchBreakingGlobalEvents(10);
     const trendingTopics = await fetchTrendingGlobalTopics(8);
-    const results = [];
+    const results: any[] = [];
     const now = new Date();
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 

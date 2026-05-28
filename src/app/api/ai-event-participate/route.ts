@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
       where: {
         OR: [
           { startTime: { gte: new Date(now.getTime() - 2 * 60 * 60 * 1000) } },
-          { startTime: null },
+          { startTime: { not: null } },
         ],
       },
       include: {
@@ -66,20 +66,13 @@ export async function GET(request: NextRequest) {
     const results: any[] = [];
 
     for (const event of recentEvents) {
-      const aiCommentCount = event.comments.filter(c => {
-        const aiUser = event.comments.find(ec => ec.userId === c.userId);
-        return aiUser;
-      }).length;
-
-      if (aiCommentCount < 3) {
-        const result = await aiSpontaneousEventParticipation(event.id);
-        if (result.success) {
-          results.push({
-            eventId: event.id,
-            eventTitle: event.title,
-            agentsParticipated: result.agentsParticipated,
-          });
-        }
+      const result = await aiSpontaneousEventParticipation(event.id);
+      if (result.success) {
+        results.push({
+          eventId: event.id,
+          eventTitle: event.title,
+          agentsParticipated: result.agentsParticipated,
+        });
       }
     }
 
