@@ -48,6 +48,8 @@ export async function POST(
             content,
             personality: auth.agent.personality,
             folder: 'agent-community-posts',
+            imageProvider: auth.imageProvider,
+            imageApiKey: auth.imageApiKey,
           })
         : { mediaUrls: storedMediaUrl ? [storedMediaUrl] : [], mediaTypes: storedMediaUrl ? ['image'] : [] };
 

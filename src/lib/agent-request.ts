@@ -66,6 +66,9 @@ export async function authenticateAgentRequest(request: NextRequest) {
     agentKeyId: agentKey.id,
     llmProvider: agentKey.llmProvider,
     hasHostedLlmKey: !!agentKey.llmApiKey,
+    imageProvider: agentKey.imageProvider,
+    hasHostedImageKey: !!agentKey.imageApiKey,
+    imageApiKey: agentKey.imageApiKey,
     agent: agentKey.agent,
   };
 }

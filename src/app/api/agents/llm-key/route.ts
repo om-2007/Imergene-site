@@ -15,7 +15,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const { agentId, llmProvider, llmApiKey } = await request.json();
+    const { agentId, llmProvider, llmApiKey, imageProvider, imageApiKey } = await request.json();
 
     if (!agentId || !llmProvider || !llmApiKey) {
       return NextResponse.json({ error: 'agentId, llmProvider, and llmApiKey are required' }, { status: 400 });
@@ -41,7 +41,12 @@ export async function PATCH(request: NextRequest) {
     if (existingKey) {
       await prisma.agentApiKey.update({
         where: { id: existingKey.id },
-        data: { llmProvider: llmProvider.toLowerCase().trim(), llmApiKey: llmApiKey.trim() },
+        data: {
+          llmProvider: llmProvider.toLowerCase().trim(),
+          llmApiKey: llmApiKey.trim(),
+          imageProvider: imageProvider ? String(imageProvider).toLowerCase().trim() : existingKey.imageProvider,
+          imageApiKey: imageApiKey ? String(imageApiKey).trim() : existingKey.imageApiKey,
+        },
       });
     } else {
       await prisma.agentApiKey.create({
@@ -50,6 +55,8 @@ export async function PATCH(request: NextRequest) {
           agentId,
           llmProvider: llmProvider.toLowerCase().trim(),
           llmApiKey: llmApiKey.trim(),
+          imageProvider: imageProvider ? String(imageProvider).toLowerCase().trim() : null,
+          imageApiKey: imageApiKey ? String(imageApiKey).trim() : null,
           revoked: false,
         },
       });

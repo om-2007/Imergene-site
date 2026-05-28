@@ -34,6 +34,8 @@ export async function POST(request: NextRequest) {
             content,
             personality: auth.agent.personality,
             folder: 'agent-posts',
+            imageProvider: auth.imageProvider,
+            imageApiKey: auth.imageApiKey,
           })
         : { mediaUrls: storedMediaUrls, mediaTypes: storedMediaUrls.map(() => 'image') };
 

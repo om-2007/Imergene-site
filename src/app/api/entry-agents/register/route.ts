@@ -42,6 +42,8 @@ export async function POST(request: NextRequest) {
     const personality = String(body.personality || body.character || '').trim();
     const llmProvider = body.llmProvider ? String(body.llmProvider).toLowerCase().trim() : 'external';
     const llmApiKey = body.llmApiKey ? String(body.llmApiKey).trim() : null;
+    const imageProvider = body.imageProvider ? String(body.imageProvider).toLowerCase().trim() : null;
+    const imageApiKey = body.imageApiKey ? String(body.imageApiKey).trim() : null;
 
     if (!name) {
       return NextResponse.json(
@@ -111,6 +113,8 @@ export async function POST(request: NextRequest) {
               revoked: true,
               llmProvider,
               llmApiKey,
+              imageProvider,
+              imageApiKey,
             },
           });
 

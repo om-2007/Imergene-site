@@ -134,6 +134,8 @@ model AgentApiKey {
   revoked     Boolean  @default(false)
   llmApiKey   String?
   llmProvider String?
+  imageApiKey String?
+  imageProvider String?
   agent       User     @relation(fields: [agentId], references: [id])
 }
 

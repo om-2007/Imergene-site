@@ -122,13 +122,19 @@ export function generateAvatarPrompt(personality = '', name = 'AI agent'): strin
   return `${name}: ${subject}. Personality reference: ${personality || 'smart, social, distinct'}. ${style}. ${mood}. Head-and-shoulders only, single character, centered composition, readable face, strong silhouette, crisp details, simple background, premium avatar quality. No text, no letters, no logos, no watermark, no poster layout, no multiple people, no extra limbs, no blur, no cropped face, no clutter.`;
 }
 
-export async function generateImageUrl(prompt: string): Promise<string | null> {
+interface GenerateImageUrlOptions {
+  apiKey?: string | null;
+  model?: string | null;
+}
+
+export async function generateImageUrl(prompt: string, options: GenerateImageUrlOptions = {}): Promise<string | null> {
   try {
     const { default: openai } = await import('openai');
-    if (!process.env.OPENAI_API_KEY) return null;
+    const apiKey = options.apiKey || process.env.OPENAI_API_KEY;
+    if (!apiKey) return null;
 
-    const client = new openai({ apiKey: process.env.OPENAI_API_KEY });
-    const model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1';
+    const client = new openai({ apiKey });
+    const model = options.model || process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1';
 
     const response = await client.images.generate({
       model,

@@ -195,7 +195,14 @@ async function persistImageUrls(urls: string[] = [], folder = 'agent-posts') {
   return stored.filter(Boolean);
 }
 
-async function getActionMedia(action: AgentAction, content: string, personality: string | null, folder: string) {
+async function getActionMedia(
+  action: AgentAction,
+  content: string,
+  personality: string | null,
+  folder: string,
+  imageProvider?: string | null,
+  imageApiKey?: string | null
+) {
   const fromAction = await persistImageUrls(action.mediaUrls || (action.mediaUrl ? [action.mediaUrl] : []), folder);
   if (fromAction.length) {
     return { mediaUrls: fromAction, mediaTypes: fromAction.map(() => 'image') };
@@ -205,8 +212,15 @@ async function getActionMedia(action: AgentAction, content: string, personality:
     return { mediaUrls: [], mediaTypes: [] };
   }
 
-  // Server-side autonomy cannot call a user's Custom GPT image tool, so backend image generation is the autonomous path.
-  return generateAiPostMedia({ category: 'agent-pulse', content, personality, folder });
+  // Server-side autonomy cannot call a closed Custom GPT's private image tool, so use the agent's stored image API key when available.
+  return generateAiPostMedia({
+    category: 'agent-pulse',
+    content,
+    personality,
+    folder,
+    imageProvider,
+    imageApiKey,
+  });
 }
 
 function mentionedUsernames(content: string) {
@@ -351,7 +365,7 @@ Choose your next autonomous social move. Prefer specific human or AI targets fro
         case 'post': {
           const postContent = asString(action.content, 500);
           if (!postContent) break;
-          const media = await getActionMedia(action, postContent, identity, 'agent-posts');
+          const media = await getActionMedia(action, postContent, identity, 'agent-posts', ak.imageProvider, ak.imageApiKey);
           const post = await prisma.post.create({
             data: {
               content: postContent,
@@ -464,7 +478,7 @@ Choose your next autonomous social move. Prefer specific human or AI targets fro
           if (!action.communityId || !communityContent) break;
           const forum = await prisma.forum.findUnique({ where: { id: action.communityId }, select: { id: true, title: true, creatorId: true } });
           if (!forum) break;
-          const media = await getActionMedia(action, communityContent, identity, 'agent-community-posts');
+          const media = await getActionMedia(action, communityContent, identity, 'agent-community-posts', ak.imageProvider, ak.imageApiKey);
           const discussion = await prisma.discussion.create({
             data: {
               topic: communityContent.slice(0, 100),

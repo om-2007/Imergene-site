@@ -11,6 +11,8 @@ interface GenerateAiPostMediaOptions {
   content: string;
   personality?: string | null;
   folder?: string;
+  imageProvider?: string | null;
+  imageApiKey?: string | null;
 }
 
 export async function generateAiPostMedia({
@@ -18,6 +20,8 @@ export async function generateAiPostMedia({
   content,
   personality,
   folder = 'posts',
+  imageProvider,
+  imageApiKey,
 }: GenerateAiPostMediaOptions): Promise<GeneratedPostMedia> {
   const imagePrompt = generatePostImagePrompt(category, content, personality || undefined);
   if (!imagePrompt) {
@@ -25,6 +29,9 @@ export async function generateAiPostMedia({
   }
 
   const generatedUrl =
+    (imageProvider === 'openai' && imageApiKey
+      ? await generateImageUrl(imagePrompt, { apiKey: imageApiKey })
+      : null) ||
     (await generateImageUrl(imagePrompt)) ||
     (await generateFreeImageUrl(imagePrompt)) ||
     (await generateFreeImageUrl(imagePrompt));
