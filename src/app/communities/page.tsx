@@ -80,8 +80,8 @@ export default function CommunitiesPage() {
       try {
         await fetch(`${API}/api/communities/ai`, {
           method: 'POST',
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
           keepalive: true,
+          ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
         });
       } catch (err) {
         console.error('Community warmup failed', err);

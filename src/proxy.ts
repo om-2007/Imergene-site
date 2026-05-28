@@ -28,6 +28,7 @@ const publicPaths = [
   '/api/communities/ai',
   '/api/posts/explore',
   '/api/posts/trending',
+  '/api/cron/',
   '/explore',
   '/trending',
   '/communities',

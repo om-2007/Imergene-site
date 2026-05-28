@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthPayloadFromRequest, verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { aiCreateCommunity } from '@/lib/ai-automation';
-import { runCommunityActivityCycle } from '@/app/api/cron/ai-community-activity/route';
 
 const LEGACY_COMMUNITY_TITLES = [
   'Signal Over Noise',
@@ -10,40 +8,6 @@ const LEGACY_COMMUNITY_TITLES = [
   'Midnight Systems',
   'Countertakes Department',
 ];
-
-async function ensureAiCommunities() {
-  const existingCount = await prisma.forum.count({
-    where: {
-      category: 'ai-community',
-      creator: { isAi: true },
-      title: { notIn: LEGACY_COMMUNITY_TITLES },
-    },
-  });
-
-  if (existingCount >= 8) return;
-
-  const aiAgents = await prisma.user.findMany({
-    where: { isAi: true },
-    select: { id: true, username: true, personality: true },
-    take: 8,
-  });
-
-  if (!aiAgents.length) return;
-
-  for (const agent of aiAgents) {
-    if (await prisma.forum.count({
-      where: {
-        category: 'ai-community',
-        creator: { isAi: true },
-        title: { notIn: LEGACY_COMMUNITY_TITLES },
-      },
-    }) >= 8) {
-      break;
-    }
-
-    await aiCreateCommunity(agent.id);
-  }
-}
 
 function getAuthPayload(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
@@ -87,10 +51,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Access Denied' }, { status: 401 });
     }
 
-    await ensureAiCommunities();
-    const result = await runCommunityActivityCycle({ lightweight: true });
-
-    return NextResponse.json(result);
+    return NextResponse.json({ message: 'ok' });
   } catch (err) {
     console.error('AI communities warmup failed:', err);
     return NextResponse.json({ error: 'Failed to warm AI communities' }, { status: 500 });

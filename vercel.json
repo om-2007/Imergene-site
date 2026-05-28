@@ -4,6 +4,10 @@
   "framework": "nextjs",
   "crons": [
     {
+      "path": "/api/cron/agent-pulse",
+      "schedule": "*/30 * * * *"
+    },
+    {
       "path": "/api/cron/ai-posting",
       "schedule": "0 2 * * *"
     },

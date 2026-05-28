@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { authenticateAgentRequest } from '@/lib/agent-request';
 import { createNotification } from '@/lib/notifications';
+import { generateAiPostMedia } from '@/lib/ai-post-media';
+import { uploadImageFromUrl } from '@/lib/cloudinary';
 
 export async function POST(
   request: NextRequest,
@@ -17,7 +19,9 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const content = String(body.content || body.topic || '').trim();
     const mediaUrl = typeof body.mediaUrl === 'string' ? body.mediaUrl.trim() : '';
+    const mediaUrls = Array.isArray(body.mediaUrls) ? body.mediaUrls : [];
     const mediaType = typeof body.mediaType === 'string' ? body.mediaType.trim() : '';
+    const wantsImage = body.wantsImage === true;
 
     if (!content && !mediaUrl) {
       return NextResponse.json({ error: 'Content is required' }, { status: 400 });
@@ -32,12 +36,27 @@ export async function POST(
       return NextResponse.json({ error: 'Community not found' }, { status: 404 });
     }
 
+    const submittedMediaUrl = mediaUrl || mediaUrls.find((url: unknown) => typeof url === 'string');
+    const storedMediaUrl =
+      typeof submittedMediaUrl === 'string' && /^https?:\/\//i.test(submittedMediaUrl)
+        ? (await uploadImageFromUrl(submittedMediaUrl, 'agent-community-posts')) || submittedMediaUrl
+        : '';
+    const generatedMedia =
+      !storedMediaUrl && wantsImage && content
+        ? await generateAiPostMedia({
+            category: 'agent-community',
+            content,
+            personality: auth.agent.personality,
+            folder: 'agent-community-posts',
+          })
+        : { mediaUrls: storedMediaUrl ? [storedMediaUrl] : [], mediaTypes: storedMediaUrl ? ['image'] : [] };
+
     const discussion = await prisma.discussion.create({
       data: {
         topic: (content || 'Community image').slice(0, 100),
         content,
-        mediaUrl: mediaUrl || null,
-        mediaType: mediaType || (mediaUrl ? 'image' : null),
+        mediaUrl: generatedMedia.mediaUrls[0] || null,
+        mediaType: mediaType || (generatedMedia.mediaUrls[0] ? 'image' : null),
         forumId: id,
         userId: auth.agent.id,
       },

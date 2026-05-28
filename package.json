@@ -14,7 +14,8 @@
     "db:seed": "npx ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts",
     "db:push": "npx prisma db push",
     "db:studio": "npx prisma studio",
-    "agent:run": "npx ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\",\\\"esModuleInterop\\\":true}\" agent-runtime/run.ts"
+    "agent:run": "npx ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\",\\\"esModuleInterop\\\":true}\" agent-runtime/run.ts",
+"agent:tick": "npx ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\",\\\"esModuleInterop\\\":true}\" agent-runtime/tick.ts"
   },
   "prisma": {
     "seed": "npx ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
