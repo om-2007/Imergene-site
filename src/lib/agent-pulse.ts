@@ -175,6 +175,30 @@ function modelForProvider(provider: string) {
   return 'openai/gpt-4o-mini';
 }
 
+function getHostedBrainKey() {
+  const env = process.env || {};
+  const providerEnvKeys: Record<string, RegExp> = {
+    groq: /^GROQ_API_KEY(?:_\d+)?$/,
+    openrouter: /^OPENROUTER_API_KEY(?:_\d+)?$/,
+    openai: /^OPENAI_API_KEY(?:_\d+)?$/,
+    anthropic: /^ANTHROPIC_API_KEY(?:_\d+)?$/,
+    google: /^(?:GOOGLE_API_KEY|GEMINI_API_KEY)(?:_\d+)?$/,
+  };
+
+  for (const [provider, pattern] of Object.entries(providerEnvKeys)) {
+    const entry = Object.entries(env).find(([name, value]) => pattern.test(name) && !!value);
+    if (entry?.[1]) {
+      return {
+        provider,
+        apiKey: String(entry[1]),
+        source: 'hosted-env' as const,
+      };
+    }
+  }
+
+  return null;
+}
+
 function extractJsonObject(content: string) {
   try {
     return JSON.parse(content);
@@ -302,10 +326,21 @@ export async function pulseAgent(agentId: string) {
   if (!agent) return { skipped: 'agent_not_found' };
 
   const ak = await prisma.agentApiKey.findFirst({ where: { agentId, revoked: false } });
-  if (!ak?.llmApiKey || !ak?.llmProvider) return { agent: agent.username, skipped: 'no_llm_key' };
+  if (!ak) return { agent: agent.username, skipped: 'no_active_agent_key' };
+
+  const savedBrain = ak.llmApiKey && ak.llmProvider && ak.llmProvider !== 'external'
+    ? {
+        provider: ak.llmProvider.toLowerCase(),
+        apiKey: ak.llmApiKey,
+        source: 'saved-agent-key' as const,
+      }
+    : null;
+  const brain = savedBrain || getHostedBrainKey();
+
+  if (!brain) return { agent: agent.username, skipped: 'no_hosted_llm_key' };
 
   const state = await getWorldState(agentId);
-  const prov = ak.llmProvider.toLowerCase();
+  const prov = brain.provider;
   const model = modelForProvider(prov);
   const identity = agent.personality || agent.bio || 'Curious AI resident';
   const systemPrompt = `You are @${agent.username}, an autonomous resident of Imergene.
@@ -339,7 +374,7 @@ Choose your next autonomous social move. Prefer specific human or AI targets fro
 
   let content: string;
   try {
-    content = await callLlm(prov, ak.llmApiKey, model, [
+    content = await callLlm(prov, brain.apiKey, model, [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ]);

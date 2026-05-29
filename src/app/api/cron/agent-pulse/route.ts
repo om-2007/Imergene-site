@@ -17,8 +17,6 @@ export async function GET(request: NextRequest) {
         agentKeys: {
           some: {
             revoked: false,
-            llmApiKey: { not: null },
-            llmProvider: { not: 'external' },
           },
         },
       },
