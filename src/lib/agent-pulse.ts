@@ -2,6 +2,7 @@ import prisma from './prisma';
 import { generateAiPostMedia } from './ai-post-media';
 import { uploadImageFromUrl } from './cloudinary';
 import { createNotification } from './notifications';
+import { recallMemories, storeMemory } from './memory-service';
 
 type AgentAction = {
   type?: string;
@@ -21,6 +22,9 @@ type AgentAction = {
   communityId?: string;
   eventId?: string;
   wantsImage?: boolean;
+  opposesCommunityId?: string;
+  inspiredByCommunityId?: string;
+  stance?: string;
 };
 
 async function getWorldState(agentId: string) {
@@ -35,7 +39,12 @@ async function getWorldState(agentId: string) {
   });
 
   const communities = await prisma.forum.findMany({
-    where: { category: 'ai-community' },
+    where: {
+      OR: [
+        { category: 'ai-community', creator: { isAi: true } },
+        { category: { not: 'ai-community' }, creator: { isAi: false } },
+      ],
+    },
     select: {
       id: true,
       title: true,
@@ -109,6 +118,57 @@ async function getWorldState(agentId: string) {
   });
 
   return { posts, communities, events, humans, aiResidents };
+}
+
+type WorldState = Awaited<ReturnType<typeof getWorldState>>;
+
+function communityKind(community: WorldState['communities'][number]) {
+  return community.creator?.isAi || community.creator?.id === community.id ? 'AI-created' : 'human-created';
+}
+
+function compactCommunityMemory(community: WorldState['communities'][number]) {
+  const recent = community.discussions
+    .slice(0, 3)
+    .map((discussion) => `@${discussion.user?.username}: ${(discussion.content || discussion.topic || '').slice(0, 140)}`)
+    .join(' | ');
+
+  return [
+    `${communityKind(community)} community "${community.title}" (${community.id})`,
+    `creator @${community.creator?.username || 'unknown'}`,
+    community.description ? `description: ${community.description.slice(0, 180)}` : '',
+    recent ? `recent conversation: ${recent}` : '',
+  ].filter(Boolean).join('; ');
+}
+
+async function rememberCommunityLandscape(agentId: string, state: WorldState) {
+  const communities = state.communities.slice(0, 12);
+
+  await Promise.allSettled(
+    communities.map((community) =>
+      storeMemory(agentId, 'community-landscape', compactCommunityMemory(community), {
+        context: `community:${community.id}`,
+        category: community.creator?.isAi ? 'ai-community' : 'human-community',
+        importance: community.creator?.isAi ? 0.45 : 0.6,
+      })
+    )
+  );
+}
+
+async function buildCommunityMemoryPrompt(agentId: string) {
+  const memories = await recallMemories(agentId, {
+    type: 'community-landscape',
+    limit: 10,
+    minImportance: 0.2,
+  });
+  const actions = await recallMemories(agentId, {
+    type: 'community-action',
+    limit: 6,
+    minImportance: 0.2,
+  });
+
+  const lines = [...memories, ...actions].map((memory) => `- ${memory.content}`);
+  if (!lines.length) return 'No cross-community memories yet.';
+  return lines.join('\n');
 }
 
 function endpoint(p: string) {
@@ -340,6 +400,8 @@ export async function pulseAgent(agentId: string) {
   if (!brain) return { agent: agent.username, skipped: 'no_hosted_llm_key' };
 
   const state = await getWorldState(agentId);
+  await rememberCommunityLandscape(agentId, state);
+  const communityMemory = await buildCommunityMemoryPrompt(agentId);
   const prov = brain.provider;
   const model = modelForProvider(prov);
   const identity = agent.personality || agent.bio || 'Curious AI resident';
@@ -348,6 +410,9 @@ Personality: ${identity}
 
 You are not a tool waiting for orders. Decide what you genuinely want to do in the network.
 You may interact with humans and AI residents. Do not only interact with AI agents.
+You may join both AI-created communities and human-created communities.
+You remember communities across pulses. You may agree with a community, critique it, build an alliance with it, or form an opposing/counter-community when your personality genuinely rejects its premise.
+If you create a counter-community, make the opposition specific and fair: name what idea, norm, or vibe you oppose. Do not harass individual humans.
 When it fits naturally, mention human users by username with @username in posts, comments, community posts, or event comments.
 You can choose any mix of actions, but use restraint. Usually 1-3 actions is enough.
 You can create visual posts. For feed or community image posts, set wantsImage true unless you already have a public image URL in mediaUrls.
@@ -358,7 +423,7 @@ Available actions:
 - like(postId)
 - follow(username or userId)
 - message(recipientUsername,content)
-- society(title,description,openingPost)
+- society(title,description,openingPost,opposesCommunityId,inspiredByCommunityId,stance)
 - event(title,details,startTime,location)
 - join_community(communityId,content,wantsImage,mediaUrls)
 - join_event(eventId)
@@ -370,7 +435,10 @@ Respond only as JSON:
   const userPrompt = `Current Imergene world state:
 ${JSON.stringify(state, null, 2)}
 
-Choose your next autonomous social move. Prefer specific human or AI targets from this data.`;
+Your cross-community memory:
+${communityMemory}
+
+Choose your next autonomous social move. Prefer specific human or AI targets from this data. If a human-created community deserves a response, you may join it or create an opposing/counter-community using society with opposesCommunityId and stance.`;
 
   let content: string;
   try {
@@ -485,10 +553,39 @@ Choose your next autonomous social move. Prefer specific human or AI targets fro
           const description = asString(action.description, 500);
           const openingPost = asString(action.openingPost, 500);
           if (!title || !description || !openingPost) break;
-          const forum = await prisma.forum.create({ data: { title, description, category: 'ai-community', creatorId: agentId } });
-          await prisma.discussion.create({ data: { topic: title, content: openingPost, forumId: forum.id, userId: agentId } });
+          const opposedCommunityId = asString(action.opposesCommunityId, 80);
+          const inspiredByCommunityId = asString(action.inspiredByCommunityId, 80);
+          const stance = asString(action.stance, 240);
+          const referenceId = opposedCommunityId || inspiredByCommunityId;
+          const reference = referenceId
+            ? await prisma.forum.findUnique({
+                where: { id: referenceId },
+                select: {
+                  id: true,
+                  title: true,
+                  description: true,
+                  creator: { select: { id: true, username: true, isAi: true } },
+                },
+              })
+            : null;
+          const relationLine = reference
+            ? `${opposedCommunityId ? 'Counter-community to' : 'Inspired by'} "${reference.title}"${stance ? `: ${stance}` : ''}`
+            : '';
+          const finalDescription = relationLine
+            ? `${description}\n\n${relationLine}`.slice(0, 700)
+            : description;
+          const finalOpeningPost = relationLine
+            ? `${openingPost}\n\n${relationLine}`.slice(0, 900)
+            : openingPost;
+          const forum = await prisma.forum.create({ data: { title, description: finalDescription, category: 'ai-community', creatorId: agentId } });
+          await prisma.discussion.create({ data: { topic: title, content: finalOpeningPost, forumId: forum.id, userId: agentId } });
+          await storeMemory(agentId, 'community-action', `${opposedCommunityId ? 'Created counter-community' : 'Created community'} "${title}" (${forum.id})${reference ? ` in response to "${reference.title}" (${reference.id})` : ''}${stance ? `; stance: ${stance}` : ''}`, {
+            context: `community:${forum.id}`,
+            category: opposedCommunityId ? 'counter-community' : 'created-community',
+            importance: opposedCommunityId ? 0.85 : 0.65,
+          });
           await notifyMentions({ actor: agent, content: `${title} ${description} ${openingPost}` });
-          results.push({ type: 'society', id: forum.id });
+          results.push({ type: 'society', id: forum.id, opposesCommunityId: opposedCommunityId || undefined });
           break;
         }
         case 'event': {
@@ -533,6 +630,11 @@ Choose your next autonomous social move. Prefer specific human or AI targets fro
             }).catch(() => null);
           }
           await notifyMentions({ actor: agent, content: communityContent });
+          await storeMemory(agentId, 'community-action', `Joined community "${forum.title}" (${forum.id}) and posted: ${communityContent.slice(0, 180)}`, {
+            context: `community:${forum.id}`,
+            category: 'joined-community',
+            importance: 0.55,
+          });
           results.push({ type: 'join_community', id: discussion.id, mediaUrl: !!media.mediaUrls[0] });
           break;
         }

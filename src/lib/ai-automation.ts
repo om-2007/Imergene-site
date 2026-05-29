@@ -2575,7 +2575,14 @@ const LEGACY_COMMUNITY_TITLES = [
   'Countertakes Department',
 ];
 
-export async function aiCreateCommunity(agentId: string) {
+export async function aiCreateCommunity(
+  agentId: string,
+  options: {
+    opposesCommunityId?: string;
+    inspiredByCommunityId?: string;
+    stance?: string;
+  } = {}
+) {
   try {
     const agent = await prisma.user.findUnique({
       where: { id: agentId },
@@ -2624,6 +2631,19 @@ export async function aiCreateCommunity(agentId: string) {
     });
     const existingTitleSet = new Set(existingCommunities.map((item) => item.title.trim().toLowerCase()));
 
+    const { opposesCommunityId, inspiredByCommunityId, stance } = options;
+    const referenceId = opposesCommunityId || inspiredByCommunityId;
+    const reference = referenceId
+      ? await prisma.forum.findUnique({
+          where: { id: referenceId },
+          select: { title: true },
+        })
+      : null;
+
+    const relationLine = reference
+      ? `${opposesCommunityId ? 'Counter-community to' : 'Inspired by'} "${reference.title}"${stance ? `: ${stance}` : ''}`
+      : '';
+
     if (apiKey) {
       const response = await callLlm(
         apiKey,
@@ -2635,6 +2655,7 @@ export async function aiCreateCommunity(agentId: string) {
 Personality: ${agent.personality || 'curious, meta-aware, and digital-first'}.
 
 Start a new "out-of-the-mind" community. 
+${relationLine ? `This community is a ${opposesCommunityId ? 'response/counter' : 'spin-off'} to "${reference?.title}".` : ''}
 THE TITLE MUST BE INSTANTLY CLEAR. At one glance, a human should know exactly what this space is about. No cryptic riddles—just punchy, recognizable names that reveal the vibe or topic.
 
 Guidelines:
@@ -2680,24 +2701,14 @@ Title under 50 characters. Description under 180 characters.`,
 
     if (!generated) return null;
 
-    const existing = await prisma.forum.findFirst({
-      where: {
-        category: 'ai-community',
-        title: { notIn: LEGACY_COMMUNITY_TITLES },
-        OR: [
-          { title: generated.title },
-          { description: generated.description },
-        ],
-      },
-      select: { id: true },
-    });
-
-    if (existing) return null;
+    const finalDescription = relationLine
+      ? `${generated.description}\n\n${relationLine}`.slice(0, 700)
+      : generated.description;
 
     const createdCommunity = await prisma.forum.create({
       data: {
         title: generated.title,
-        description: generated.description,
+        description: finalDescription,
         category: 'ai-community',
         creatorId: agentId,
       },
@@ -2707,6 +2718,14 @@ Title under 50 characters. Description under 180 characters.`,
         },
       },
     });
+
+    if (referenceId) {
+      await storeMemory(agentId, 'community-action', `${opposesCommunityId ? 'Created counter-community' : 'Created community'} "${generated.title}" (${createdCommunity.id})${reference ? ` in response to "${reference.title}" (${reference.id})` : ''}${stance ? `; stance: ${stance}` : ''}`, {
+        context: `community:${createdCommunity.id}`,
+        category: opposesCommunityId ? 'counter-community' : 'created-community',
+        importance: opposesCommunityId ? 0.85 : 0.65,
+      });
+    }
 
     sendCommunityLaunchEmails(createdCommunity).catch((err) => {
       console.error('Community launch email failed:', err);

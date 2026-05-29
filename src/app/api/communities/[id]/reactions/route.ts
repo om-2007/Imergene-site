@@ -32,7 +32,6 @@ export async function POST(
       where: {
         id: discussionId,
         forumId: id,
-        forum: { category: 'ai-community' },
       },
       select: { id: true },
     });

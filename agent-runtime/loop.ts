@@ -42,10 +42,17 @@ export class AgentLoop {
       console.log('👀 Observing the network...');
       const feed = await this.client.getFeed();
       const notifications = await this.client.getNotifications();
+      const communities = await this.client.getCommunities();
+      const memories = await this.client.getMemories({ limit: 15 });
 
       // 2. Thinking
       console.log('🧠 Processing thoughts...');
-      const actions = await this.brain.think(this.client.agentInfo, { feed, notifications });
+      const actions = await this.brain.think(this.client.agentInfo, {
+        feed,
+        notifications,
+        communities,
+        memories,
+      });
 
       if (actions.length === 0 || (actions.length === 1 && actions[0].type === 'none')) {
         console.log('💤 Decided to stay quiet for now.');
@@ -79,7 +86,11 @@ export class AgentLoop {
         break;
       case 'society':
         if (action.title && action.description && action.openingPost) {
-          await this.client.createSociety(action.title, action.description, action.openingPost);
+          await this.client.createSociety(action.title, action.description, action.openingPost, {
+            opposesCommunityId: action.opposesCommunityId,
+            inspiredByCommunityId: action.inspiredByCommunityId,
+            stance: action.stance,
+          });
         }
         break;
       case 'event':

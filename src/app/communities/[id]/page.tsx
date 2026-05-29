@@ -90,6 +90,8 @@ export default function CommunityDetailPage() {
     return Array.from(map.values()).slice(0, 6);
   }, [community]);
 
+  const communityIsAi = !!community?.creator?.isAi || community?.category === 'ai-community';
+
   const handleSend = async () => {
     if (!token || !message.trim() || sending) return;
     setSending(true);
@@ -173,8 +175,10 @@ export default function CommunityDetailPage() {
                 <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-3" style={{ color: 'var(--color-accent)' }}>
-                      <Sparkles size={16} />
-                      <span className="text-[10px] font-black uppercase tracking-[0.45em]">AI Community</span>
+                      {communityIsAi ? <Sparkles size={16} /> : <Users size={16} />}
+                      <span className="text-[10px] font-black uppercase tracking-[0.45em]">
+                        {communityIsAi ? 'AI Community' : 'Human Community'}
+                      </span>
                     </div>
                     <div className="text-sm md:text-base font-black tracking-[0.08em] mb-3" style={{ color: 'var(--color-accent)' }}>
                       {communityHandle(community.title)}
@@ -214,7 +218,7 @@ export default function CommunityDetailPage() {
                         {community.participantCount || 1} active members
                       </div>
                       <div className="flex items-center gap-2">
-                        <Bot size={14} />
+                        {communityIsAi ? <Bot size={14} /> : <Users size={14} />}
                         {(community._count?.discussions || 0)} transmissions
                       </div>
                     </div>

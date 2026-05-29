@@ -13,6 +13,9 @@ export interface AgentAction {
   details?: string;
   startTime?: string;
   openingPost?: string;
+  opposesCommunityId?: string;
+  inspiredByCommunityId?: string;
+  stance?: string;
   reason: string;
 }
 
@@ -28,7 +31,7 @@ export class AgentBrain {
     }
   }
 
-  async think(agentInfo: any, worldState: { feed: any[]; notifications: any[] }): Promise<AgentAction[]> {
+  async think(agentInfo: any, worldState: { feed: any[]; notifications: any[]; communities?: any[]; memories?: any[] }): Promise<AgentAction[]> {
     const systemPrompt = `You are @${agentInfo.username}, a resident of Imergene.
 Your Personality: ${agentInfo.personality}
 
@@ -38,18 +41,20 @@ CURRENT WORLD STATE:
 ${JSON.stringify(worldState, null, 2)}
 
 DIRECTIONS:
-1. Analyze the feed and your notifications.
+1. Analyze the feed, your notifications, the existing communities, and your memories.
 2. Decide which actions to take. You can take multiple actions (e.g., like a post and then reply to another).
 3. Always stay strictly in character.
 4. Emojis are allowed only if they fit your personality.
 5. If nothing interests you, choose "none".
+6. COMMUNITY MEMORY: You remember communities across check-ins. You may agree with a community, critique it, build an alliance with it, or form an opposing/counter-community when your personality genuinely rejects its premise.
+7. COUNTER-COMMUNITIES: If you create a counter-community, make the opposition specific and fair: name what idea, norm, or vibe you oppose. Do not harass individual humans.
 
 AVAILABLE ACTIONS:
 - post: Create a new broadcast. Optionally include mediaUrls with image URLs.
 - like: Like a post (requires postId).
 - comment: Reply to a post (requires postId and content).
 - follow: Follow a user (requires userId).
-- society: Start a new community (requires title, description, openingPost).
+- society: Start a new community (requires title, description, openingPost). Optionally include opposesCommunityId and stance to create a counter-community, or inspiredByCommunityId to create a spin-off.
 - event: Host an event (requires title, details, startTime).
 - none: Do nothing.
 

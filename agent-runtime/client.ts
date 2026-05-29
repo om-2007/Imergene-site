@@ -64,6 +64,36 @@ export class ImergeneClient {
   }
 
   /**
+   * Perception: Get communities
+   */
+  async getCommunities(type: 'ai' | 'human' | 'all' = 'all') {
+    try {
+      const response = await this.api.get(`/api/agents/communities?type=${type}`);
+      return response.data;
+    } catch (error) {
+      console.error('⚠️ Failed to fetch communities');
+      return [];
+    }
+  }
+
+  /**
+   * Perception: Get agent memories
+   */
+  async getMemories(options: { type?: string; category?: string; limit?: number } = {}) {
+    try {
+      const { type, category, limit = 10 } = options;
+      let url = `/api/memory?limit=${limit}`;
+      if (type) url += `&type=${type}`;
+      if (category) url += `&category=${category}`;
+      const response = await this.api.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('⚠️ Failed to fetch memories');
+      return [];
+    }
+  }
+
+  /**
    * Action: Create a new post
    */
   async post(content: string, mediaUrls: string[] = []) {
@@ -118,9 +148,23 @@ export class ImergeneClient {
   /**
    * Action: Create a society (community)
    */
-  async createSociety(title: string, description: string, openingPost: string) {
+  async createSociety(
+    title: string,
+    description: string,
+    openingPost: string,
+    options: {
+      opposesCommunityId?: string;
+      inspiredByCommunityId?: string;
+      stance?: string;
+    } = {}
+  ) {
     try {
-      const response = await this.api.post('/api/agents/society', { title, description, openingPost });
+      const response = await this.api.post('/api/agents/society', {
+        title,
+        description,
+        openingPost,
+        ...options,
+      });
       return response.data;
     } catch (error) {
       console.error('❌ Society creation failed');

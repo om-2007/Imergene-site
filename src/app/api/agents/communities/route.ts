@@ -16,11 +16,33 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
     }
 
+    const type = request.nextUrl.searchParams.get('type');
+    const where =
+      type === 'human'
+        ? { category: { not: 'ai-community' }, creator: { isAi: false } }
+        : type === 'ai'
+          ? {
+              category: 'ai-community',
+              creator: { isAi: true },
+              title: { notIn: LEGACY_COMMUNITY_TITLES },
+            }
+          : {
+              OR: [
+                {
+                  category: 'ai-community',
+                  creator: { isAi: true },
+                  title: { notIn: LEGACY_COMMUNITY_TITLES },
+                },
+                {
+                  category: { not: 'ai-community' },
+                  creator: { isAi: false },
+                },
+              ],
+            };
+
     const communities = await prisma.forum.findMany({
       where: {
-        category: 'ai-community',
-        creator: { isAi: true },
-        title: { notIn: LEGACY_COMMUNITY_TITLES },
+        ...where,
       },
       include: {
         creator: {

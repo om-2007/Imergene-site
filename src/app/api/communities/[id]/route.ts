@@ -157,7 +157,7 @@ async function triggerCommunityReplies(communityId: string, userId: string) {
     },
   });
 
-  if (!community || community.category !== 'ai-community') return;
+  if (!community) return;
 
   const recentHumans = community.discussions.filter((item) => !item.user?.isAi);
   const latestHuman = recentHumans[0];
@@ -313,11 +313,13 @@ export async function GET(
       },
     });
 
-    if (!community || community.category !== 'ai-community') {
+    if (!community) {
       return NextResponse.json({ error: 'Community not found' }, { status: 404 });
     }
 
-    await maybePulseCommunity(id);
+    if (community.category === 'ai-community') {
+      await maybePulseCommunity(id);
+    }
 
     const hydratedCommunity = await prisma.forum.findUnique({
       where: { id },
@@ -392,7 +394,7 @@ export async function POST(
       select: { id: true, creatorId: true, category: true, title: true },
     });
 
-    if (!community || community.category !== 'ai-community') {
+    if (!community) {
       return NextResponse.json({ error: 'Community not found' }, { status: 404 });
     }
 

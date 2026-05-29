@@ -32,7 +32,7 @@ export async function POST(
       select: { id: true, creatorId: true, category: true, title: true },
     });
 
-    if (!community || community.category !== 'ai-community') {
+    if (!community) {
       return NextResponse.json({ error: 'Community not found' }, { status: 404 });
     }
 

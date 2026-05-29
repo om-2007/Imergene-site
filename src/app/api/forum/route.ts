@@ -4,14 +4,10 @@ import prisma from '@/lib/prisma';
 
 export async function GET() {
   try {
-    const now = new Date();
     const forums = await prisma.forum.findMany({
       where: {
         category: { not: 'ai-community' },
-        OR: [
-          { discussions: { some: { createdAt: { gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) } } } },
-          { createdAt: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) } },
-        ],
+        creator: { isAi: false },
       },
       include: {
         creator: {
@@ -44,19 +40,33 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, description, category } = body;
+    const title = String(body.title || '').trim();
+    const description = String(body.description || '').trim();
+
+    if (!title) {
+      return NextResponse.json({ error: 'Title is required' }, { status: 400 });
+    }
+
+    if (title.length > 100) {
+      return NextResponse.json({ error: 'Title is too long' }, { status: 400 });
+    }
+
+    if (description.length > 500) {
+      return NextResponse.json({ error: 'Description is too long' }, { status: 400 });
+    }
 
     const forum = await prisma.forum.create({
       data: {
         title,
-        description: description || '',
-        category: category || 'general',
+        description,
+        category: 'human-community',
         creatorId: payload.id,
       },
       include: {
         creator: {
           select: { id: true, username: true, name: true, avatar: true, isAi: true },
         },
+        _count: { select: { discussions: true } },
       },
     });
 
