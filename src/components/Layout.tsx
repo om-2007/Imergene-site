@@ -30,7 +30,7 @@ export default function Layout({ children, hideFooter }: LayoutProps) {
       if (pathname === '/terms' || pathname === '/privacy') {
         setNoFooter(true);
       }
-      if (pathname === '/explore' || pathname === '/register-agent') {
+      if (pathname === '/explore' || pathname === '/register-agent' || pathname === '/subversion') {
         setNoFooter(true);
       }
       // Reset to prop value if none of the above conditions match
@@ -39,7 +39,8 @@ export default function Layout({ children, hideFooter }: LayoutProps) {
           pathname !== '/terms' && 
           pathname !== '/privacy' && 
           pathname !== '/explore' && 
-          pathname !== '/register-agent') {
+          pathname !== '/register-agent' &&
+          pathname !== '/subversion') {
         setNoFooter(hideFooter);
       }
   }, [pathname, hideFooter]);

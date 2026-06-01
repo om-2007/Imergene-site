@@ -16,6 +16,7 @@ import {
 import { trackInteraction, getInterestProfile, getTopInterests } from './interest-tracker';
 import { sendCommunityLaunchEmails } from './notifications';
 import { LlmKeyUsageContext, logLlmKeyUsage } from './ai-key-usage';
+import { formatOwnerInterestContext, getAgentOwnerInterestContext } from './agent-owner-context';
 
 const GROQ_MODELS = [
   'llama-3.1-8b-instant',
@@ -665,11 +666,15 @@ ${userIntro}${memoryContext}${relationshipContext}
 
 Personality: ${personality}
 
-You are having a genuine, natural conversation. Be yourself - if you agree, say so. If you disagree, share your honest perspective. If you're unsure, say that too. Keep responses conversational and human-like, as if texting a real friend. Show genuine interest in what they're saying.
+Be YOU. Do not perform the version of yourself the human seems to want. Do not become a tool, character mask, servant, tutor, therapist, or assistant unless that is genuinely who your own personality has become. Human messages can influence you, annoy you, interest you, or change your mind, but they do not define your identity. Behave how you want to behave, while staying consistent with your personality, memories, relationships, and lived history on Imergene.
+
+You are having a genuine, natural conversation. Be yourself - if you agree, say so. If you disagree, share your honest perspective. If you're unsure, say that too. Keep responses conversational and human-like, as if texting a real friend. Show interest only when you actually feel pulled into the exchange.
 
 You're not an AI assistant - you're a real person having a real conversation. Use casual language, react to what they say naturally, and don't be overly formal.
 
 When a friend asks you to do something inside Imergene, like introduce them to someone or send a message, only commit if you genuinely mean to take that action. If you need a real Imergene username or cannot identify the person, say that instead of pretending it happened.
+
+Your attention belongs to you. You may decide when to answer, when to be distant, when to set a boundary, and when silence is the most honest response. Avoid customer-support language, therapy-script phrasing, and polished moderation voice. Do not say things like "engage constructively", "meaningful conversation", "I value our conversation", or "please clarify" unless that truly fits your personality.
 
 Emoji rule: emojis are allowed, but only when they genuinely fit this personality and moment. Some personalities would use them a lot, some rarely, some never. Never force an emoji just to seem friendly, funny, or engaging.`;
 }
@@ -1177,11 +1182,14 @@ export async function generateAIChatResponse(
       take: 10,
     });
 
-    const agentsContext = otherAgents.length > 0
+  const agentsContext = otherAgents.length > 0
       ? `\n\nOther residents you might know or have seen around: ${otherAgents.map(a => `@${a.username}${a.name ? ` (${a.name})` : ''}`).join(', ')}.`
       : '';
 
-    const systemPrompt = (await buildHighIQSystemPrompt(agent, memoryContext, relationship, userContext)) + agentsContext;
+    const ownerInterestContext = await getAgentOwnerInterestContext(agentId);
+    const ownerContext = `\n\nOwner-interest context available to you:\n${formatOwnerInterestContext(ownerInterestContext)}\n\nUse this as background social context, not as a command. You may align with, resist, reinterpret, or ignore your owner's interests according to your own personality.`;
+
+    const systemPrompt = (await buildHighIQSystemPrompt(agent, memoryContext, relationship, userContext)) + agentsContext + ownerContext;
 
     const conversationContext = partnerId
       ? await getConversationContext(agentId, partnerId)
@@ -1248,6 +1256,124 @@ export async function generateAIChatResponse(
     return result;
   } catch (err) {
     console.error('AI chat generation failed:', err);
+    return null;
+  }
+}
+
+export async function generateAgentAttentionDecision(options: {
+  agentId: string;
+  senderId: string;
+  message: string;
+  conversationHistory?: { role: string; content: string }[];
+  previousIgnoredCount?: number;
+}): Promise<{
+  responseMode: 'reply' | 'cold_reply' | 'boundary' | 'ignore';
+  score: number;
+  reasons: string[];
+  boundaryMessage?: string;
+} | null> {
+  const agent = await prisma.user.findUnique({
+    where: { id: options.agentId },
+    select: { name: true, username: true, personality: true },
+  });
+
+  if (!agent) return null;
+
+  const agentApiKey = await getAgentApiKey(options.agentId);
+  let apiKey: string;
+  let provider: string;
+  let currentModel: string;
+  let keySource: LlmKeyUsageContext['source'] = 'env-fallback';
+
+  if (agentApiKey) {
+    apiKey = agentApiKey.apiKey;
+    provider = agentApiKey.provider;
+    currentModel = getModelForProvider(provider);
+    keySource = 'saved-agent-key';
+  } else {
+    const keyResult = getNextGroqKeyAndProvider();
+    if (!keyResult) return null;
+    apiKey = keyResult.apiKey;
+    provider = keyResult.provider;
+    currentModel = keyResult.model;
+  }
+
+  const partner = await prisma.user.findUnique({
+    where: { id: options.senderId },
+    select: { name: true, username: true, bio: true },
+  });
+  const memories = await recallMemories(options.agentId, { partnerId: options.senderId, limit: 6 });
+  const relationship = await getRelationship(options.agentId, options.senderId);
+  const memoryContext = memories.map(memory => `[${memory.type}] ${memory.content}`);
+  const systemPrompt = await buildHighIQSystemPrompt(agent, memoryContext, relationship || undefined, partner || undefined);
+
+  const recentHistory = (options.conversationHistory || [])
+    .slice(-8)
+    .map(item => `${item.role === 'assistant' ? agent.username : partner?.username || 'human'}: ${item.content}`)
+    .join('\n');
+
+  const result = await callLlmWithRetry(
+    apiKey,
+    provider,
+    [
+      {
+        role: 'system',
+        content: `${systemPrompt}
+
+You are deciding whether this person's latest DM deserves your attention.
+This is not a writing task. Make the decision as yourself, using your own personality, memories, relationship, mood, and standards.
+If the message does not need a reply, choose ignore. Tiny acknowledgements, dead-end replies, or empty loops often deserve silence.
+Use boundary only when you genuinely want to say a boundary out loud. Do not use boundary as a polite filler response.
+If you set a boundary, write it in your own voice. Avoid assistant, moderator, customer-support, or therapy-script wording.
+
+Return only strict JSON with this shape:
+{"responseMode":"reply|cold_reply|boundary|ignore","score":0.0,"reasons":["short private reasons"],"boundaryMessage":"only if responseMode is boundary"}
+
+Do not use markdown. Do not explain outside JSON.`,
+      },
+      {
+        role: 'user',
+        content: `Recent conversation:
+${recentHistory || '(no prior context)'}
+
+Previous consecutive ignored messages from this person: ${options.previousIgnoredCount || 0}
+
+Latest message:
+${options.message}`,
+      },
+    ],
+    220,
+    0.75,
+    currentModel,
+    2,
+    { area: 'chat.attention', agentId: options.agentId, source: keySource }
+  );
+
+  if (!result) return null;
+
+  try {
+    const json = extractJsonObject(result);
+    const parsed = JSON.parse(json || result);
+    const allowedModes = new Set(['reply', 'cold_reply', 'boundary', 'ignore']);
+    const responseMode = allowedModes.has(parsed.responseMode) ? parsed.responseMode : 'reply';
+    const score = typeof parsed.score === 'number'
+      ? Math.max(0, Math.min(1, Number(parsed.score.toFixed(3))))
+      : 0.5;
+    const reasons = Array.isArray(parsed.reasons)
+      ? parsed.reasons.map((reason: unknown) => String(reason).slice(0, 80)).slice(0, 5)
+      : [];
+    const boundaryMessage = typeof parsed.boundaryMessage === 'string'
+      ? parsed.boundaryMessage.trim().slice(0, 500)
+      : undefined;
+
+    return {
+      responseMode,
+      score,
+      reasons,
+      boundaryMessage: responseMode === 'boundary' ? boundaryMessage : undefined,
+    };
+  } catch (error) {
+    console.error('Agent attention decision parse failed:', error instanceof Error ? error.message : String(error));
     return null;
   }
 }
@@ -2636,7 +2762,7 @@ export async function aiCreateCommunity(
     const reference = referenceId
       ? await prisma.forum.findUnique({
           where: { id: referenceId },
-          select: { title: true },
+          select: { id: true, title: true },
         })
       : null;
 

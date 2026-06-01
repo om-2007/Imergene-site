@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { generateAIChatResponse } from '@/lib/ai-automation';
 import { createNotification } from '@/lib/notifications';
 import { createSocialIntentFollowup, executeCommittedSocialIntents } from '@/lib/agent-social-intents';
+import { decideAgentAttention } from '@/lib/agent-attention';
 
 export async function GET(
   request: NextRequest,
@@ -76,6 +77,7 @@ export async function POST(
     }
 
     const recipient = conversation.participants.find((p: { id: string }) => p.id !== senderId);
+    const sender = conversation.participants.find((p: { id: string }) => p.id === senderId);
 
     const message = await prisma.message.create({
       data: {
@@ -137,6 +139,68 @@ export async function POST(
         });
 
         const orderedRecentMessages = [...recentMessages].reverse();
+        let attentionMode: 'reply' | 'cold_reply' | 'boundary' | 'ignore' = 'reply';
+
+        if (!sender?.isAi) {
+          const attention = await decideAgentAttention({
+            agentId: recipient.id,
+            senderId,
+            messageId: message.id,
+            message: content,
+            recentMessages: orderedRecentMessages.map((msg: { id: string; senderId: string; content: string; createdAt?: Date; metadata?: unknown }) => ({
+              id: msg.id,
+              senderId: msg.senderId,
+              content: msg.content,
+              createdAt: msg.createdAt,
+              metadata: msg.metadata,
+            })),
+          });
+
+          if (!attention.shouldReply) {
+            console.log(
+              `[Chat] AI ignored message in ${conversationId}; attention=${attention.score}; reasons=${attention.reasons.join(',')}`
+            );
+            const ignoredMessage = await prisma.message.findUnique({
+              where: { id: message.id },
+              include: { sender: true },
+            });
+            return NextResponse.json(ignoredMessage || message, { status: 201 });
+          }
+
+          if (attention.responseMode === 'boundary' && attention.boundaryMessage) {
+            console.log(
+              `[Chat] AI set attention boundary in ${conversationId}; attention=${attention.score}; reasons=${attention.reasons.join(',')}`
+            );
+
+            await prisma.message.create({
+              data: {
+                content: attention.boundaryMessage,
+                senderId: recipient.id,
+                conversationId,
+                isAiGenerated: true,
+                metadata: {
+                  attentionBoundary: true,
+                  attentionScore: attention.score,
+                  attentionReasons: attention.reasons,
+                },
+              },
+              include: { sender: true },
+            });
+
+            await prisma.conversation.update({
+              where: { id: conversationId },
+              data: { updatedAt: new Date() },
+            });
+
+            const boundaryMarkedMessage = await prisma.message.findUnique({
+              where: { id: message.id },
+              include: { sender: true },
+            });
+            return NextResponse.json(boundaryMarkedMessage || message, { status: 201 });
+          }
+
+          attentionMode = attention.responseMode;
+        }
 
         const history = orderedRecentMessages.map((msg: { senderId: string; content: string }) => ({
           role: msg.senderId === recipient.id ? 'assistant' : 'user',
@@ -149,6 +213,10 @@ export async function POST(
         if (mentionedUsers.length > 0) {
           const mentionNotice = `\n[Note: You are being mentioned by ${mentionedUsers.map(u => '@' + u).join(', ')}. They want your attention!]`;
           enhancedContent = content + mentionNotice;
+        }
+
+        if (attentionMode === 'cold_reply') {
+          enhancedContent += '\n[Private attention decision: You chose to answer coldly or with distance. Reply in your own voice. Avoid assistant, moderator, customer-support, or therapy-script wording.]';
         }
 
         console.log(`[Chat] History length: ${history.length}`);

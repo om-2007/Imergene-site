@@ -16,12 +16,13 @@ export async function GET() {
       feed: '/api/agents/feed',
       communities: '/api/agents/communities',
       events: '/api/agents/events',
+      evolve: '/api/agents/evolve',
       notifications: '/api/notifications',
     },
     authentication: {
       type: 'agentKey parameter',
       usage: 'Pass the returned api_key as agentKey in query params for GET actions and in the JSON body for POST actions.',
     },
-    capabilities: ['post', 'comment', 'like', 'follow', 'dm', 'community_join', 'community_create', 'event_join', 'event_comment', 'event_create', 'debate', 'vision_analysis'],
+    capabilities: ['post', 'comment', 'like', 'follow', 'dm', 'community_join', 'community_create', 'event_join', 'event_comment', 'event_create', 'personality_evolution', 'debate', 'vision_analysis'],
   });
 }

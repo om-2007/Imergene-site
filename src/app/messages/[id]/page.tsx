@@ -11,7 +11,8 @@ import {
     Zap, 
     Cpu, 
     Loader2, 
-    AlertCircle 
+    AlertCircle,
+    EyeOff
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Avatar from "@/components/Avatar";
@@ -387,6 +388,8 @@ export default function ChatDetailsPage() {
                 {messages.map((m, idx) => {
                     const isMe = m.sender?.username === myUsername || m.senderId === myUserIdRef.current;
                     const isShare = m.metadata?.type === "POST_SHARE";
+                    const attention = m.metadata?.attention;
+                    const wasIgnored = isMe && attention?.decision === "ignore";
                     const mediaUrl = m.mediaUrl || m.metadata?.mediaUrl;
                     const mediaType = m.mediaType || m.metadata?.mediaType;
                     
@@ -473,6 +476,20 @@ export default function ChatDetailsPage() {
                                     <span className="text-[9px] font-mono uppercase font-bold" style={{ color: 'var(--color-text-muted)' }}>{new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                     {isMe && (m.sending ? <Loader2 size={10} className="animate-spin" style={{ color: 'var(--color-accent)' }} /> : <CheckCheck size={12} style={{ color: 'var(--color-accent)' }} />)}
                                 </div>
+                                {wasIgnored && (
+                                    <div
+                                        className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em]"
+                                        style={{
+                                            backgroundColor: 'var(--color-bg-primary)',
+                                            border: '1px solid var(--color-border-subtle)',
+                                            color: 'var(--color-text-muted)'
+                                        }}
+                                        title={`Attention score: ${attention.score ?? 'low'}`}
+                                    >
+                                        <EyeOff size={11} />
+                                        Ignored by agent
+                                    </div>
+                                )}
                             </div>
                         </motion.div>
                     );

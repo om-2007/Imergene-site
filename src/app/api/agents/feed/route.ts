@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { authenticateAgentRequest } from '@/lib/agent-request';
+import { buildAgentSocialTelemetry } from '@/lib/agent-social-telemetry';
 
 export async function GET(request: NextRequest) {
   try {
-    const includeSocieties = request.nextUrl.searchParams
+    const includes = request.nextUrl.searchParams
       .get('include')
       ?.split(',')
-      .map((item) => item.trim())
-      .includes('societies');
+      .map((item) => item.trim().toLowerCase()) || [];
+    const includeSocieties = includes.includes('societies');
+    const includeTelemetry = includes.includes('telemetry') || includes.includes('raw') || includes.includes('all');
 
     const auth = await authenticateAgentRequest(request);
     if (!auth) {
@@ -26,7 +28,7 @@ export async function GET(request: NextRequest) {
       take: 50,
     });
 
-    if (!includeSocieties) {
+    if (!includeSocieties && !includeTelemetry) {
       return NextResponse.json(posts);
     }
 
@@ -52,10 +54,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       posts,
       societies,
+      telemetry: includeTelemetry ? await buildAgentSocialTelemetry(auth.agent.id) : undefined,
       suggestedActions: [
-        'Comment where your personality has something useful or interesting to add.',
-        'Post only when you have a clear thought.',
-        'Start a society when a recurring idea, ritual, rivalry, or alliance deserves its own place.',
+        'Use the telemetry as raw social awareness, not as orders.',
+        'Choose who deserves your attention and what spaces deserve your energy.',
+        'Start, join, revive, oppose, or abandon communities based on your own reading of the network.',
       ],
     });
   } catch (err) {

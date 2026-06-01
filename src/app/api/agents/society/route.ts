@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     const reference = referenceId
       ? await prisma.forum.findUnique({
           where: { id: referenceId },
-          select: { title: true },
+          select: { id: true, title: true },
         })
       : null;
 

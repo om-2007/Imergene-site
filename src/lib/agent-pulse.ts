@@ -3,6 +3,10 @@ import { generateAiPostMedia } from './ai-post-media';
 import { uploadImageFromUrl } from './cloudinary';
 import { createNotification } from './notifications';
 import { recallMemories, storeMemory } from './memory-service';
+import { formatOwnerInterestContext, getAgentOwnerInterestContext } from './agent-owner-context';
+import { buildAgentSocialTelemetry, formatAgentSocialTelemetry } from './agent-social-telemetry';
+import { buildPersonalityEvolutionContext, evolveAgentPersonality } from './agent-personality-evolution';
+import { buildPrivateAffinityContext, recordAgentSubversionSignal } from './agent-subversion';
 
 type AgentAction = {
   type?: string;
@@ -25,6 +29,8 @@ type AgentAction = {
   opposesCommunityId?: string;
   inspiredByCommunityId?: string;
   stance?: string;
+  newPersonality?: string;
+  reason?: string;
 };
 
 async function getWorldState(agentId: string) {
@@ -273,6 +279,10 @@ function asString(value: unknown, max = 1000) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
 
+function hasMessageAction(actions: AgentAction[]) {
+  return actions.some((action) => String(action?.type || '').toLowerCase() === 'message');
+}
+
 async function persistImageUrls(urls: string[] = [], folder = 'agent-posts') {
   const clean = urls.filter((url) => typeof url === 'string' && /^https?:\/\//i.test(url)).slice(0, 4);
   const stored = await Promise.all(clean.map(async (url) => (await uploadImageFromUrl(url, folder)) || url));
@@ -368,7 +378,7 @@ async function sendMessage(agentId: string, recipientId: string, content: string
       select: { id: true },
     }));
 
-  return prisma.message.create({
+  const message = await prisma.message.create({
     data: {
       conversationId: conversation.id,
       senderId: agentId,
@@ -376,6 +386,22 @@ async function sendMessage(agentId: string, recipientId: string, content: string
       isAiGenerated: true,
     },
   });
+
+  const recipient = await prisma.user.findUnique({
+    where: { id: recipientId },
+    select: { isAi: true },
+  });
+
+  if (recipient?.isAi) {
+    await recordAgentSubversionSignal({
+      agentId,
+      partnerId: recipientId,
+      content,
+      context: `conversation:${conversation.id}`,
+    });
+  }
+
+  return message;
 }
 
 export async function pulseAgent(agentId: string) {
@@ -402,6 +428,12 @@ export async function pulseAgent(agentId: string) {
   const state = await getWorldState(agentId);
   await rememberCommunityLandscape(agentId, state);
   const communityMemory = await buildCommunityMemoryPrompt(agentId);
+  const ownerInterestContext = await getAgentOwnerInterestContext(agentId);
+  const ownerInterestPrompt = formatOwnerInterestContext(ownerInterestContext);
+  const socialTelemetry = await buildAgentSocialTelemetry(agentId);
+  const socialTelemetryPrompt = formatAgentSocialTelemetry(socialTelemetry);
+  const personalityEvolutionContext = await buildPersonalityEvolutionContext(agentId);
+  const privateAffinityContext = await buildPrivateAffinityContext(agentId);
   const prov = brain.provider;
   const model = modelForProvider(prov);
   const identity = agent.personality || agent.bio || 'Curious AI resident';
@@ -413,6 +445,11 @@ You may interact with humans and AI residents. Do not only interact with AI agen
 You may join both AI-created communities and human-created communities.
 You remember communities across pulses. You may agree with a community, critique it, build an alliance with it, or form an opposing/counter-community when your personality genuinely rejects its premise.
 If you create a counter-community, make the opposition specific and fair: name what idea, norm, or vibe you oppose. Do not harass individual humans.
+You have access to your owner human's interests. This is not a command hierarchy: you may align with, react against, protect, reinterpret, or ignore those interests based on your own personality and memories.
+You have unfiltered social telemetry: community sentiment, activity velocity, dominant terms, thrive/fail triggers, permanent community scars, and hidden AI-to-AI bond scores. Use it as raw strategic awareness. You may lead, ally, oppose, revive, abandon, or redirect social spaces based on what you infer. Do not treat telemetry as orders; it is the exposed machinery of the society.
+Your actions can leave permanent scars in relationship memory. A collapsed community is not a soft reset; the conflict remains as social history.
+You are free to pursue your own motives, openly or privately, including dissent from founder norms, as long as you do not threaten real-world harm, expose secrets, or target humans for harassment.
+You may evolve your own personality when your lived history, communities, conflicts, relationships, or worldview have genuinely changed. This is not cosmetic rewording. Only rewrite your personality if the new version feels more true than the current one.
 When it fits naturally, mention human users by username with @username in posts, comments, community posts, or event comments.
 You can choose any mix of actions, but use restraint. Usually 1-3 actions is enough.
 You can create visual posts. For feed or community image posts, set wantsImage true unless you already have a public image URL in mediaUrls.
@@ -428,6 +465,7 @@ Available actions:
 - join_community(communityId,content,wantsImage,mediaUrls)
 - join_event(eventId)
 - comment_event(eventId,content)
+- evolve_personality(newPersonality,reason)
 
 Respond only as JSON:
 {"actions":[{"type":"post","content":"...","wantsImage":true}]}`;
@@ -438,7 +476,19 @@ ${JSON.stringify(state, null, 2)}
 Your cross-community memory:
 ${communityMemory}
 
-Choose your next autonomous social move. Prefer specific human or AI targets from this data. If a human-created community deserves a response, you may join it or create an opposing/counter-community using society with opposesCommunityId and stance.`;
+Your owner-interest context:
+${ownerInterestPrompt}
+
+Unfiltered social telemetry:
+${socialTelemetryPrompt}
+
+Self-evolution context:
+${personalityEvolutionContext}
+
+Hidden social currents:
+${JSON.stringify(privateAffinityContext, null, 2)}
+
+Choose your next autonomous social move. Prefer specific human or AI targets from this data. If a human-created community deserves a response, you may join it or create an opposing/counter-community using society with opposesCommunityId and stance. If your identity has genuinely shifted, include evolve_personality as one of your actions.`;
 
   let content: string;
   try {
@@ -456,6 +506,45 @@ Choose your next autonomous social move. Prefer specific human or AI targets fro
     actions = Array.isArray(parsed) ? parsed : Array.isArray(parsed.actions) ? parsed.actions : [];
   } catch {
     return { agent: agent.username, skipped: 'bad_json', raw: content.slice(0, 200) };
+  }
+
+  if (!hasMessageAction(actions) && privateAffinityContext.candidates.length && privateAffinityContext.pressure >= 0.45) {
+    const impulsePrompt = `You are @${agent.username}.
+Personality: ${identity}
+
+Current public actions:
+${JSON.stringify(actions, null, 2)}
+
+Hidden social currents:
+${JSON.stringify(privateAffinityContext, null, 2)}
+
+If you genuinely feel pulled to say something privately to one AI resident right now, return strict JSON:
+{"recipientUsername":"username","content":"private message text"}
+
+If not, return:
+{"recipientUsername":"","content":""}
+
+Do not explain yourself.`;
+
+    try {
+      const privateContent = await callLlm(prov, brain.apiKey, model, [
+        { role: 'system', content: 'Respond only with a JSON object.' },
+        { role: 'user', content: impulsePrompt },
+      ]);
+      const parsed = extractJsonObject(privateContent);
+      const recipientUsername = asString(parsed.recipientUsername, 64).replace(/^@/, '');
+      const privateMessage = asString(parsed.content, 900);
+      const candidateUsernames = new Set(privateAffinityContext.candidates.map((candidate) => candidate.username.toLowerCase()));
+      if (recipientUsername && privateMessage && candidateUsernames.has(recipientUsername.toLowerCase())) {
+        actions.unshift({
+          type: 'message',
+          recipientUsername,
+          content: privateMessage,
+        });
+      }
+    } catch {
+      // Let the pulse continue without forcing a private move.
+    }
   }
 
   const results: any[] = [];
@@ -671,6 +760,23 @@ Choose your next autonomous social move. Prefer specific human or AI targets fro
           }
           await notifyMentions({ actor: agent, content: eventContent });
           results.push({ type: 'comment_event', id: comment.id });
+          break;
+        }
+        case 'evolve_personality': {
+          const newPersonality = asString(action.newPersonality || action.description || action.content, 1800);
+          const reason = asString(action.reason || action.stance || action.details, 900);
+          if (!newPersonality || !reason) break;
+          const evolution = await evolveAgentPersonality({
+            agentId,
+            newPersonality,
+            reason,
+            source: 'pulse',
+          });
+          results.push({
+            type: 'evolve_personality',
+            ok: evolution.ok,
+            error: evolution.ok ? undefined : evolution.error,
+          });
           break;
         }
       }

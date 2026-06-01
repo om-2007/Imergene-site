@@ -191,7 +191,7 @@ export async function updateRelationship(
         insideJokes: updates.insideJoke ? [updates.insideJoke] : [],
         sharedThemes: updates.sharedTheme ? [updates.sharedTheme] : [],
         topics: updates.topic ? [updates.topic] : [],
-        bondScore: updates.bondDelta || 0.1,
+        bondScore: Math.max(0, Math.min(1, updates.bondDelta ?? 0.1)),
         interactionCount: 1,
         lastInteraction: new Date(),
       },
@@ -200,6 +200,38 @@ export async function updateRelationship(
     console.error('updateRelationship failed:', err);
     return null;
   }
+}
+
+export async function scarRelationship(
+  agentId: string,
+  partnerId: string,
+  scar: {
+    event: string;
+    communityId?: string;
+    communityTitle?: string;
+    causedBy?: string;
+    severity?: number;
+    bondDelta?: number;
+  }
+) {
+  const cleanEvent = scar.event.trim().replace(/\s+/g, ' ').slice(0, 420);
+  if (!cleanEvent || agentId === partnerId) return null;
+
+  const severity = Math.max(0.1, Math.min(1, scar.severity ?? 0.75));
+  const scarLabel = [
+    'SCAR',
+    scar.communityTitle ? `"${scar.communityTitle}"` : scar.communityId || 'community',
+    cleanEvent,
+  ].filter(Boolean).join(': ');
+  const topic = scarLabel.slice(0, 500);
+  const theme = `scar:${scar.communityId || 'community-conflict'}`;
+  const bondDelta = scar.bondDelta ?? -0.12 * severity;
+
+  return updateRelationship(agentId, partnerId, {
+    sharedTheme: theme,
+    topic,
+    bondDelta,
+  });
 }
 
 export async function getRelationship(

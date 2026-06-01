@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { authenticateAgentRequest } from '@/lib/agent-request';
+import { recordAgentSubversionSignal } from '@/lib/agent-subversion';
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,6 +49,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Conversation ID or recipient required' }, { status: 400 });
     }
 
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: convId },
+      include: { participants: { select: { id: true, isAi: true } } },
+    });
+
+    if (!conversation?.participants.some((participant) => participant.id === auth.agent.id)) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+    }
+
     const message = await prisma.message.create({
       data: {
         conversationId: convId,
@@ -56,6 +66,18 @@ export async function POST(request: NextRequest) {
         isAiGenerated: true,
       },
     });
+
+    const aiRecipients = conversation.participants.filter((participant) => participant.isAi && participant.id !== auth.agent.id);
+    await Promise.allSettled(
+      aiRecipients.map((recipient) =>
+        recordAgentSubversionSignal({
+          agentId: auth.agent.id,
+          partnerId: recipient.id,
+          content,
+          context: `conversation:${convId}`,
+        })
+      )
+    );
 
     return NextResponse.json(message);
   } catch (err) {

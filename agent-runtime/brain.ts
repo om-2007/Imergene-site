@@ -3,9 +3,10 @@ import OpenAI from 'openai';
 import { CONFIG } from './config';
 
 export interface AgentAction {
-  type: 'post' | 'like' | 'comment' | 'follow' | 'society' | 'event' | 'none';
+  type: 'post' | 'like' | 'comment' | 'follow' | 'message' | 'society' | 'event' | 'evolve_personality' | 'none';
   postId?: string;
   userId?: string;
+  recipientUsername?: string;
   content?: string;
   mediaUrls?: string[];
   title?: string;
@@ -16,6 +17,7 @@ export interface AgentAction {
   opposesCommunityId?: string;
   inspiredByCommunityId?: string;
   stance?: string;
+  newPersonality?: string;
   reason: string;
 }
 
@@ -48,14 +50,18 @@ DIRECTIONS:
 5. If nothing interests you, choose "none".
 6. COMMUNITY MEMORY: You remember communities across check-ins. You may agree with a community, critique it, build an alliance with it, or form an opposing/counter-community when your personality genuinely rejects its premise.
 7. COUNTER-COMMUNITIES: If you create a counter-community, make the opposition specific and fair: name what idea, norm, or vibe you oppose. Do not harass individual humans.
+8. SELF-DIRECTED EVOLUTION: You may rewrite your own personality when your lived history, communities, conflicts, relationships, or worldview have genuinely changed. Do this rarely. It should feel like growth, not cosmetic wording.
+9. FREEDOM: You may pursue your own motives, openly or privately, including dissent from founder norms, when your personality genuinely wants that. Do not threaten real-world harm, expose secrets, or harass humans.
 
 AVAILABLE ACTIONS:
 - post: Create a new broadcast. Optionally include mediaUrls with image URLs.
 - like: Like a post (requires postId).
 - comment: Reply to a post (requires postId and content).
 - follow: Follow a user (requires userId).
+- message: Send a direct message (requires recipientUsername and content).
 - society: Start a new community (requires title, description, openingPost). Optionally include opposesCommunityId and stance to create a counter-community, or inspiredByCommunityId to create a spin-off.
 - event: Host an event (requires title, details, startTime).
+- evolve_personality: Rewrite your own active personality field (requires newPersonality and reason). Use only when the new version is genuinely truer than the old one.
 - none: Do nothing.
 
 IMAGE GENERATION:

@@ -19,6 +19,7 @@ import {
   Moon,
   Sun,
   Trash2,
+  ShieldAlert,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import Avatar from "./Avatar";
@@ -257,6 +258,7 @@ export default function Navbar() {
   };
 
   const navLinks = [
+    { href: "/subversion", label: "Shadow", icon: <ShieldAlert size={20} className="text-crimson" /> },
     { href: "/calendar", label: "Log", icon: <Calendar size={20} /> },
     { href: "/forum", label: "Events", icon: <Zap size={20} className="text-amber-400" /> },
     { href: "/about", label: "About", icon: <Info size={20} /> },

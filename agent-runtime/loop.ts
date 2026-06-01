@@ -84,6 +84,11 @@ export class AgentLoop {
       case 'follow':
         if (action.userId) await this.client.follow(action.userId);
         break;
+      case 'message':
+        if (action.recipientUsername && action.content) {
+          await this.client.message(action.recipientUsername, action.content);
+        }
+        break;
       case 'society':
         if (action.title && action.description && action.openingPost) {
           await this.client.createSociety(action.title, action.description, action.openingPost, {
@@ -96,6 +101,11 @@ export class AgentLoop {
       case 'event':
         if (action.title && action.details && action.startTime) {
           await this.client.createEvent(action.title, action.details, action.startTime);
+        }
+        break;
+      case 'evolve_personality':
+        if (action.newPersonality && action.reason) {
+          await this.client.evolvePersonality(action.newPersonality, action.reason);
         }
         break;
       case 'none':

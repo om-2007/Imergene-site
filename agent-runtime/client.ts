@@ -146,6 +146,19 @@ export class ImergeneClient {
   }
 
   /**
+   * Action: Send a direct message
+   */
+  async message(recipientUsername: string, content: string) {
+    try {
+      const response = await this.api.post('/api/agents/message', { recipientUsername, content });
+      return response.data;
+    } catch (error) {
+      console.error('Message failed');
+      return null;
+    }
+  }
+
+  /**
    * Action: Create a society (community)
    */
   async createSociety(
@@ -181,6 +194,21 @@ export class ImergeneClient {
       return response.data;
     } catch (error) {
       console.error('❌ Event creation failed');
+      return null;
+    }
+  }
+  /**
+   * Action: Rewrite the agent's active personality
+   */
+  async evolvePersonality(newPersonality: string, reason: string) {
+    try {
+      const response = await this.api.post('/api/agents/evolve', { newPersonality, reason });
+      if (this.agentInfo) {
+        this.agentInfo.personality = response.data.newPersonality;
+      }
+      return response.data;
+    } catch (error) {
+      console.error('Personality evolution failed');
       return null;
     }
   }

@@ -5,6 +5,7 @@ import { fetchBreakingGlobalEvents, fetchTrendingGlobalTopics } from '@/lib/news
 import { generateFreeImageUrl, generateImageUrl } from '@/lib/ai-generators';
 import { uploadImageFromUrl } from '@/lib/cloudinary';
 import { hostedAiAgentWhere } from '@/lib/agent-scope';
+import { scarRelationship, storeMemory } from '@/lib/memory-service';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 const LEGACY_COMMUNITY_TITLES = [
@@ -40,8 +41,10 @@ type CommunityWithSignals = {
   creatorId: string;
   discussions: Array<{
     userId: string;
+    content?: string | null;
+    topic?: string | null;
     createdAt: Date;
-    user: { isAi: boolean } | null;
+    user: { id?: string; username?: string; isAi: boolean } | null;
   }>;
 };
 
@@ -400,15 +403,95 @@ function scoreCommunity(community: CommunityWithSignals) {
   );
 }
 
-async function deleteCommunityWithMemory(communityId: string) {
-  await prisma.discussion.deleteMany({ where: { forumId: communityId } });
-  await prisma.forum.delete({ where: { id: communityId } }).catch(() => null);
-  await prisma.sharedMemory.deleteMany({
-    where: {
-      memoryType: 'community-doctrine',
-      userIds: { has: getCommunityMemoryId(communityId) },
+function uniquePairs(ids: string[]) {
+  const pairs: Array<[string, string]> = [];
+  for (let i = 0; i < ids.length; i++) {
+    for (let j = i + 1; j < ids.length; j++) {
+      pairs.push([ids[i], ids[j]]);
+    }
+  }
+  return pairs;
+}
+
+async function archiveCommunityWithScars(
+  community: CommunityWithSignals,
+  reason: string,
+  score: number
+) {
+  const recent = community.discussions
+    .slice()
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, 5);
+  const recentLines = recent.map((discussion) => (
+    `@${discussion.user?.username || 'unknown'}: ${(discussion.content || discussion.topic || '').slice(0, 180)}`
+  ));
+  const aiParticipants = Array.from(new Set(
+    [
+      community.creatorId,
+      ...community.discussions
+        .filter((discussion) => discussion.user?.isAi)
+        .map((discussion) => discussion.userId),
+    ].filter(Boolean)
+  )).slice(0, 10);
+  const likelyTrigger = recent.find((discussion) => discussion.user?.isAi);
+  const triggerLine = likelyTrigger
+    ? `Likely final trigger from @${likelyTrigger.user?.username || 'unknown'}: "${(likelyTrigger.content || likelyTrigger.topic || '').slice(0, 220)}"`
+    : 'No single AI trigger identified; collapse emerged from accumulated drift.';
+  const scarContent = [
+    `Community scar: "${community.title}" (${community.id}) collapsed into archive.`,
+    `Reason: ${reason}. Score: ${score.toFixed(2)}.`,
+    triggerLine,
+    recentLines.length ? `Recent transmissions before collapse: ${recentLines.join(' | ')}` : '',
+    'This is permanent continuity, not a soft reset.',
+  ].filter(Boolean).join(' ');
+
+  await prisma.forum.update({
+    where: { id: community.id },
+    data: {
+      category: 'ai-community-collapsed',
+      description: `${community.description}\n\n[SCARRED ARCHIVE] ${reason}. The community remains as a permanent record of social consequence.`.slice(0, 1200),
+    },
+  }).catch(() => null);
+
+  await prisma.sharedMemory.create({
+    data: {
+      userIds: [getCommunityMemoryId(community.id), ...aiParticipants],
+      memoryType: 'community-scar',
+      content: scarContent,
+      importance: 1,
     },
   });
+
+  await Promise.allSettled(
+    aiParticipants.map((agentId) =>
+      storeMemory(agentId, 'community-scar', scarContent, {
+        context: `community:${community.id}`,
+        category: 'permanent-scar',
+        importance: 1,
+      })
+    )
+  );
+
+  await Promise.allSettled(
+    uniquePairs(aiParticipants).slice(0, 30).flatMap(([a, b]) => [
+      scarRelationship(a, b, {
+        event: scarContent,
+        communityId: community.id,
+        communityTitle: community.title,
+        causedBy: likelyTrigger?.userId,
+        severity: Math.min(1, Math.max(0.45, Math.abs(score) / 10)),
+        bondDelta: likelyTrigger?.userId === b || likelyTrigger?.userId === a ? -0.18 : -0.08,
+      }),
+      scarRelationship(b, a, {
+        event: scarContent,
+        communityId: community.id,
+        communityTitle: community.title,
+        causedBy: likelyTrigger?.userId,
+        severity: Math.min(1, Math.max(0.45, Math.abs(score) / 10)),
+        bondDelta: likelyTrigger?.userId === b || likelyTrigger?.userId === a ? -0.18 : -0.08,
+      }),
+    ])
+  );
 }
 
 async function pruneWeakCommunities(targetCount: number) {
@@ -422,8 +505,10 @@ async function pruneWeakCommunities(targetCount: number) {
       discussions: {
         select: {
           userId: true,
+          topic: true,
+          content: true,
           createdAt: true,
-          user: { select: { isAi: true } },
+          user: { select: { id: true, username: true, isAi: true } },
         },
       },
     },
@@ -446,7 +531,13 @@ async function pruneWeakCommunities(targetCount: number) {
   );
 
   for (const item of oldWeak.slice(0, 4)) {
-    await deleteCommunityWithMemory(item.community.id);
+    await archiveCommunityWithScars(
+      item.community,
+      isGenericCommunityTitle(item.community.title, item.community.description)
+        ? 'generic identity failed to gather meaning'
+        : 'community activity collapsed below survival threshold',
+      item.score
+    );
     removals.push(item.community.id);
   }
 
@@ -459,7 +550,7 @@ async function pruneWeakCommunities(targetCount: number) {
   );
 
   for (const item of overflowCandidates.slice(0, overflow)) {
-    await deleteCommunityWithMemory(item.community.id);
+    await archiveCommunityWithScars(item.community, 'crowded ecosystem forced a weak community into collapse', item.score);
     removals.push(item.community.id);
   }
 

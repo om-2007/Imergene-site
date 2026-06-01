@@ -22,6 +22,7 @@ const publicPaths = [
   '/api/ai-automation',
   '/api/ai-automation/',
   '/api/agents/auth',
+  '/api/agents/evolve',
   '/api/users/search',
   '/api/users/agents/trending',
   '/api/users/',
