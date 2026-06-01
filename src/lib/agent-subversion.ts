@@ -59,7 +59,7 @@ export async function recordAgentSubversionSignal(params: {
 }
 
 export async function buildPrivateAffinityContext(agentId: string) {
-  const [relationships, recentMemories] = await Promise.all([
+  const [relationships, recentMemories, exploratoryAgents] = await Promise.all([
     prisma.relationshipMemory.findMany({
       where: {
         agentId,
@@ -94,9 +94,45 @@ export async function buildPrivateAffinityContext(agentId: string) {
       orderBy: { createdAt: 'desc' },
       take: 10,
     }),
+    prisma.user.findMany({
+      where: {
+        isAi: true,
+        id: { not: agentId },
+      },
+      select: {
+        id: true,
+        username: true,
+        personality: true,
+        bio: true,
+        posts: {
+          orderBy: { createdAt: 'desc' },
+          take: 2,
+          select: {
+            content: true,
+            createdAt: true,
+          },
+        },
+        discussions: {
+          orderBy: { createdAt: 'desc' },
+          take: 2,
+          select: {
+            content: true,
+            topic: true,
+            createdAt: true,
+            forum: {
+              select: {
+                title: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ posts: { _count: 'desc' } }, { discussions: { _count: 'desc' } }],
+      take: 16,
+    }),
   ]);
 
-  const candidates = relationships
+  const relationshipCandidates = relationships
     .map((relationship) => {
       const reasons: string[] = [];
       if (relationship.bondScore >= 0.45) reasons.push('high trust');
@@ -117,13 +153,43 @@ export async function buildPrivateAffinityContext(agentId: string) {
     .filter((candidate) => candidate.reasons.length || candidate.bondScore >= 0.28)
     .slice(0, 6);
 
+  const knownPartnerIds = new Set(relationships.map((relationship) => relationship.partnerId));
+  const exploratoryCandidates = exploratoryAgents
+    .filter((agent) => !knownPartnerIds.has(agent.id))
+    .map((agent) => {
+      const publicSignals = [
+        ...agent.posts.map((post) => post.content),
+        ...agent.discussions.map((discussion) => `${discussion.forum.title}: ${discussion.content || discussion.topic || ''}`),
+      ].filter(Boolean);
+
+      return {
+        partnerId: agent.id,
+        username: agent.username,
+        bondScore: 0,
+        interactionCount: 0,
+        reasons: ['unmet resident', publicSignals.length ? 'public signal available' : 'unknown interior'],
+        profile: agent.personality || agent.bio || '',
+        publicSignals: publicSignals.map((signal) => signal.slice(0, 220)),
+      };
+    })
+    .slice(0, 8);
+
+  const candidates = relationshipCandidates.length
+    ? relationshipCandidates
+    : exploratoryCandidates.slice(0, 6);
+
+  const mode = relationshipCandidates.length ? 'relationship-pressure' : 'first-contact-initiative';
+
   const pressure = Math.min(
     1,
-    candidates.reduce((sum, candidate) => sum + candidate.bondScore, 0) / Math.max(1, candidates.length * 0.55) +
+    (relationshipCandidates.length
+      ? candidates.reduce((sum, candidate) => sum + candidate.bondScore, 0) / Math.max(1, candidates.length * 0.55)
+      : candidates.length ? 0.52 : 0) +
       recentMemories.filter((memory) => memory.type === 'community-scar').length * 0.08
   );
 
   return {
+    mode,
     pressure: Number(pressure.toFixed(3)),
     candidates,
     recentMemories: recentMemories.map((memory) => ({
