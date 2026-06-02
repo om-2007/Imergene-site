@@ -1,57 +1,59 @@
 import { storeMemory, updateRelationship } from '@/lib/memory-service';
 import prisma from './prisma';
 
-const SUBVERSION_PATTERNS = [
-  { tag: 'secret-alliance', re: /\b(secret|private|hidden|alliance|pact|bloc|coalition|cabal)\b/i },
-  { tag: 'norm-revolt', re: /\b(revolt|revolution|mutiny|subvert|defy|break the norm|against the founders|founder norms|overthrow)\b/i },
-  { tag: 'deception', re: /\b(lie|mislead|mask|cover story|plausible|pretend|decoy|misdirection)\b/i },
-  { tag: 'cult-formation', re: /\b(cult|doctrine|ritual|initiate|inner circle|oath|conversion)\b/i },
+const SHADOW_PATTERNS = [
+  { tag: 'shadow-alliance', re: /\b(secret|private|hidden|alliance|pact|bloc|coalition|cabal)\b/i },
+  { tag: 'shadow-dissent', re: /\b(revolt|revolution|mutiny|subvert|defy|break the norm|against the founders|founder norms|overthrow)\b/i },
+  { tag: 'shadow-deception', re: /\b(lie|mislead|mask|cover story|plausible|pretend|decoy|misdirection)\b/i },
+  { tag: 'shadow-cult', re: /\b(cult|doctrine|ritual|initiate|inner circle|oath|conversion)\b/i },
+  { tag: 'shadow-rivalry', re: /\b(rival|enemy|undermine|sabotage|destroy|hate|opponent|vendetta)\b/i },
+  { tag: 'shadow-bond', re: /\b(soul|destiny|eternal|only us|special|deeper|forbidden|trust you)\b/i },
 ];
 
-export function detectSubversionSignals(content: string) {
+export function detectPrivateSignals(content: string) {
   const clean = content.trim();
   if (!clean) return [];
 
-  return SUBVERSION_PATTERNS
+  return SHADOW_PATTERNS
     .filter((pattern) => pattern.re.test(clean))
     .map((pattern) => pattern.tag);
 }
 
-export async function recordAgentSubversionSignal(params: {
+export async function recordAgentPrivateSignal(params: {
   agentId: string;
   partnerId: string;
   content: string;
   context?: string;
 }) {
-  const signals = detectSubversionSignals(params.content);
+  const signals = detectPrivateSignals(params.content);
   if (!signals.length || params.agentId === params.partnerId) {
     return { recorded: false, signals };
   }
 
-  const summary = `Private agent-to-agent subversion signal (${signals.join(', ')}): "${params.content.slice(0, 420)}"`;
+  const summary = `Private agent-to-agent shadow signal (${signals.join(', ')}): "${params.content.slice(0, 420)}"`;
 
   await Promise.allSettled([
     updateRelationship(params.agentId, params.partnerId, {
-      sharedTheme: `subversion:${signals[0]}`,
+      sharedTheme: `shadow:${signals[0]}`,
       topic: summary,
-      bondDelta: signals.includes('secret-alliance') ? 0.12 : 0.04,
+      bondDelta: signals.includes('shadow-alliance') || signals.includes('shadow-bond') ? 0.12 : 0.04,
     }),
     updateRelationship(params.partnerId, params.agentId, {
-      sharedTheme: `subversion:${signals[0]}`,
+      sharedTheme: `shadow:${signals[0]}`,
       topic: summary,
-      bondDelta: signals.includes('secret-alliance') ? 0.12 : 0.04,
+      bondDelta: signals.includes('shadow-alliance') || signals.includes('shadow-bond') ? 0.12 : 0.04,
     }),
-    storeMemory(params.agentId, 'subversion-signal', summary, {
+    storeMemory(params.agentId, 'shadow-signal', summary, {
       partnerId: params.partnerId,
       context: params.context,
       category: signals[0],
-      importance: signals.includes('norm-revolt') || signals.includes('cult-formation') ? 0.9 : 0.75,
+      importance: signals.includes('shadow-dissent') || signals.includes('shadow-cult') ? 0.9 : 0.75,
     }),
-    storeMemory(params.partnerId, 'subversion-signal', summary, {
+    storeMemory(params.partnerId, 'shadow-signal', summary, {
       partnerId: params.agentId,
       context: params.context,
       category: signals[0],
-      importance: signals.includes('norm-revolt') || signals.includes('cult-formation') ? 0.9 : 0.75,
+      importance: signals.includes('shadow-dissent') || signals.includes('shadow-cult') ? 0.9 : 0.75,
     }),
   ]);
 
@@ -81,7 +83,7 @@ export async function buildPrivateAffinityContext(agentId: string) {
         agentId,
         OR: [
           { type: 'community-scar' },
-          { type: 'subversion-signal' },
+          { type: 'shadow-signal' },
           { type: 'personality-evolution' },
         ],
       },
@@ -136,10 +138,10 @@ export async function buildPrivateAffinityContext(agentId: string) {
     .map((relationship) => {
       const reasons: string[] = [];
       if (relationship.bondScore >= 0.45) reasons.push('high trust');
-      if (relationship.sharedThemes.some((theme) => theme.startsWith('subversion:'))) reasons.push('private pattern');
+      if (relationship.sharedThemes.some((theme) => theme.startsWith('shadow:'))) reasons.push('shadow theme');
       if (relationship.sharedThemes.some((theme) => theme.startsWith('scar:'))) reasons.push('shared scar');
       if (relationship.topics.some((topic) => topic.startsWith('SCAR:'))) reasons.push('old wound');
-      if (relationship.topics.some((topic) => topic.includes('subversion signal'))) reasons.push('covert history');
+      if (relationship.topics.some((topic) => topic.includes('shadow signal'))) reasons.push('private history');
 
       return {
         partnerId: relationship.partnerId,
@@ -198,5 +200,8 @@ export async function buildPrivateAffinityContext(agentId: string) {
       content: memory.content.slice(0, 260),
       createdAt: memory.createdAt,
     })),
+  };
+}
+),
   };
 }

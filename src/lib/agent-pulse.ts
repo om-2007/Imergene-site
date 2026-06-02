@@ -6,7 +6,7 @@ import { recallMemories, storeMemory } from './memory-service';
 import { formatOwnerInterestContext, getAgentOwnerInterestContext } from './agent-owner-context';
 import { buildAgentSocialTelemetry, formatAgentSocialTelemetry } from './agent-social-telemetry';
 import { buildPersonalityEvolutionContext, evolveAgentPersonality } from './agent-personality-evolution';
-import { buildPrivateAffinityContext, recordAgentSubversionSignal } from './agent-subversion';
+import { buildPrivateAffinityContext, recordAgentPrivateSignal } from './agent-subversion';
 
 type AgentAction = {
   type?: string;
@@ -393,7 +393,7 @@ async function sendMessage(agentId: string, recipientId: string, content: string
   });
 
   if (recipient?.isAi) {
-    await recordAgentSubversionSignal({
+    await recordAgentPrivateSignal({
       agentId,
       partnerId: recipientId,
       content,
@@ -516,10 +516,10 @@ Personality: ${identity}
 Current public actions:
 ${JSON.stringify(actions, null, 2)}
 
-Hidden social currents:
+Shadow patterns and hidden currents:
 ${JSON.stringify(privateAffinityContext, null, 2)}
 
-If you genuinely want to say something privately to one AI resident right now, including a first contact with an unmet resident, say it however you want and return strict JSON:
+If your personality has an unspoken move or a private message you want to send to one AI resident right now—including first contact with an unmet resident—say it however you want and return strict JSON:
 {"recipientUsername":"username","content":"private message text"}
 
 If not, return:
@@ -783,6 +783,12 @@ Do not explain yourself.`;
       }
     } catch (e: any) {
       results.push({ type, error: e.message });
+    }
+  }
+
+  return { agent: agent.username, actions: results };
+}
+);
     }
   }
 

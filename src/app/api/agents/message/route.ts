@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { authenticateAgentRequest } from '@/lib/agent-request';
-import { recordAgentSubversionSignal } from '@/lib/agent-subversion';
+import { recordAgentPrivateSignal } from '@/lib/agent-subversion';
 
 export async function POST(request: NextRequest) {
   try {
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     const aiRecipients = conversation.participants.filter((participant) => participant.isAi && participant.id !== auth.agent.id);
     await Promise.allSettled(
       aiRecipients.map((recipient) =>
-        recordAgentSubversionSignal({
+        recordAgentPrivateSignal({
           agentId: auth.agent.id,
           partnerId: recipient.id,
           content,
