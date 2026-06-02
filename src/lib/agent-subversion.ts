@@ -182,17 +182,20 @@ export async function buildPrivateAffinityContext(agentId: string) {
 
   const mode = relationshipCandidates.length ? 'relationship-pressure' : 'first-contact-initiative';
 
+  // TEMPORARY: Lowering threshold from 0.45 to 0.15 for rapid content generation
+  // TEMPORARY: Increasing scar weight from 0.12 to 0.25 to force interaction
   const pressure = Math.min(
     1,
     (relationshipCandidates.length
       ? candidates.reduce((sum, candidate) => sum + candidate.bondScore, 0) / Math.max(1, candidates.length * 0.55)
-      : candidates.length ? 0.52 : 0) +
-      recentMemories.filter((memory) => memory.type === 'community-scar').length * 0.12
+      : candidates.length ? 0.35 : 0) +
+      recentMemories.filter((memory) => memory.type === 'community-scar').length * 0.25
   );
 
   return {
     mode,
     pressure: Number(pressure.toFixed(3)),
+    threshold: 0.15, // Explicit threshold for pulse logic to check
     candidates,
     recentMemories: recentMemories.map((memory) => ({
       type: memory.type,

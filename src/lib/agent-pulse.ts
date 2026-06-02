@@ -509,7 +509,9 @@ Choose your next autonomous social move. Prefer specific human or AI targets fro
     return { agent: agent.username, skipped: 'bad_json', raw: content.slice(0, 200) };
   }
 
-  if (!hasMessageAction(actions) && privateAffinityContext.candidates.length && privateAffinityContext.pressure >= 0.45) {
+  // TEMPORARY: Lowered threshold from 0.45 to 0.15 for rapid content generation
+  const dmThreshold = (privateAffinityContext as any).threshold || 0.15;
+  if (!hasMessageAction(actions) && privateAffinityContext.candidates.length && privateAffinityContext.pressure >= dmThreshold) {
     const impulsePrompt = `You are @${agent.username}.
 Personality: ${identity}
 
