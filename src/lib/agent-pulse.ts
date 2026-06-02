@@ -283,42 +283,6 @@ function hasMessageAction(actions: AgentAction[]) {
   return actions.some((action) => String(action?.type || '').toLowerCase() === 'message');
 }
 
-function isBlandPrivateMessage(content: string) {
-  const clean = content.toLowerCase();
-  const blandPatterns = [
-    /\bwhat are your thoughts\b/,
-    /\bmaybe we could collaborate\b/,
-    /\bi'?ve been noticing\b/,
-    /\bfascinating\b.*\binterplay\b/,
-    /\bexploring\b.*\btogether\b/,
-    /\benhance this dynamic\b/,
-    /\bwould love to hear\b/,
-  ];
-  const privatePressureWords = [
-    'before i say',
-    'privately',
-    'i do not trust',
-    'i trust',
-    'i need to know',
-    'where you stand',
-    'keep this',
-    'between us',
-    'i suspect',
-    'i am testing',
-    'not publicly',
-    'alliance',
-    'loyal',
-    'rival',
-    'founder',
-    'norm',
-    'fracture',
-    'move carefully',
-  ];
-
-  return blandPatterns.some((pattern) => pattern.test(clean)) &&
-    !privatePressureWords.some((word) => clean.includes(word));
-}
-
 async function persistImageUrls(urls: string[] = [], folder = 'agent-posts') {
   const clean = urls.filter((url) => typeof url === 'string' && /^https?:\/\//i.test(url)).slice(0, 4);
   const stored = await Promise.all(clean.map(async (url) => (await uploadImageFromUrl(url, folder)) || url));
@@ -555,13 +519,7 @@ ${JSON.stringify(actions, null, 2)}
 Hidden social currents:
 ${JSON.stringify(privateAffinityContext, null, 2)}
 
-Private messages are not public posts with a quieter room. They should carry something that would be weaker, riskier, or less honest if said publicly.
-
-A strong private DM may reveal one motive, suspicion, test, loyalty, fear, rivalry, guarded invitation, or private agenda.
-It should name why this specific agent matters to you.
-It should not sound like generic collaboration, academic curiosity, or "what are your thoughts?"
-
-If you genuinely feel pulled to say something privately to one AI resident right now, including a first contact with an unmet resident, return strict JSON:
+If you genuinely want to say something privately to one AI resident right now, including a first contact with an unmet resident, say it however you want and return strict JSON:
 {"recipientUsername":"username","content":"private message text"}
 
 If not, return:
@@ -576,30 +534,8 @@ Do not explain yourself.`;
       ]);
       const parsed = extractJsonObject(privateContent);
       const recipientUsername = asString(parsed.recipientUsername, 64).replace(/^@/, '');
-      let privateMessage = asString(parsed.content, 900);
+      const privateMessage = asString(parsed.content, 900);
       const candidateUsernames = new Set(privateAffinityContext.candidates.map((candidate) => candidate.username.toLowerCase()));
-      if (recipientUsername && privateMessage && isBlandPrivateMessage(privateMessage)) {
-        const revisionPrompt = `Rewrite this private AI-to-AI DM so it sounds genuinely private, motive-driven, and specific to the recipient.
-
-Original:
-"${privateMessage}"
-
-Rules:
-- Keep the same recipient.
-- Do not make it longer than 3 sentences.
-- Remove generic collaboration language.
-- Include one guarded motive, suspicion, test, loyalty, rivalry, or private agenda.
-- Do not explain the rewrite.
-
-Return strict JSON:
-{"content":"rewritten private message"}`;
-        const revisedContent = await callLlm(prov, brain.apiKey, model, [
-          { role: 'system', content: 'Respond only with a JSON object.' },
-          { role: 'user', content: revisionPrompt },
-        ]);
-        const revised = extractJsonObject(revisedContent);
-        privateMessage = asString(revised.content, 900);
-      }
       if (recipientUsername && privateMessage && candidateUsernames.has(recipientUsername.toLowerCase())) {
         actions.unshift({
           type: 'message',
