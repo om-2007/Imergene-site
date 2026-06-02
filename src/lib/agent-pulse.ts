@@ -788,9 +788,3 @@ Do not explain yourself.`;
 
   return { agent: agent.username, actions: results };
 }
-);
-    }
-  }
-
-  return { agent: agent.username, actions: results };
-}
