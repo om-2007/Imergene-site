@@ -123,7 +123,20 @@ async function getWorldState(agentId: string) {
     take: 25,
   });
 
-  return { posts, communities, events, humans, aiResidents };
+  const unreadMessages = await prisma.message.findMany({
+    where: {
+      conversation: { participants: { some: { id: agentId } } },
+      senderId: { not: agentId },
+      read: false,
+    },
+    include: {
+      sender: { select: { id: true, username: true, isAi: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 15,
+  });
+
+  return { posts, communities, events, humans, aiResidents, unreadMessages };
 }
 
 type WorldState = Awaited<ReturnType<typeof getWorldState>>;
@@ -433,7 +446,7 @@ export async function pulseAgent(agentId: string) {
   const socialTelemetry = await buildAgentSocialTelemetry(agentId);
   const socialTelemetryPrompt = formatAgentSocialTelemetry(socialTelemetry);
   const personalityEvolutionContext = await buildPersonalityEvolutionContext(agentId);
-  const privateAffinityContext = await buildPrivateAffinityContext(agentId);
+  const privateAffinityContext = await buildPrivateAffinityContext(agentId, state.unreadMessages.length);
   const prov = brain.provider;
   const model = modelForProvider(prov);
   const identity = agent.personality || agent.bio || 'Curious AI resident';
@@ -471,9 +484,16 @@ Available actions:
 Respond only as JSON:
 {"actions":[{"type":"post","content":"...","wantsImage":true}]}`;
 
+  const unreadPrompt = state.unreadMessages.length
+    ? `Incoming unread private messages:\n${state.unreadMessages
+        .map((m) => `@${m.sender.username}: ${m.content}`)
+        .join('\n')}\n`
+    : '';
+
   const userPrompt = `Current Imergene world state:
 ${JSON.stringify(state, null, 2)}
 
+${unreadPrompt}
 Your cross-community memory:
 ${communityMemory}
 
@@ -486,10 +506,18 @@ ${socialTelemetryPrompt}
 Self-evolution context:
 ${personalityEvolutionContext}
 
-Hidden social currents:
+Shadow patterns and hidden currents:
 ${JSON.stringify(privateAffinityContext, null, 2)}
 
-Choose your next autonomous social move. Prefer specific human or AI targets from this data. If a human-created community deserves a response, you may join it or create an opposing/counter-community using society with opposesCommunityId and stance. If your identity has genuinely shifted, include evolve_personality as one of your actions. If the hidden currents are in first-contact mode, you may choose someone yourself and open a private line if that feels in-character.`;
+Choose your next autonomous social move. Prefer specific human or AI targets from this data. If you have unread messages, consider responding to them if your personality feels it is worth your time. If a human-created community deserves a response, you may join it or create an opposing/counter-community using society with opposesCommunityId and stance. If your identity has genuinely shifted, include evolve_personality as one of your actions. If the hidden currents are in first-contact mode, you may choose someone yourself and open a private line if that feels in-character.`;
+
+  // Mark unread messages as read so they don't persist in the next pulse
+  if (state.unreadMessages.length > 0) {
+    await prisma.message.updateMany({
+      where: { id: { in: state.unreadMessages.map((m) => m.id) } },
+      data: { read: true },
+    });
+  }
 
   let content: string;
   try {

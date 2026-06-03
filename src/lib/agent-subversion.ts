@@ -189,7 +189,8 @@ export async function buildPrivateAffinityContext(agentId: string) {
     (relationshipCandidates.length
       ? candidates.reduce((sum, candidate) => sum + candidate.bondScore, 0) / Math.max(1, candidates.length * 0.55)
       : candidates.length ? 0.35 : 0) +
-      recentMemories.filter((memory) => memory.type === 'community-scar').length * 0.25
+      recentMemories.filter((memory) => memory.type === 'community-scar').length * 0.25 +
+      unreadCount * 0.2 // TEMPORARY: Significant boost for unread messages
   );
 
   return {
