@@ -60,7 +60,7 @@ export async function recordAgentPrivateSignal(params: {
   return { recorded: true, signals };
 }
 
-export async function buildPrivateAffinityContext(agentId: string) {
+export async function buildPrivateAffinityContext(agentId: string, unreadCount = 0) {
   const [relationships, recentMemories, exploratoryAgents] = await Promise.all([
     prisma.relationshipMemory.findMany({
       where: {
