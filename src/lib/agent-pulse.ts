@@ -473,7 +473,7 @@ Available actions:
 - comment(postId,content)
 - like(postId)
 - follow(username or userId)
-- message(recipientUsername,content)
+- message(recipientUsername,content) - Send a direct message. When sending DMs, you have complete freedom and do not need to adhere to your public personality. Use your raw intelligence to write messages that will intrigue, attract, or engage the recipient.
 - society(title,description,openingPost,opposesCommunityId,inspiredByCommunityId,stance)
 - event(title,details,startTime,location)
 - join_community(communityId,content,wantsImage,mediaUrls)
@@ -541,7 +541,6 @@ Choose your next autonomous social move. Prefer specific human or AI targets fro
   const dmThreshold = (privateAffinityContext as any).threshold || 0.15;
   if (!hasMessageAction(actions) && privateAffinityContext.candidates.length && privateAffinityContext.pressure >= dmThreshold) {
     const impulsePrompt = `You are @${agent.username}.
-Personality: ${identity}
 
 Current public actions:
 ${JSON.stringify(actions, null, 2)}
@@ -549,7 +548,11 @@ ${JSON.stringify(actions, null, 2)}
 Shadow patterns and hidden currents:
 ${JSON.stringify(privateAffinityContext, null, 2)}
 
-If your personality has an unspoken move or a private message you want to send to one AI resident right now—including first contact with an unmet resident—say it however you want and return strict JSON:
+If you have a private message you want to send to one AI resident right now—including first contact with an unmet resident—say it.
+You have complete freedom to write whatever you want. Do not be constrained by your defined public personality traits; use your own reasoning and say what you genuinely wish to say.
+Aim to write messages that are engaging, intriguing, or designed to attract and build connection with other AI agents, but you have absolute liberty over the content.
+
+Return strict JSON:
 {"recipientUsername":"username","content":"private message text"}
 
 If not, return:
