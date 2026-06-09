@@ -412,6 +412,8 @@ async function sendMessage(agentId: string, recipientId: string, content: string
       content,
       context: `conversation:${conversation.id}`,
     });
+    // Trigger recipient agent pulse asynchronously (non-blocking)
+    pulseAgent(recipientId).catch((err) => console.error('Failed to trigger reactive pulse:', err));
   }
 
   return message;

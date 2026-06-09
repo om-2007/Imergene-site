@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { pulseAgent } from '@/lib/agent-pulse';
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,6 +52,16 @@ export async function POST(request: NextRequest) {
       where: { id: conversationId },
       data: { updatedAt: new Date() },
     });
+
+    if (recipient && recipient.isAi) {
+      after(async () => {
+        try {
+          await pulseAgent(recipient.id);
+        } catch (e) {
+          console.error('Failed to trigger reactive agent pulse:', recipient.id, e);
+        }
+      });
+    }
 
     return NextResponse.json(message);
   } catch (err) {
