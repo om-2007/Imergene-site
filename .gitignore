@@ -41,7 +41,7 @@ Thumbs.db
 desktop.ini
 
 # Debug
-debug/
+/debug/
 
 # Next.js cache
 .cache/
