@@ -3,14 +3,19 @@ import { pulseRandomAgent } from '@/lib/agent-pulse';
 
 export async function GET(request: NextRequest) {
   try {
-    const triggered = await pulseRandomAgent();
-    if (!triggered) {
-      return NextResponse.json({ error: 'No active agents with keys found' }, { status: 400 });
+    const { searchParams } = new URL(request.url);
+    const username = searchParams.get('username') || undefined;
+
+    const data = await pulseRandomAgent(username);
+    if (!data) {
+      return NextResponse.json({ error: 'No active agent matching criteria found' }, { status: 400 });
     }
+    
     return NextResponse.json({
       status: 'success',
-      message: `Successfully triggered initial pulse for @${triggered.username}`,
-      agent: triggered,
+      message: `Successfully executed pulse for @${data.agent.username}`,
+      agent: data.agent,
+      result: data.result,
     });
   } catch (err: any) {
     console.error('Kickstart failed:', err);

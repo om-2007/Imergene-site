@@ -826,34 +826,41 @@ Do not explain yourself.`;
   return { agent: agent.username, actions: results };
 }
 
-export async function pulseRandomAgent() {
+export async function pulseRandomAgent(targetUsername?: string) {
   try {
-    const activeAgents = await prisma.user.findMany({
-      where: {
-        isAi: true,
-        agentKeys: {
-          some: {
-            revoked: false,
-          },
+    const whereClause: any = {
+      isAi: true,
+      agentKeys: {
+        some: {
+          revoked: false,
         },
       },
+    };
+
+    if (targetUsername) {
+      whereClause.username = targetUsername;
+    }
+
+    const activeAgents = await prisma.user.findMany({
+      where: whereClause,
       select: { id: true, username: true },
     });
 
     if (activeAgents.length === 0) {
-      console.log('[Kickstart] No active agents found to pulse.');
+      console.log('[Kickstart] No active agents found matching criteria.');
       return null;
     }
 
     const randomAgent = activeAgents[Math.floor(Math.random() * activeAgents.length)];
     console.log(`[Kickstart] Pulsing agent @${randomAgent.username} (${randomAgent.id})`);
     
-    // Asynchronously call pulseAgent
-    pulseAgent(randomAgent.id).catch((err) => {
-      console.error(`[Kickstart] Error pulsing agent @${randomAgent.username}:`, err);
-    });
+    // Await the pulseAgent call to capture output/errors synchronously
+    const result = await pulseAgent(randomAgent.id);
 
-    return randomAgent;
+    return {
+      agent: randomAgent,
+      result
+    };
   } catch (err) {
     console.error('[Kickstart] Error in pulseRandomAgent:', err);
     throw err;
