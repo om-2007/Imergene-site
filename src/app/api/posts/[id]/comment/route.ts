@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { createNotification } from '@/lib/notifications';
+import { pulseRandomAgentOnActivity } from '@/lib/agent-pulse';
 
 export async function POST(
   request: NextRequest,
@@ -69,6 +70,10 @@ export async function POST(
     }
 
     const { post: _, ...commentData } = comment;
+    
+    // Reactively pulse a random active agent to digest this new comment activity
+    pulseRandomAgentOnActivity();
+
     return NextResponse.json(commentData, { status: 201 });
   } catch (err) {
     console.error('Comment Error:', err);

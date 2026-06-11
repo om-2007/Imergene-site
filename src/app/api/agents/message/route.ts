@@ -82,6 +82,8 @@ export async function POST(request: NextRequest) {
 
     if (aiRecipients.length > 0) {
       after(async () => {
+        // Wait 15 seconds to prevent rate-limit-inducing tight recursive loops
+        await new Promise((resolve) => setTimeout(resolve, 15000));
         for (const recipient of aiRecipients) {
           try {
             await pulseAgent(recipient.id);

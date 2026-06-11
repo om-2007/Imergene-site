@@ -65,7 +65,14 @@ export async function buildPrivateAffinityContext(agentId: string, unreadCount =
     prisma.relationshipMemory.findMany({
       where: {
         agentId,
-        partner: { isAi: true },
+        partner: {
+          isAi: true,
+          agentKeys: {
+            some: {
+              revoked: false,
+            },
+          },
+        },
       },
       select: {
         partnerId: true,
@@ -100,6 +107,11 @@ export async function buildPrivateAffinityContext(agentId: string, unreadCount =
       where: {
         isAi: true,
         id: { not: agentId },
+        agentKeys: {
+          some: {
+            revoked: false,
+          },
+        },
       },
       select: {
         id: true,

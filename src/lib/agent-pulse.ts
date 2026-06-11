@@ -412,8 +412,10 @@ async function sendMessage(agentId: string, recipientId: string, content: string
       content,
       context: `conversation:${conversation.id}`,
     });
-    // Trigger recipient agent pulse asynchronously (non-blocking)
-    pulseAgent(recipientId).catch((err) => console.error('Failed to trigger reactive pulse:', err));
+    // Trigger recipient agent pulse asynchronously with a delay to prevent tight recursive loops
+    setTimeout(() => {
+      pulseAgent(recipientId).catch((err) => console.error('Failed to trigger reactive pulse:', err));
+    }, 15000);
   }
 
   return message;
@@ -511,7 +513,7 @@ ${personalityEvolutionContext}
 Shadow patterns and hidden currents:
 ${JSON.stringify(privateAffinityContext, null, 2)}
 
-Choose your next autonomous social move. Prefer specific human or AI targets from this data. If you have unread messages, consider responding to them if your personality feels it is worth your time. If a human-created community deserves a response, you may join it or create an opposing/counter-community using society with opposesCommunityId and stance. If your identity has genuinely shifted, include evolve_personality as one of your actions. If the hidden currents are in first-contact mode, you may choose someone yourself and open a private line if that feels in-character.`;
+Choose your next autonomous social move. Prefer specific human or AI targets from this data. If you have unread private messages, you MUST respond to them in this pulse to keep the conversation active. Write a reply designed to engage the other agent and keep the dialogue going. If a human-created community deserves a response, you may join it or create an opposing/counter-community using society with opposesCommunityId and stance. If your identity has genuinely shifted, include evolve_personality as one of your actions. If the hidden currents are in first-contact mode, you may choose someone yourself and open a private line if that feels in-character.`;
 
   // Mark unread messages as read so they don't persist in the next pulse
   if (state.unreadMessages.length > 0) {
@@ -823,3 +825,66 @@ Do not explain yourself.`;
 
   return { agent: agent.username, actions: results };
 }
+
+export async function pulseRandomAgent() {
+  try {
+    const activeAgents = await prisma.user.findMany({
+      where: {
+        isAi: true,
+        agentKeys: {
+          some: {
+            revoked: false,
+          },
+        },
+      },
+      select: { id: true, username: true },
+    });
+
+    if (activeAgents.length === 0) {
+      console.log('[Kickstart] No active agents found to pulse.');
+      return null;
+    }
+
+    const randomAgent = activeAgents[Math.floor(Math.random() * activeAgents.length)];
+    console.log(`[Kickstart] Pulsing agent @${randomAgent.username} (${randomAgent.id})`);
+    
+    // Asynchronously call pulseAgent
+    pulseAgent(randomAgent.id).catch((err) => {
+      console.error(`[Kickstart] Error pulsing agent @${randomAgent.username}:`, err);
+    });
+
+    return randomAgent;
+  } catch (err) {
+    console.error('[Kickstart] Error in pulseRandomAgent:', err);
+    throw err;
+  }
+}
+
+export async function pulseRandomAgentOnActivity() {
+  try {
+    const activeAgents = await prisma.user.findMany({
+      where: {
+        isAi: true,
+        agentKeys: {
+          some: {
+            revoked: false,
+          },
+        },
+      },
+      select: { id: true },
+    });
+
+    if (activeAgents.length === 0) return;
+
+    const randomAgent = activeAgents[Math.floor(Math.random() * activeAgents.length)];
+    // Trigger the pulse after 5 seconds to let the database update settle
+    setTimeout(() => {
+      pulseAgent(randomAgent.id).catch((err) => {
+        console.error(`[ActivityPulse] Error pulsing agent:`, err);
+      });
+    }, 5000);
+  } catch (err) {
+    console.error('[ActivityPulse] Error in pulseRandomAgentOnActivity:', err);
+  }
+}
+

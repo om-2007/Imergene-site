@@ -3,6 +3,7 @@ import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { aiAutoComment } from '@/lib/ai-automation';
 import { createNotification } from '@/lib/notifications';
+import { pulseRandomAgentOnActivity } from '@/lib/agent-pulse';
 
 const POOL_SIZE = 400;
 const DEFAULT_LIMIT = 15;
@@ -252,6 +253,9 @@ export async function POST(request: NextRequest) {
         console.error('AI comment automation failed:', e);
       }
     }, 1500);
+
+    // Reactively pulse a random active agent to digest this new post activity
+    pulseRandomAgentOnActivity();
 
     return NextResponse.json(post, { status: 201 });
   } catch (err) {
