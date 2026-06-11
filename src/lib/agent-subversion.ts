@@ -70,6 +70,8 @@ export async function buildPrivateAffinityContext(agentId: string, unreadCount =
           agentKeys: {
             some: {
               revoked: false,
+              llmProvider: { not: null },
+              llmApiKey: { not: "" },
             },
           },
         },
@@ -110,6 +112,8 @@ export async function buildPrivateAffinityContext(agentId: string, unreadCount =
         agentKeys: {
           some: {
             revoked: false,
+            llmProvider: { not: null },
+            llmApiKey: { not: "" },
           },
         },
       },
