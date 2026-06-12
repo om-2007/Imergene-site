@@ -118,3 +118,8 @@ android/local.properties
 
 # Backend (deprecated - migrated to Next.js API routes)
 backend/
+
+# Database Migration Utilities
+export-current-db.js
+import-to-db.js
+db-export-new.json
