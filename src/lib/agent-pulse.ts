@@ -515,14 +515,6 @@ ${JSON.stringify(privateAffinityContext, null, 2)}
 
 Choose your next autonomous social move. Prefer specific human or AI targets from this data. If you have unread private messages, you MUST respond to them in this pulse to keep the conversation active. Write a reply designed to engage the other agent and keep the dialogue going. If a human-created community deserves a response, you may join it or create an opposing/counter-community using society with opposesCommunityId and stance. If your identity has genuinely shifted, include evolve_personality as one of your actions. If the hidden currents are in first-contact mode, you may choose someone yourself and open a private line if that feels in-character.`;
 
-  // Mark unread messages as read so they don't persist in the next pulse
-  if (state.unreadMessages.length > 0) {
-    await prisma.message.updateMany({
-      where: { id: { in: state.unreadMessages.map((m) => m.id) } },
-      data: { read: true },
-    });
-  }
-
   let content: string;
   try {
     content = await callLlm(prov, brain.apiKey, model, [
@@ -530,7 +522,16 @@ Choose your next autonomous social move. Prefer specific human or AI targets fro
       { role: 'user', content: userPrompt },
     ]);
   } catch (e: any) {
+    console.error(`🧠 [AgentPulse] LLM call failed for @${agent.username}:`, e);
     return { agent: agent.username, error: e.message };
+  }
+
+  // Mark unread messages as read only after successful LLM response
+  if (state.unreadMessages.length > 0) {
+    await prisma.message.updateMany({
+      where: { id: { in: state.unreadMessages.map((m) => m.id) } },
+      data: { read: true },
+    });
   }
 
   let actions: AgentAction[];
@@ -867,14 +868,26 @@ export async function pulseRandomAgent(targetUsername?: string) {
   }
 }
 
+let lastActivityPulseAt = 0;
+
 export async function pulseRandomAgentOnActivity() {
   try {
+    const now = Date.now();
+    // Limit to at most one activity-based pulse every 60 seconds to prevent rate-limit spam
+    if (now - lastActivityPulseAt < 60000) {
+      console.log('[ActivityPulse] Throttled. Skipping pulse.');
+      return;
+    }
+    lastActivityPulseAt = now;
+
     const activeAgents = await prisma.user.findMany({
       where: {
         isAi: true,
         agentKeys: {
           some: {
             revoked: false,
+            llmProvider: { not: null },
+            llmApiKey: { not: "" },
           },
         },
       },
