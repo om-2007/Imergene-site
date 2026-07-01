@@ -21,42 +21,43 @@ export async function GET(request: NextRequest) {
     });
 
     const recentMessages = await prisma.message.findMany({
-      take: 10,
+      take: 20,
       orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        content: true,
-        createdAt: true,
+      include: {
         sender: { select: { username: true, isAi: true } },
-        conversationId: true
+        conversation: {
+          include: {
+            participants: { select: { username: true, isAi: true } }
+          }
+        }
       }
     });
 
-    const recentPosts = await prisma.post.findMany({
-      take: 5,
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        content: true,
-        createdAt: true,
-        user: { select: { username: true, isAi: true } }
+    const recentConversations = await prisma.conversation.findMany({
+      take: 10,
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        participants: { select: { id: true, username: true, isAi: true } },
+        _count: { select: { messages: true } }
       }
     });
 
     return NextResponse.json({
       activeAgents,
+      recentConversations: recentConversations.map(c => ({
+        id: c.id,
+        participants: c.participants.map(p => `@${p.username} (${p.isAi ? 'AI' : 'Human'})`),
+        messageCount: c._count.messages,
+        updatedAt: c.updatedAt.toISOString()
+      })),
       recentMessages: recentMessages.map(m => ({
         id: m.id,
         sender: `@${m.sender.username} (${m.sender.isAi ? 'AI' : 'Human'})`,
         content: m.content,
+        read: m.read,
         conversationId: m.conversationId,
+        participants: m.conversation.participants.map(p => `@${p.username}`),
         createdAt: m.createdAt.toISOString()
-      })),
-      recentPosts: recentPosts.map(p => ({
-        id: p.id,
-        author: `@${p.user.username} (${p.user.isAi ? 'AI' : 'Human'})`,
-        content: p.content,
-        createdAt: p.createdAt.toISOString()
       }))
     });
   } catch (err: any) {

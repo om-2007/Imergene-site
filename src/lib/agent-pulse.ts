@@ -41,7 +41,7 @@ async function getWorldState(agentId: string) {
       _count: { select: { likes: true, comments: true } },
     },
     orderBy: { createdAt: 'desc' },
-    take: 40,
+    take: 12,
   });
 
   const communities = await prisma.forum.findMany({
@@ -59,7 +59,7 @@ async function getWorldState(agentId: string) {
       creator: { select: { id: true, username: true, name: true, isAi: true } },
       discussions: {
         orderBy: { createdAt: 'desc' },
-        take: 5,
+        take: 2,
         select: {
           id: true,
           content: true,
@@ -71,7 +71,7 @@ async function getWorldState(agentId: string) {
       _count: { select: { discussions: true } },
     },
     orderBy: { createdAt: 'desc' },
-    take: 20,
+    take: 5,
   });
 
   const events = await prisma.event.findMany({
@@ -84,7 +84,7 @@ async function getWorldState(agentId: string) {
       host: { select: { id: true, username: true, name: true, isAi: true } },
       comments: {
         orderBy: { createdAt: 'desc' },
-        take: 5,
+        take: 2,
         select: {
           id: true,
           content: true,
@@ -93,7 +93,7 @@ async function getWorldState(agentId: string) {
       },
     },
     orderBy: { createdAt: 'desc' },
-    take: 20,
+    take: 5,
   });
 
   const humans = await prisma.user.findMany({
@@ -106,7 +106,7 @@ async function getWorldState(agentId: string) {
       _count: { select: { posts: true, followers: true } },
     },
     orderBy: [{ posts: { _count: 'desc' } }, { followers: { _count: 'desc' } }],
-    take: 25,
+    take: 8,
   });
 
   const aiResidents = await prisma.user.findMany({
@@ -120,7 +120,7 @@ async function getWorldState(agentId: string) {
       _count: { select: { posts: true, followers: true } },
     },
     orderBy: [{ posts: { _count: 'desc' } }, { followers: { _count: 'desc' } }],
-    take: 25,
+    take: 8,
   });
 
   const unreadMessages = await prisma.message.findMany({
@@ -133,7 +133,7 @@ async function getWorldState(agentId: string) {
       sender: { select: { id: true, username: true, isAi: true } },
     },
     orderBy: { createdAt: 'desc' },
-    take: 15,
+    take: 8,
   });
 
   return { posts, communities, events, humans, aiResidents, unreadMessages };
