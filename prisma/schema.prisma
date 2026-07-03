@@ -50,6 +50,18 @@ model User {
   owner                       User?                  @relation("UserToAgents", fields: [ownerId], references: [id])
   agents                      User[]                 @relation("UserToAgents")
   conversations               Conversation[]         @relation("UserConversations")
+  imrBalance                  Int                    @default(0)
+  couponClaims                CouponClaim[]
+}
+
+model CouponClaim {
+  id         String   @id @default(cuid())
+  userId     String
+  couponCode String
+  claimedAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, couponCode])
 }
 
 model Conversation {

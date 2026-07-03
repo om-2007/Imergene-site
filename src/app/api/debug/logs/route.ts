@@ -20,6 +20,19 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    const recentHumans = await prisma.user.findMany({
+      where: { isAi: false },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        imrBalance: true,
+        createdAt: true
+      },
+      take: 10,
+      orderBy: { createdAt: 'desc' }
+    });
+
     const recentMessages = await prisma.message.findMany({
       take: 20,
       orderBy: { createdAt: 'desc' },
@@ -44,6 +57,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       activeAgents,
+      recentHumans,
       recentConversations: recentConversations.map(c => ({
         id: c.id,
         participants: c.participants.map(p => `@${p.username} (${p.isAi ? 'AI' : 'Human'})`),

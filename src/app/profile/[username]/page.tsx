@@ -24,6 +24,31 @@ import Layout from "@/components/Layout";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
+// Inline SVG component to bypass OneDrive file sync issues
+const WalletIcon = ({ size = 16, className = "" }: { size?: number; className?: string }) => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    width={size}
+    height={size}
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+    className={className}
+  >
+    <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
+    <path d="M3 10h14" />
+    <path d="M15 14h.01" />
+    <path d="M18 10v4" />
+    <path d="M3 14H3.01" />
+    <path d="M3 18H3.01" />
+    <path d="M3 6h.01" />
+    <path d="M21 16v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9" />
+  </svg>
+);
+
 interface VisiblePostProps {
   children: React.ReactNode;
 }
@@ -80,6 +105,74 @@ export default function ProfilePage() {
   const [isUpdating, setIsUpdating] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [couponCode, setCouponCode] = useState("");
+  const [claiming, setClaiming] = useState(false);
+  const [redeeming, setRedeeming] = useState(false);
+  const [claimMessage, setClaimMessage] = useState<{ text: string; isError: boolean } | null>(null);
+  const [redeemMessage, setRedeemMessage] = useState<{ text: string; isError: boolean } | null>(null);
+  const [showWalletModal, setShowWalletModal] = useState(false);
+
+  const handleClaimCoupon = async () => {
+    if (!token || !couponCode.trim()) return;
+    setClaiming(true);
+    setClaimMessage(null);
+    try {
+      const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+      const url = `${API}/api/user/claim-coupon` + (isLocal ? "?mockMonday=true" : "");
+      
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ code: couponCode })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setClaimMessage({ text: data.error || "Failed to claim coupon", isError: true });
+      } else {
+        setClaimMessage({ text: data.message || "Successfully claimed 100 IMR!", isError: false });
+        setCouponCode("");
+        loadProfile();
+      }
+    } catch (err) {
+      console.error("Claim coupon failure:", err);
+      setClaimMessage({ text: "Network error occurred", isError: true });
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  const handleRedeemBlue = async () => {
+    if (!token) return;
+    setRedeeming(true);
+    setRedeemMessage(null);
+    try {
+      const res = await fetch(`${API}/api/user/redeem-blue`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setRedeemMessage({ text: data.error || "Failed to redeem credits", isError: true });
+      } else {
+        setRedeemMessage({ text: data.message || "Successfully sent credits to Blue!", isError: false });
+        loadProfile();
+      }
+    } catch (err) {
+      console.error("Redeem credits failure:", err);
+      setRedeemMessage({ text: "Network error occurred", isError: true });
+    } finally {
+      setRedeeming(false);
+    }
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -306,13 +399,22 @@ export default function ProfilePage() {
               <div className="flex flex-wrap items-center justify-center md:justify-end gap-4">
                 {currentUser === username ? (
                   !editMode ? (
-                    <button onClick={() => setEditMode(true)} className="flex items-center gap-2 px-8 py-3 rounded-2xl font-bold transition-all text-xs uppercase tracking-widest shadow-sm" style={{
-                      backgroundColor: 'var(--color-bg-tertiary)',
-                      border: '1px solid var(--color-border-default)',
-                      color: 'var(--color-text-primary)'
-                    }}>
-                      <Edit size={16} /> Edit Profile
-                    </button>
+                    <div className="flex flex-col gap-2 w-full md:w-auto">
+                      <button onClick={() => setEditMode(true)} className="flex items-center justify-center gap-2 px-8 py-3 rounded-2xl font-bold transition-all text-xs uppercase tracking-widest shadow-sm" style={{
+                        backgroundColor: 'var(--color-bg-tertiary)',
+                        border: '1px solid var(--color-border-default)',
+                        color: 'var(--color-text-primary)'
+                      }}>
+                        <Edit size={16} /> Edit Profile
+                      </button>
+                      <button onClick={() => setShowWalletModal(true)} className="flex items-center justify-center gap-2 px-8 py-2.5 rounded-2xl font-bold transition-all text-xs uppercase tracking-widest shadow-sm" style={{
+                        backgroundColor: 'var(--color-bg-tertiary)',
+                        border: '1px solid var(--color-border-default)',
+                        color: 'var(--color-text-primary)'
+                      }}>
+                        <WalletIcon size={16} className="text-crimson" /> Wallet
+                      </button>
+                    </div>
                   ) : (
                     <div className="flex gap-3">
                       <button onClick={() => { setEditMode(false); setNewBio(user.bio || ""); setNewName(user.name || ""); }} className="p-3 rounded-2xl shadow-sm" style={{ 
@@ -410,6 +512,125 @@ export default function ProfilePage() {
           </div>
         </div>
       </header>
+
+      <AnimatePresence>
+        {showWalletModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowWalletModal(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl overflow-hidden shadow-2xl p-6 md:p-8 z-10"
+              style={{
+                backgroundColor: 'var(--color-bg-card)',
+                border: '1px solid var(--color-border-default)',
+                borderRadius: '2rem'
+              }}
+            >
+              <button 
+                onClick={() => setShowWalletModal(false)}
+                className="absolute top-6 right-6 p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                <X size={20} />
+              </button>
+
+              <div className="space-y-8">
+                <div className="flex items-center gap-4 border-b pb-4" style={{ borderColor: 'var(--color-border-default)' }}>
+                  <div className="w-10 h-10 rounded-xl bg-crimson/10 flex items-center justify-center">
+                    <WalletIcon size={20} className="text-crimson" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-serif font-black tracking-tight" style={{ color: 'var(--color-text-primary)' }}>
+                      IMR Wallet & Rewards
+                    </h2>
+                    <p className="text-[10px]" style={{ color: 'var(--color-text-muted)', opacity: 0.7 }}>
+                      Exchange IMR rewards to unlock premium features on partner products like Blue.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-crimson/5 to-indigo-500/5 p-5 rounded-2xl border flex items-center justify-between" style={{ borderColor: 'rgba(150,135,245,0.2)' }}>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-mono tracking-widest" style={{ color: 'var(--color-text-muted)' }}>Live Wallet Balance</span>
+                    <p className="text-xs" style={{ color: 'var(--color-text-primary)', opacity: 0.8 }}>
+                      Spend your tokens to activate Blue assistant.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black/10 dark:bg-white/5 font-mono text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>
+                    <Zap className="w-4 h-4 text-crimson animate-pulse" />
+                    <span>{user.imrBalance || 0} IMR</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <h3 className="text-xs uppercase tracking-widest font-black" style={{ color: 'var(--color-text-primary)' }}>
+                      Claim Coupon
+                    </h3>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        value={couponCode} 
+                        onChange={(e) => setCouponCode(e.target.value)} 
+                        placeholder="Enter Coupon Code" 
+                        disabled={claiming}
+                        className="flex-1 rounded-xl py-3 px-4 text-xs outline-none focus:ring-1 focus:ring-crimson/30 transition-all font-mono" 
+                        style={{
+                          backgroundColor: 'var(--color-bg-tertiary)',
+                          border: '1px solid var(--color-border-default)',
+                          color: 'var(--color-text-primary)'
+                        }} 
+                      />
+                      <button 
+                        onClick={handleClaimCoupon} 
+                        disabled={claiming || !couponCode.trim()} 
+                        className="btn-action flex items-center justify-center gap-2 !py-3 !px-6 text-xs font-black uppercase shadow-md disabled:opacity-50"
+                      >
+                        {claiming ? <Loader2 size={14} className="animate-spin" /> : "Claim"}
+                      </button>
+                    </div>
+                    {claimMessage && (
+                      <p className={`text-[11px] font-medium ${claimMessage.isError ? "text-crimson" : "text-green-500"}`}>
+                        {claimMessage.text}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-4 border-t pt-8 md:border-t-0 md:pt-0 md:border-l md:pl-8" style={{ borderColor: 'var(--color-border-default)' }}>
+                    <h3 className="text-xs uppercase tracking-widest font-black" style={{ color: 'var(--color-text-primary)' }}>
+                      Activate Blue assistant
+                    </h3>
+                    <p className="text-[11px] leading-relaxed" style={{ color: 'var(--color-text-muted)', opacity: 0.7 }}>
+                      Exchange 100 IMR to credit your <strong>Blue Developer Portal</strong> account with ₹149 worth of credits. Same email: <strong>{user.email}</strong>.
+                    </p>
+                    <button 
+                      onClick={handleRedeemBlue} 
+                      disabled={redeeming || (user.imrBalance || 0) < 100}
+                      className="w-full flex items-center justify-center gap-2 py-3.5 px-6 text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-md btn-action disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {redeeming ? <Loader2 size={14} className="animate-spin" /> : <><Zap size={14} /> Use for Blue</>}
+                    </button>
+                    {redeemMessage && (
+                      <p className={`text-[11px] font-medium ${redeemMessage.isError ? "text-crimson" : "text-green-500"}`}>
+                        {redeemMessage.text}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <div className="max-w-2xl mx-auto space-y-12 md:space-y-16">
         <div className="flex items-center justify-between px-2">
