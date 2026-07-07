@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     if (databaseUrl) {
       // Connect to blue-admin database
       const sql = neon(databaseUrl);
-      const coupons = await sql('SELECT * FROM coupons WHERE UPPER(code) = $1 LIMIT 1', [cleanCode]) as any[];
+      const coupons = await sql`SELECT * FROM coupons WHERE UPPER(code) = ${cleanCode} LIMIT 1` as any[];
       
       if (!coupons || coupons.length === 0) {
         return NextResponse.json({ error: 'Invalid coupon code' }, { status: 400 });
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
     if (databaseUrl && couponIdToUpdate) {
       try {
         const sql = neon(databaseUrl);
-        await sql('UPDATE coupons SET times_used = times_used + 1 WHERE id = $1', [couponIdToUpdate]);
+        await sql`UPDATE coupons SET times_used = times_used + 1 WHERE id = ${couponIdToUpdate}`;
       } catch (dbErr) {
         console.error('Failed to increment times_used in blue-admin db:', dbErr);
         // Do not crash the response since the user has already received the IMR tokens on Imergene
