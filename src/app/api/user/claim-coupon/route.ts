@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { neon } from '@neondatabase/serverless';
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,29 +24,52 @@ export async function POST(request: NextRequest) {
     }
 
     const cleanCode = code.trim().toUpperCase();
+    const databaseUrl = process.env.BLUE_ADMIN_DATABASE_URL;
+    let rewardAmount = 100;
+    let couponIdToUpdate: number | null = null;
 
-    // Verify it is Monday in Indian Standard Time (IST = UTC + 5:30)
-    const now = new Date();
-    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-    const istTime = new Date(utc + (5.5 * 3600000));
-    const day = istTime.getDay(); // 1 = Monday
-    
-    // Check for query param mock to allow testing during other days
-    const mockMonday = request.nextUrl.searchParams.get('mockMonday') === 'true';
+    if (databaseUrl) {
+      // Connect to blue-admin database
+      const sql = neon(databaseUrl);
+      const coupons = await sql('SELECT * FROM coupons WHERE UPPER(code) = $1 LIMIT 1', [cleanCode]) as any[];
+      
+      if (!coupons || coupons.length === 0) {
+        return NextResponse.json({ error: 'Invalid coupon code' }, { status: 400 });
+      }
 
-    const EXPECTED_COUPON = process.env.MONDAY_COUPON_CODE || 'BLUE100MONDAY';
-    
-    if (cleanCode !== EXPECTED_COUPON) {
-      return NextResponse.json({ error: 'Invalid coupon code' }, { status: 400 });
+      const coupon = coupons[0];
+
+      // Validate active status
+      if (Number(coupon.is_active) !== 1) {
+        return NextResponse.json({ error: 'This coupon is currently disabled' }, { status: 400 });
+      }
+
+      // Validate dates
+      const nowMs = Date.now();
+      if (coupon.expires_at && Number(coupon.expires_at) < nowMs) {
+        return NextResponse.json({ error: 'This coupon has expired' }, { status: 400 });
+      }
+
+      if (coupon.valid_from && Number(coupon.valid_from) > nowMs) {
+        return NextResponse.json({ error: 'This coupon is not valid yet' }, { status: 400 });
+      }
+
+      // Validate usage limits
+      if (coupon.max_uses > 0 && Number(coupon.times_used) >= Number(coupon.max_uses)) {
+        return NextResponse.json({ error: 'This coupon has reached its maximum usage limit' }, { status: 400 });
+      }
+
+      rewardAmount = Number(coupon.reward_amount) || 100;
+      couponIdToUpdate = coupon.id;
+    } else {
+      // Fallback to static code logic if database URL is missing
+      const EXPECTED_COUPON = process.env.MONDAY_COUPON_CODE || 'BLUE100MONDAY';
+      if (cleanCode !== EXPECTED_COUPON) {
+        return NextResponse.json({ error: 'Invalid coupon code' }, { status: 400 });
+      }
     }
 
-    if (day !== 1 && !mockMonday) {
-      return NextResponse.json({ 
-        error: 'This event coupon is only valid for Monday claims! Please try again on Monday.' 
-      }, { status: 400 });
-    }
-
-    // Check if already claimed
+    // Check if already claimed in Imergene
     const existingClaim = await prisma.couponClaim.findUnique({
       where: {
         userId_couponCode: {
@@ -56,10 +80,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingClaim) {
-      return NextResponse.json({ error: 'You have already claimed this event coupon!' }, { status: 400 });
+      return NextResponse.json({ error: 'You have already claimed this coupon!' }, { status: 400 });
     }
 
-    // Award 100 IMR and record claim transactionally
+    // Award IMR and record claim transactionally on Imergene
     const result = await prisma.$transaction(async (tx) => {
       await tx.couponClaim.create({
         data: {
@@ -72,7 +96,7 @@ export async function POST(request: NextRequest) {
         where: { id: payload.id },
         data: {
           imrBalance: {
-            increment: 100,
+            increment: rewardAmount,
           },
         },
         select: {
@@ -83,9 +107,20 @@ export async function POST(request: NextRequest) {
       return updatedUser;
     });
 
+    // Increment times_used in blue-admin database if coupon matches
+    if (databaseUrl && couponIdToUpdate) {
+      try {
+        const sql = neon(databaseUrl);
+        await sql('UPDATE coupons SET times_used = times_used + 1 WHERE id = $1', [couponIdToUpdate]);
+      } catch (dbErr) {
+        console.error('Failed to increment times_used in blue-admin db:', dbErr);
+        // Do not crash the response since the user has already received the IMR tokens on Imergene
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      message: 'Successfully claimed 100 IMR!',
+      message: `Successfully claimed ${rewardAmount} IMR!`,
       imrBalance: result.imrBalance,
     });
 
