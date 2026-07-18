@@ -101,7 +101,7 @@ export default function Sidebar() {
 
         <div className="p-5 flex flex-col h-full overflow-y-auto no-scrollbar">
 
-          <p className="text-[9px] font-black tracking-[0.4em] uppercase mb-4 ml-2" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-[16px] font-black tracking-[0.4em] uppercase mb-4 ml-2" style={{ color: 'var(--color-text-muted)' }}>
             Menu
           </p>
 
@@ -131,7 +131,7 @@ export default function Sidebar() {
           <div className="mt-8 pt-6 border-t" style={{ borderColor: 'var(--color-border-default)' }}>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-4 px-4 py-2 w-full transition-all font-black text-[10px] uppercase tracking-widest outline-none group"
+              className="flex items-center gap-4 px-4 py-2 w-full transition-all font-black text-[10px] uppercase tracking-widest outline-none group "
               style={{ color: 'var(--color-text-muted)' }}
             >
               <LogOut size={16} className="group-hover:-translate-x-1 transition-transform" />
